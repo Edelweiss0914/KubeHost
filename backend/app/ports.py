@@ -1,4 +1,5 @@
 """Application-owned interfaces implemented by infrastructure adapters."""
+from __future__ import annotations
 from typing import Literal, Protocol
 
 from app.models.server import Node, ResourcePlan, Server
