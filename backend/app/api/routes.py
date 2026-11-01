@@ -34,7 +34,7 @@ def nodes(svc: Service) -> list[Node]:
 
 @router.get("/api/v1/servers", response_model=list[Server])
 def servers(owner: Owner, svc: Service) -> list[Server]:
-    return svc.repository.list(owner)
+    return svc.repository.list_by_owner(owner)
 
 
 @router.post("/api/v1/servers", response_model=Server, status_code=201)

@@ -31,7 +31,7 @@ class ServerService:
 
     def create(self, owner_id: str, request: ServerCreate) -> Server:
         with self._lock:
-            servers = self.repository.list(owner_id)
+            servers = self.repository.list_by_owner(owner_id)
             retained = self.repository.retained_for(owner_id)
             allocated = servers + retained
             if (sum(s.cpu for s in servers) + request.cpu > 4

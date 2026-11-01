@@ -1,6 +1,4 @@
 """Ports and in-memory adapters. No Kubernetes SDK or network client is present."""
-from __future__ import annotations
-
 from typing import Literal
 
 from app.models.server import Node, ResourcePlan, Server
@@ -12,7 +10,7 @@ class InMemoryServerRepository:
         self._servers: dict[str, Server] = {}
         self.retained: dict[str, Server] = {}
 
-    def list(self, owner_id: str) -> list[Server]:
+    def list_by_owner(self, owner_id: str) -> list[Server]:
         return [s.model_copy(deep=True) for s in self._servers.values() if s.owner_id == owner_id]
 
     def get(self, server_id: str) -> Server | None:
