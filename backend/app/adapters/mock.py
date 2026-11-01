@@ -1,5 +1,6 @@
 """Ports and in-memory adapters. No Kubernetes SDK or network client is present."""
 from __future__ import annotations
+
 from typing import Literal
 
 from app.models.server import Node, ResourcePlan, Server
