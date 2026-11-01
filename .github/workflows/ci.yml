@@ -2,8 +2,6 @@ name: Mock MVP checks
 
 on:
   pull_request:
-  push:
-    branches: [feat/mock-mvp]
 
 permissions:
   contents: read
