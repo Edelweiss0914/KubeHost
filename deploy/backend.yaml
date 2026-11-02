@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kubehost-db
+  namespace: kubehost-system
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubehost-backend
+  namespace: kubehost-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubehost-backend
+  template:
+    metadata:
+      labels:
+        app: kubehost-backend
+    spec:
+      serviceAccountName: kubehost-backend
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      containers:
+      - name: backend
+        image: localhost/kubehost-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: KUBEHOST_MODE
+          value: "real"
+        - name: KUBEHOST_DB_PATH
+          value: "/data/kubehost.db"
+        - name: KUBEHOST_ADMIN_SECRET
+          value: "kubehost"
+        - name: KUBEHOST_CORS_ORIGINS
+          value: "http://100.84.38.5"
+        volumeMounts:
+        - name: db
+          mountPath: /data
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: kubehost-db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubehost-backend
+  namespace: kubehost-system
+spec:
+  selector:
+    app: kubehost-backend
+  ports:
+  - port: 8000
+    targetPort: 8000
