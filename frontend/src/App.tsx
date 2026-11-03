@@ -10,6 +10,7 @@ import { ServerList } from './features/ServerList';
 import { ServerDetail } from './features/ServerDetail';
 import { ClusterMap } from './features/ClusterMap';
 import { Login } from './features/Login';
+import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
 
 function getStoredAuth(): { token: string; username: string } | null {
@@ -195,6 +196,7 @@ function initialTheme(): Theme {
 export function App() {
   const { health, mode, servers, retained, nodes, topologyPods, tenant, loading, error, refresh } = useConsole();
   const [auth, setAuth] = useState<{ token: string; username: string } | null>(getStoredAuth);
+  const [showLogin, setShowLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -240,10 +242,19 @@ export function App() {
 
   // Real mode: require login. Mock mode: skip auth.
   if (mode === 'real' && !auth) {
-    return <Login onLogin={(token, username) => {
+    function handleLogin(token: string, username: string) {
       try { localStorage.setItem('kubehost-token', token); localStorage.setItem('kubehost-username', username); } catch { /* ignore */ }
       setAuth({ token, username });
-    }}/>;
+      setShowLogin(false);
+    }
+    return (
+      <>
+        <Landing onEnter={() => setShowLogin(true)} />
+        {showLogin && (
+          <Login onLogin={handleLogin} onClose={() => setShowLogin(false)} />
+        )}
+      </>
+    );
   }
   const mock = mode === 'mock';
   const modeLabel = mode === 'mock' ? 'MOCK MODE' : mode === 'real' ? 'KUBERNETES' : 'MODE UNKNOWN';
