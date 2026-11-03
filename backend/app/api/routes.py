@@ -95,7 +95,7 @@ def topology_pods(owner: Owner, svc: Service) -> list[ServerPod]:
 
 @router.get("/api/v1/servers", response_model=list[Server])
 def servers(owner: Owner, svc: Service) -> list[Server]:
-    return svc.repository.list_by_owner(owner)
+    return svc.list(owner)
 
 
 @router.post("/api/v1/servers", response_model=Server, status_code=201)

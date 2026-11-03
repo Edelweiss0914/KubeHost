@@ -39,10 +39,8 @@ class ServerService:
             except Exception:
                 pass  # already exists — idempotent
 
-    def get(self, owner_id: str, server_id: str) -> Server:
-        server = self.repository.get(server_id)
-        if server is None or server.owner_id != owner_id:
-            raise ServerNotFound("Server not found")
+    def _sync_status(self, server: Server) -> Server:
+        """K8s 실제 상태와 DB 상태를 동기화. 실패 시 기존 상태 유지."""
         try:
             real_status = self.adapter.get_status(server.id, server.resource_plan.namespace)
             if real_status is not None and real_status != server.status:
@@ -51,6 +49,16 @@ class ServerService:
         except Exception:
             pass
         return server
+
+    def get(self, owner_id: str, server_id: str) -> Server:
+        server = self.repository.get(server_id)
+        if server is None or server.owner_id != owner_id:
+            raise ServerNotFound("Server not found")
+        return self._sync_status(server)
+
+    def list(self, owner_id: str) -> list[Server]:
+        servers = self.repository.list_by_owner(owner_id)
+        return [self._sync_status(s) for s in servers]
 
     def create(self, owner_id: str, request: ServerCreate) -> Server:
         mock = self.mode == "mock"
