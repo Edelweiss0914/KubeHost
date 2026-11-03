@@ -21,6 +21,7 @@ function getStoredAuth(): { token: string; username: string } | null {
 }
 
 type View = 'dashboard' | 'servers' | 'create' | 'detail' | 'cluster' | 'admin';
+type ServerSubView = 'overview' | 'console' | 'settings' | 'schedule' | 'metrics';
 
 type QuotaEntry = { used: string; hard: string };
 type TenantInfo = { namespace: string; quota: Record<string, QuotaEntry> };
@@ -252,6 +253,7 @@ export function App() {
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
   const [showChangePw, setShowChangePw] = useState(false);
+  const [serverSubView, setServerSubView] = useState<ServerSubView>('overview');
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -317,6 +319,7 @@ export function App() {
   async function open(id: string) {
     await run(async () => {
       setSelected(await api.server(id));
+      setServerSubView('overview');
       setView('detail');
     });
   }
@@ -324,6 +327,7 @@ export function App() {
   async function create(input: ServerInput) {
     await run(async () => {
       setSelected(await api.create(input));
+      setServerSubView('overview');
       setView('detail');
       setNotice('서버와 리소스 계획을 생성했습니다.');
       await refresh();
@@ -396,6 +400,24 @@ export function App() {
         <button className={view === 'servers' || view === 'create' || view === 'detail' ? 'active' : ''} aria-current={view === 'servers' || view === 'create' || view === 'detail' ? 'page' : undefined} onClick={() => navigate('servers')}>
           ▤ <span>게임 서버</span><span className="nav-count">{servers.length}</span>
         </button>
+        {view === 'detail' && selected && (
+          <div className="sub-nav">
+            <div className="sub-nav-label">{selected.name}</div>
+            {([
+              ['overview', '◫ 서버 정보'],
+              ['console', '▶ 콘솔'],
+              ['settings', '⚙ 설정'],
+              ['schedule', '◷ 스케줄'],
+              ['metrics', '▦ 메트릭'],
+            ] as [ServerSubView, string][]).map(([sv, label]) => (
+              <button
+                key={sv}
+                className={`sub-nav-item ${serverSubView === sv ? 'active' : ''}`}
+                onClick={() => setServerSubView(sv)}
+              >{label}</button>
+            ))}
+          </div>
+        )}
         <button className={view === 'cluster' ? 'active' : ''} aria-current={view === 'cluster' ? 'page' : undefined} onClick={() => navigate('cluster')}>
           ▧ <span>클러스터 맵</span>
         </button>
@@ -454,6 +476,7 @@ export function App() {
               onBack={() => navigate('servers')}
               onAction={action => void changeStatus(action)}
               onDelete={(deleteData, confirmation) => void remove(deleteData, confirmation)}
+              subView={serverSubView}
             />}
           </>}
         <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>

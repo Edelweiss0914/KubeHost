@@ -1576,3 +1576,42 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .metrics-chart .eyebrow { display: block; margin-bottom: .5rem; }
 .metrics-chart-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
 .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem; }
+
+/* === Pelican-style sub-nav === */
+.sub-nav{
+  margin-top:6px;
+  padding-left:16px;
+  border-left:2px solid #2c4841;
+  display:grid;
+  gap:3px}
+.sub-nav-label{
+  font-size:9px;
+  color:#4a6070;
+  letter-spacing:1.2px;
+  font-weight:600;
+  padding:4px 10px 6px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.sub-nav-item{
+  background:none !important;
+  color:#6d8299 !important;
+  border-color:transparent !important;
+  text-align:left;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding:9px 10px;
+  font-size:12px;
+  font-weight:400;
+  border-radius:6px}
+.sub-nav-item:hover{background:#192232 !important;color:#a8c4d4 !important}
+.sub-nav-item.active{background:#182e2b !important;color:#7dd4b0 !important;font-weight:600}
+
+/* === Server detail header === */
+.server-detail-header{margin-bottom:23px}
+.server-detail-header-info{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:15px}

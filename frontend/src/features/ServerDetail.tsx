@@ -7,6 +7,8 @@ import { api } from '../api/client';
 import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
 import { MetricsChart } from '../components/MetricsChart';
 
+type ServerSubView = 'overview' | 'console' | 'settings' | 'schedule' | 'metrics';
+
 type K8sResource = {
   apiVersion: string
   kind: string
@@ -254,10 +256,10 @@ type ServerDetailProps = {
   onAction: (action: 'start' | 'stop') => void;
   onDelete: (deleteData: boolean, confirmation: string) => void;
   onBack: () => void;
+  subView: ServerSubView;
 };
 
-export function ServerDetail({ server, busy, onAction, onDelete, onBack }: ServerDetailProps) {
-  const [showSettings, setShowSettings] = useState(false);
+export function ServerDetail({ server, busy, onAction, onDelete, subView }: ServerDetailProps) {
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -266,24 +268,18 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
   const active = server.status === 'running' || server.status === 'provisioning';
 
   return <>
-    <button className="text-button back" onClick={onBack}>← 서버 목록</button>
-    <section className="panel detail-overview">
-      <div className="section-title detail-summary">
-        <div><span className="eyebrow">MINECRAFT JAVA / PAPER</span><h2>{server.name}</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
+    <div className="server-detail-header panel">
+      <div className="server-detail-header-info">
+        <div>
+          <span className="eyebrow">MINECRAFT JAVA / PAPER</span>
+          <h2 style={{margin:'6px 0 2px'}}>{server.name}</h2>
+          <p className="detail-meta" style={{margin:0}}>{server.node_id} · {new Date(server.created_at).toLocaleString('ko-KR')}</p>
+        </div>
         <Status value={server.status}/>
       </div>
-      <dl className="details-grid">
-        <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
-        <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
-        <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
-        <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
-        <div><dt>접속 주소</dt><dd><code>{server.connection ?? '할당 중'}</code></dd></div>
-        <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
-      </dl>
-      <div className="actions">
+      <div className="actions" style={{marginTop:'14px'}}>
         <button disabled={busy || !canStart} onClick={() => onAction('start')}>시작</button>
         <button className="secondary" disabled={busy || !canStop} onClick={() => onAction('stop')}>중지</button>
-        <button className="secondary" type="button" aria-expanded={showSettings} onClick={() => setShowSettings(s => !s)}>⚙ 설정</button>
         <button className="danger" disabled={busy} onClick={() => setDeleting(true)}>서버 삭제</button>
       </div>
       {deleting && <form className="delete-box" onSubmit={event => { event.preventDefault(); onDelete(deleteData, confirmation); }}>
@@ -300,21 +296,39 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
           </button>
         </div>
       </form>}
-    </section>
-    <section className="panel">
-      <div className="section-title"><div><span className="eyebrow">배포된 리소스</span><h2>Kubernetes 리소스 계획</h2></div></div>
-      <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
-      <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
-      {server.resource_plan.warnings.map(warning => <p className="muted" key={warning}>{warning}</p>)}
-      <ResourcePlanViewer plan={server.resource_plan} />
-    </section>
-    {showSettings && <ServerSettingsPanel serverId={server.id} onClose={() => setShowSettings(false)}/>}
-    <section className="panel">
-      <ServerMetricsPanel serverId={server.id} />
-    </section>
-    <section className="panel">
-      <SchedulePanel serverId={server.id} />
-    </section>
-    <ServerConsole serverId={server.id} active={active}/>
+    </div>
+
+    {subView === 'overview' && (
+      <section className="panel detail-overview">
+        <div className="section-title"><div><span className="eyebrow">서버 정보</span><h2>상세 정보</h2></div></div>
+        <dl className="details-grid">
+          <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
+          <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
+          <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
+          <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
+          <div><dt>접속 주소</dt><dd><code>{server.connection ?? '할당 중'}</code></dd></div>
+          <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
+        </dl>
+        <section className="panel" style={{marginTop:'20px'}}>
+          <div className="section-title"><div><span className="eyebrow">배포된 리소스</span><h2>Kubernetes 리소스 계획</h2></div></div>
+          <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
+          <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
+          {server.resource_plan.warnings.map(warning => <p className="muted" key={warning}>{warning}</p>)}
+          <ResourcePlanViewer plan={server.resource_plan} />
+        </section>
+      </section>
+    )}
+    {subView === 'console' && <ServerConsole serverId={server.id} active={active}/>}
+    {subView === 'settings' && <ServerSettingsPanel serverId={server.id} onClose={() => {}}/>}
+    {subView === 'schedule' && (
+      <section className="panel">
+        <SchedulePanel serverId={server.id} />
+      </section>
+    )}
+    {subView === 'metrics' && (
+      <section className="panel">
+        <ServerMetricsPanel serverId={server.id} />
+      </section>
+    )}
   </>;
 }
