@@ -96,7 +96,12 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
   lastUpdated: Date | null;
 }) {
   const [nsMetrics, setNsMetrics] = useState<NamespaceMetrics | null>(null);
-  useEffect(() => { api.namespaceMetrics(60).then(setNsMetrics).catch(() => {}); }, []);
+  useEffect(() => {
+    const load = () => api.namespaceMetrics(60).then(setNsMetrics).catch(() => {});
+    void load();
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const running = servers.filter(server => server.status === 'running').length;
   const provisioning = servers.filter(server => server.status === 'provisioning').length;

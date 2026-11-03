@@ -394,7 +394,11 @@ function OverviewTab() {
     api.clusterMetrics().then(setClusterMetrics).catch(() => {});
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(() => { if (!document.hidden) api.clusterMetrics().then(setClusterMetrics).catch(() => {}); }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleForceStop = (serverId: string, serverName: string) => {
     if (!confirm(`'${serverName}' 서버를 강제 중지하시겠습니까?`)) return;

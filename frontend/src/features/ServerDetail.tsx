@@ -100,10 +100,10 @@ function ServerMetricsPanel({ serverId }: { serverId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.serverMetrics(serverId, 60)
-      .then(setMetrics)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const load = () => api.serverMetrics(serverId, 60).then(setMetrics).catch(() => {});
+    load().finally(() => setLoading(false));
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 15000);
+    return () => window.clearInterval(timer);
   }, [serverId]);
 
   return (
