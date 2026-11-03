@@ -5,6 +5,25 @@ type LandingProps = {
   onEnter: () => void;
 };
 
+const GAMES = [
+  '⚔️  Valheim',
+  '🌿  Terraria',
+  '🦕  ARK: Survival',
+  '🔫  Rust',
+  '🎮  CS2',
+  '🔧  Garry\'s Mod',
+  '🧟  7 Days to Die',
+  '⚙️  Factorio',
+  '🏭  Satisfactory',
+  '🧟  Project Zomboid',
+  '🐾  Palworld',
+  '🧛  V Rising',
+  '🌲  Don\'t Starve Together',
+  '🚀  Space Engineers',
+  '⭐  Starbound',
+  '🏗️  Team Fortress 2',
+];
+
 const STACK = [
   { icon: '⎈', name: 'K3s',        desc: '경량 Kubernetes' },
   { icon: '⚡', name: 'FastAPI',    desc: 'Python 백엔드' },
@@ -144,6 +163,18 @@ export function Landing({ onEnter }: LandingProps) {
           </div>
         </div>
       </section>
+
+      {/* ── Games Marquee ────────────────────────────────────── */}
+      <div className="landing-marquee-wrap" aria-label="지원 게임 목록">
+        <p className="landing-marquee-label">SUPPORTED GAMES</p>
+        <div className="landing-marquee">
+          <div className="landing-marquee-track">
+            {[...GAMES, ...GAMES].map((g, i) => (
+              <span className="landing-marquee-item" key={i}>{g}</span>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── Tech Stack ───────────────────────────────────────── */}
       <section className="landing-stack landing-reveal" aria-label="기술 스택">
