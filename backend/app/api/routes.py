@@ -448,3 +448,115 @@ async def stream_logs(
             await websocket.close()
         except Exception:
             pass
+
+
+# ── JVM settings ──────────────────────────────────────────────────────────────
+
+class _JvmBody(_BaseModel):
+    memory_mb: int
+
+
+@router.get("/api/v1/servers/{server_id}/jvm")
+def get_jvm(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    mb = svc.adapter.get_jvm(server_id, server.resource_plan.namespace)
+    return {"memory_mb": mb}
+
+
+@router.put("/api/v1/servers/{server_id}/jvm", status_code=204)
+def set_jvm(server_id: str, body: _JvmBody, owner: Owner, svc: Service) -> None:
+    if body.memory_mb < 512 or body.memory_mb > 8192:
+        raise HTTPException(status_code=422, detail="메모리는 512–8192 MiB 범위입니다.")
+    server = svc.get(owner, server_id)
+    svc.adapter.set_jvm(server_id, server.resource_plan.namespace, body.memory_mb)
+
+
+# ── server.properties ─────────────────────────────────────────────────────────
+
+class _PropertiesBody(_BaseModel):
+    content: str
+
+
+@router.get("/api/v1/servers/{server_id}/properties")
+def get_properties(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    content = svc.adapter.get_raw_properties(server_id, server.resource_plan.namespace)
+    return {"content": content}
+
+
+@router.put("/api/v1/servers/{server_id}/properties", status_code=204)
+def set_properties(server_id: str, body: _PropertiesBody, owner: Owner, svc: Service) -> None:
+    server = svc.get(owner, server_id)
+    svc.adapter.set_raw_properties(server_id, server.resource_plan.namespace, body.content)
+
+
+# ── World backups ──────────────────────────────────────────────────────────────
+
+@router.get("/api/v1/servers/{server_id}/backups")
+def list_backups(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    backups = svc.adapter.list_backups(server_id, server.resource_plan.namespace)
+    return {"backups": backups}
+
+
+@router.post("/api/v1/servers/{server_id}/backups", status_code=201)
+def create_backup(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    filename = svc.adapter.create_backup(server_id, server.resource_plan.namespace)
+    return {"filename": filename}
+
+
+@router.post("/api/v1/servers/{server_id}/backups/{filename}/restore", status_code=204)
+def restore_backup(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
+    server = svc.get(owner, server_id)
+    try:
+        svc.adapter.restore_backup(server_id, server.resource_plan.namespace, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/api/v1/servers/{server_id}/backups/{filename}", status_code=204)
+def delete_backup(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
+    server = svc.get(owner, server_id)
+    try:
+        svc.adapter.delete_backup(server_id, server.resource_plan.namespace, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ── Plugin management ──────────────────────────────────────────────────────────
+
+from fastapi import UploadFile, File as _File
+
+
+@router.get("/api/v1/servers/{server_id}/plugins")
+def list_plugins(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    plugins = svc.adapter.list_plugins(server_id, server.resource_plan.namespace)
+    return {"plugins": plugins}
+
+
+@router.post("/api/v1/servers/{server_id}/plugins", status_code=201)
+async def upload_plugin(
+    server_id: str, owner: Owner, svc: Service,
+    file: UploadFile = _File(...),
+) -> dict:
+    filename = (file.filename or "plugin.jar").strip()
+    if not filename.endswith(".jar"):
+        raise HTTPException(status_code=422, detail=".jar 파일만 업로드할 수 있습니다.")
+    content = await file.read()
+    server = svc.get(owner, server_id)
+    try:
+        svc.adapter.upload_plugin(server_id, server.resource_plan.namespace, filename, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"filename": filename}
+
+
+@router.delete("/api/v1/servers/{server_id}/plugins/{filename}", status_code=204)
+def delete_plugin(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
+    server = svc.get(owner, server_id)
+    try:
+        svc.adapter.delete_plugin(server_id, server.resource_plan.namespace, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))

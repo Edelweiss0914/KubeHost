@@ -61,6 +61,19 @@ class InMemoryServerRepository:
 
 
 class MockKubernetesAdapter:
+    def __init__(self) -> None:
+        self._jvm: dict[str, int] = {}
+        self._properties: dict[str, str] = {}
+        self._backups: dict[str, list[str]] = {}
+        self._plugins: dict[str, list[str]] = {}
+
+    _MOCK_PROPERTIES = (
+        "difficulty=easy\ngamemode=survival\nmax-players=20\n"
+        "motd=A Minecraft Server\npvp=true\nonline-mode=true\n"
+        "spawn-protection=16\nview-distance=10\nwhite-list=false\n"
+        "enable-rcon=true\nrcon.port=25575\n"
+    )
+
     def nodes(self) -> list[Node]:
         return [Node(id="mock-control-plane", name="mock-control-plane", role="control-plane",
                      schedulable=False, cpu_capacity=4, memory_mb_capacity=8192,
@@ -139,5 +152,46 @@ class MockKubernetesAdapter:
 
     def update_tenant_quota(self, namespace: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
         pass
+
+    def get_jvm(self, server_id: str, namespace: str) -> int:
+        return self._jvm.get(server_id, 1536)
+
+    def set_jvm(self, server_id: str, namespace: str, memory_mb: int) -> None:
+        self._jvm[server_id] = memory_mb
+
+    def get_raw_properties(self, server_id: str, namespace: str) -> str:
+        return self._properties.get(server_id, self._MOCK_PROPERTIES)
+
+    def set_raw_properties(self, server_id: str, namespace: str, content: str) -> None:
+        self._properties[server_id] = content
+
+    def list_backups(self, server_id: str, namespace: str) -> list[str]:
+        return list(self._backups.get(server_id, []))
+
+    def create_backup(self, server_id: str, namespace: str) -> str:
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        filename = f"world-{ts}.tar.gz"
+        self._backups.setdefault(server_id, []).append(filename)
+        return filename
+
+    def restore_backup(self, server_id: str, namespace: str, filename: str) -> None:
+        pass  # no-op in mock
+
+    def delete_backup(self, server_id: str, namespace: str, filename: str) -> None:
+        if server_id in self._backups:
+            self._backups[server_id] = [f for f in self._backups[server_id] if f != filename]
+
+    def list_plugins(self, server_id: str, namespace: str) -> list[str]:
+        return list(self._plugins.get(server_id, ["EssentialsX-2.20.1.jar", "LuckPerms-Bukkit-5.4.jar"]))
+
+    def upload_plugin(self, server_id: str, namespace: str, filename: str, content: bytes) -> None:
+        self._plugins.setdefault(server_id, [])
+        if filename not in self._plugins[server_id]:
+            self._plugins[server_id].append(filename)
+
+    def delete_plugin(self, server_id: str, namespace: str, filename: str) -> None:
+        if server_id in self._plugins:
+            self._plugins[server_id] = [f for f in self._plugins[server_id] if f != filename]
 
 

@@ -341,3 +341,125 @@ class K8sAdapter:
                     except ApiException as exc:
                         if exc.status != 404:
                             raise
+
+    # ── Pod exec helper ──────────────────────────────────────────────────────
+    def _exec_in_pod(self, server_id: str, namespace: str, command: list[str],
+                     stdin_data: bytes | None = None) -> str:
+        from kubernetes.stream import stream  # type: ignore[import-untyped]
+        name = self._sts_name(server_id)
+        pods = self._core.list_namespaced_pod(
+            namespace, label_selector=f"app.kubernetes.io/name={name}"
+        ).items
+        if not pods:
+            raise ValueError("파드가 실행 중이지 않습니다.")
+        pod_name = pods[0].metadata.name
+        resp = stream(
+            self._core.connect_get_namespaced_pod_exec,
+            pod_name, namespace,
+            command=command,
+            stdin=stdin_data is not None,
+            stdout=True, stderr=True, tty=False,
+            _preload_content=False,
+        )
+        if stdin_data is not None:
+            resp.write_stdin(stdin_data.decode("utf-8", errors="replace"))
+        out = ""
+        while resp.is_open():
+            resp.update(timeout=10)
+            if resp.peek_stdout():
+                out += resp.read_stdout()
+        resp.close()
+        return out
+
+    # ── JVM memory ───────────────────────────────────────────────────────────
+    def get_jvm(self, server_id: str, namespace: str) -> int:
+        name = self._sts_name(server_id)
+        try:
+            sts = self._apps.read_namespaced_stateful_set(name, namespace)
+            env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
+            raw = env.get("MEMORY", "0M")
+            return int(raw.rstrip("MmGg")) if raw else 0
+        except ApiException:
+            return 0
+
+    def set_jvm(self, server_id: str, namespace: str, memory_mb: int) -> None:
+        name = self._sts_name(server_id)
+        sts = self._apps.read_namespaced_stateful_set(name, namespace)
+        current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
+        current["MEMORY"] = f"{memory_mb}M"
+        new_env = [{"name": k, "value": v} for k, v in current.items()]
+        self._apps.patch_namespaced_stateful_set(name, namespace, {
+            "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
+        })
+
+    # ── server.properties ────────────────────────────────────────────────────
+    def get_raw_properties(self, server_id: str, namespace: str) -> str:
+        try:
+            return self._exec_in_pod(server_id, namespace,
+                                     ["cat", "/data/server.properties"])
+        except Exception:
+            return ""
+
+    def set_raw_properties(self, server_id: str, namespace: str, content: str) -> None:
+        self._exec_in_pod(server_id, namespace,
+                          ["sh", "-c", "cat > /data/server.properties"],
+                          stdin_data=content.encode("utf-8"))
+
+    # ── World backups ─────────────────────────────────────────────────────────
+    def list_backups(self, server_id: str, namespace: str) -> list[str]:
+        try:
+            out = self._exec_in_pod(server_id, namespace,
+                ["sh", "-c", "ls /data/backups/*.tar.gz 2>/dev/null | xargs -I{} basename {} || true"])
+            return [f.strip() for f in out.strip().splitlines() if f.strip().endswith(".tar.gz")]
+        except Exception:
+            return []
+
+    def create_backup(self, server_id: str, namespace: str) -> str:
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        filename = f"world-{ts}.tar.gz"
+        self._exec_in_pod(server_id, namespace, [
+            "sh", "-c",
+            f"mkdir -p /data/backups && "
+            f"tar -czf /data/backups/{filename} -C /data "
+            f"$(ls -d /data/world /data/world_nether /data/world_the_end 2>/dev/null | xargs -I{{}} basename {{}})"
+            f" 2>/dev/null || true"
+        ])
+        return filename
+
+    def restore_backup(self, server_id: str, namespace: str, filename: str) -> None:
+        if "/" in filename or ".." in filename:
+            raise ValueError("잘못된 파일명입니다.")
+        self._exec_in_pod(server_id, namespace, [
+            "sh", "-c",
+            f"tar -xzf /data/backups/{filename} -C /data"
+        ])
+
+    def delete_backup(self, server_id: str, namespace: str, filename: str) -> None:
+        if "/" in filename or ".." in filename:
+            raise ValueError("잘못된 파일명입니다.")
+        self._exec_in_pod(server_id, namespace, ["rm", f"/data/backups/{filename}"])
+
+    # ── Plugin management ─────────────────────────────────────────────────────
+    def list_plugins(self, server_id: str, namespace: str) -> list[str]:
+        try:
+            out = self._exec_in_pod(server_id, namespace,
+                ["sh", "-c", "ls /data/plugins/*.jar 2>/dev/null | xargs -I{} basename {} || true"])
+            return [f.strip() for f in out.strip().splitlines() if f.strip().endswith(".jar")]
+        except Exception:
+            return []
+
+    def upload_plugin(self, server_id: str, namespace: str, filename: str, content: bytes) -> None:
+        if "/" in filename or ".." in filename:
+            raise ValueError("잘못된 파일명입니다.")
+        import base64
+        b64 = base64.b64encode(content).decode()
+        self._exec_in_pod(server_id, namespace, [
+            "sh", "-c",
+            f"mkdir -p /data/plugins && echo '{b64}' | base64 -d > /data/plugins/{filename}"
+        ])
+
+    def delete_plugin(self, server_id: str, namespace: str, filename: str) -> None:
+        if "/" in filename or ".." in filename:
+            raise ValueError("잘못된 파일명입니다.")
+        self._exec_in_pod(server_id, namespace, ["rm", f"/data/plugins/{filename}"])
