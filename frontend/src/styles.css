@@ -695,10 +695,70 @@ summary{font-size:13px;color:var(--accent)}
 .server-card-connection {
   font-size: 12px;
   color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .server-card-connection code {
   font-size: 11px;
   word-break: break-all;
+  flex: 1;
+}
+
+/* Copy button */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.copy-btn:hover { background: var(--hover); color: var(--text); border-color: var(--accent-border); }
+.copy-btn.copied { background: #14532d44; color: #4ade80; border-color: #4ade8055; }
+
+/* Player panel */
+.player-panel { }
+.player-count-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text);
+}
+.player-count-badge.has-players { background: #14532d44; border-color: #4ade8055; color: #4ade80; }
+.player-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.player-chip img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  image-rendering: pixelated;
 }
 
 .server-card-btn {

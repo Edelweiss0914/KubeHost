@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { api } from '../api/client';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
@@ -21,6 +21,24 @@ const filters: { value: StatusFilter; label: string }[] = [
   { value: 'stopped', label: '중지됨' },
   { value: 'error', label: '오류' },
 ];
+
+function CopyBtn({ text }: { text: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [text]);
+  if (!text) return null;
+  return (
+    <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={copy} title="클립보드에 복사">
+      {copied ? '✓ 복사됨' : '복사'}
+    </button>
+  );
+}
 
 function gameIcon(game: string): string {
   if (game === 'minecraft-java') return '⛏';
@@ -59,6 +77,7 @@ function ServerCard({ server, onSelect }: { server: Server; onSelect: (id: strin
       </div>
       <div className="server-card-connection">
         <code>{server.connection ?? '배정 대기'}</code>
+        <CopyBtn text={server.connection} />
       </div>
       <button
         className="server-card-btn secondary"
@@ -146,7 +165,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
                   <td><Status value={server.status}/></td>
                   <td>{server.node_id}</td>
                   <td>{server.cpu} vCPU · {server.memory_mb / 1024} GiB RAM<small>{server.storage_gb} GiB 스토리지</small></td>
-                  <td><code>{server.connection ?? '배정 대기'}</code></td>
+                  <td style={{display:'flex', alignItems:'center', gap:'6px'}}><code>{server.connection ?? '배정 대기'}</code><CopyBtn text={server.connection}/></td>
                   <td><button className="secondary" onClick={() => onSelect(server.id)} aria-label={server.name + ' 상세 보기'}>상세 보기</button></td>
                 </tr>)}</tbody>
               </table>

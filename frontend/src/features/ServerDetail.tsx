@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { ServerSettingsPanel } from './ServerSettings';
@@ -94,6 +94,78 @@ function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
 }
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+function CopyBtn({ text }: { text: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(() => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [text]);
+  if (!text) return null;
+  return (
+    <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={copy} title="클립보드에 복사">
+      {copied ? '✓ 복사됨' : '복사'}
+    </button>
+  );
+}
+
+type PlayerData = { count: number; max: number; names: string[] };
+
+function PlayerPanel({ serverId, active }: { serverId: string; active: boolean }) {
+  const [data, setData] = useState<PlayerData>({ count: 0, max: 0, names: [] });
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(() => {
+    if (!active) { setLoading(false); return; }
+    api.players(serverId).then(setData).catch(() => {}).finally(() => setLoading(false));
+  }, [serverId, active]);
+
+  useEffect(() => {
+    setLoading(true);
+    refresh();
+    if (!active) return;
+    const timer = window.setInterval(refresh, 30000);
+    return () => window.clearInterval(timer);
+  }, [refresh, active]);
+
+  return (
+    <section className="panel player-panel">
+      <div className="section-title">
+        <div><span className="eyebrow">PLAYERS</span><h2>접속 플레이어</h2></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {active && (
+            <span className={`player-count-badge${data.count > 0 ? ' has-players' : ''}`}>
+              {loading ? '…' : `${data.count} / ${data.max}`}
+            </span>
+          )}
+          {active && <button className="secondary" onClick={refresh}>새로 고침</button>}
+        </div>
+      </div>
+      {!active
+        ? <p className="muted">서버가 실행 중일 때 플레이어 목록을 확인할 수 있습니다.</p>
+        : loading
+          ? <p className="muted">불러오는 중…</p>
+          : data.count === 0
+            ? <p className="muted">현재 접속 중인 플레이어가 없습니다.</p>
+            : <div className="player-grid">
+                {data.names.map(name => (
+                  <div key={name} className="player-chip">
+                    <img
+                      src={`https://mc-heads.net/avatar/${encodeURIComponent(name)}/24`}
+                      alt={name}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    {name}
+                  </div>
+                ))}
+              </div>
+      }
+    </section>
+  );
+}
 
 const TIME_RANGE_OPTIONS: { label: string; minutes: number }[] = [
   { label: '15분', minutes: 15 },
@@ -268,7 +340,7 @@ function ScheduleForm({ initial, onSave, onCancel }: {
   );
 }
 
-type ServerSubView = 'console' | 'overview' | 'metrics' | 'schedule' | 'settings';
+type ServerSubView = 'console' | 'players' | 'overview' | 'metrics' | 'schedule' | 'settings';
 
 type ServerDetailProps = {
   server: Server;
@@ -289,6 +361,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
 
   const NAV_ITEMS: [ServerSubView, string, string][] = [
     ['console', '▶', '콘솔'],
+    ['players', '◉', '플레이어'],
     ['overview', '◫', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
@@ -365,6 +438,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
             <ServerConsole serverId={server.id} active={active}/>
           </div>
         )}
+        {subView === 'players' && (
+          <PlayerPanel serverId={server.id} active={active} />
+        )}
         {subView === 'overview' && (
           <>
             <section className="panel">
@@ -376,7 +452,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
                 <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
                 <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
                 <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
-                <div><dt>접속 주소</dt><dd><code>{server.connection ?? '할당 중'}</code></dd></div>
+                <div><dt>접속 주소</dt><dd style={{display:'flex',alignItems:'center',gap:'8px'}}><code>{server.connection ?? '할당 중'}</code><CopyBtn text={server.connection}/></dd></div>
                 <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
               </dl>
             </section>
