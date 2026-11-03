@@ -11,7 +11,7 @@ const STACK = [
   { icon: '⚛', name: 'React',      desc: '프론트엔드' },
   { icon: '◉', name: 'Prometheus', desc: '메트릭 수집' },
   { icon: '▦', name: 'StatefulSet',desc: '영속 스토리지' },
-  { icon: '⌨', name: 'RCON',       desc: '서버 제어' },
+  { icon: '⌨', name: 'Console',     desc: '서버 제어' },
 ];
 
 const FAQ = [
@@ -20,8 +20,8 @@ const FAQ = [
     a: '현재 KubeHost는 비공개 베타로 운영 중입니다. 관리자에게 직접 요청하시면 초대 코드를 발급받을 수 있습니다.',
   },
   {
-    q: '어떤 Minecraft 버전을 지원하나요?',
-    a: 'Paper 1.21.x를 기본으로 지원합니다. Vanilla·Fabric·Forge 이미지는 추후 추가 예정입니다.',
+    q: '어떤 게임을 지원하나요?',
+    a: '컨테이너 이미지로 실행 가능한 모든 게임 서버를 지원합니다. 현재는 테스트 환경으로 운영 중이며, 다양한 게임 이미지를 순차적으로 추가할 예정입니다.',
   },
   {
     q: '서버 데이터는 안전하게 보관되나요?',
@@ -75,13 +75,13 @@ export function Landing({ onEnter }: LandingProps) {
         <div className="landing-hero-orb landing-hero-orb-2" aria-hidden="true" />
 
         <div className="landing-hero-content">
-          <span className="landing-eyebrow">K3S · KUBERNETES · MINECRAFT</span>
+          <span className="landing-eyebrow">K3S · KUBERNETES · GAME SERVERS</span>
           <h1 id="hero-headline" className="landing-hero-h1">
             게임 서버를 K8s로,<br />
             <span className="landing-accent-text">단 몇 초 만에.</span>
           </h1>
           <p className="landing-hero-sub">
-            Kubernetes 위에서 동작하는 Minecraft 서버 플랫폼.<br />
+            Kubernetes 위에서 동작하는 게임 서버 호스팅 플랫폼.<br />
             배포부터 모니터링까지.
           </p>
           <div className="landing-hero-actions">
@@ -132,7 +132,7 @@ export function Landing({ onEnter }: LandingProps) {
               ✓ 서버가 배포되었습니다 (2.3s)
             </p>
             <p className="landing-terminal-line landing-terminal-ok landing-anim-line" style={{'--li':4} as React.CSSProperties}>
-              ✓ 포트 포워딩: 25565 → mc-my-world:25565
+              ✓ 포트 포워딩: 7777 → game-my-world:7777
             </p>
             <p className="landing-terminal-line landing-terminal-muted landing-anim-line" style={{'--li':5} as React.CSSProperties}>
               &gt; 서버 상태: <span className="landing-terminal-running">running</span>
@@ -262,8 +262,8 @@ export function Landing({ onEnter }: LandingProps) {
                 </div>
               </div>
               <div className="lm-console-box">
-                <div className="lm-console-line">[INFO] Starting Minecraft server...</div>
-                <div className="lm-console-line lm-console-ok">[DONE] Server started on :25565</div>
+                <div className="lm-console-line">[INFO] Starting game server...</div>
+                <div className="lm-console-line lm-console-ok">[DONE] Server started on :7777</div>
                 <div className="lm-console-line">[INFO] 3 players online</div>
                 <div className="lm-console-cursor">█</div>
               </div>
@@ -286,7 +286,7 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-step-content">
               <h3 className="landing-step-title">서버 생성</h3>
               <p className="landing-step-desc">
-                서버 이름, Minecraft 버전, 리소스 플랜을 입력합니다. Worker 노드를 선택하면 끝입니다.
+                서버 이름, 게임 이미지, 리소스 플랜을 입력합니다. Worker 노드를 선택하면 끝입니다.
               </p>
             </div>
           </li>
@@ -306,7 +306,7 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-step-content">
               <h3 className="landing-step-title">모니터링</h3>
               <p className="landing-step-desc">
-                대시보드에서 CPU·메모리 추이를 확인하고, RCON 콘솔로 서버를 직접 제어합니다.
+                대시보드에서 CPU·메모리 추이를 확인하고, 콘솔로 서버를 직접 제어합니다.
               </p>
             </div>
           </li>
