@@ -167,6 +167,100 @@ function PlayerPanel({ serverId, active }: { serverId: string; active: boolean }
   );
 }
 
+function ManagePanel({ serverId, active }: { serverId: string; active: boolean }) {
+  const [whitelist, setWhitelist] = useState<string[]>([]);
+  const [wlLoading, setWlLoading] = useState(true);
+  const [wlInput, setWlInput] = useState('');
+  const [wlBusy, setWlBusy] = useState(false);
+  const [opInput, setOpInput] = useState('');
+  const [opBusy, setOpBusy] = useState(false);
+  const [flash, setFlash] = useState('');
+
+  const showFlash = (msg: string) => { setFlash(msg); setTimeout(() => setFlash(''), 3000); };
+
+  useEffect(() => {
+    if (!active) { setWlLoading(false); return; }
+    api.whitelist(serverId).then(r => setWhitelist(r.names)).catch(() => {}).finally(() => setWlLoading(false));
+  }, [serverId, active]);
+
+  async function addWl() {
+    const name = wlInput.trim(); if (!name) return;
+    setWlBusy(true);
+    try {
+      await api.addWhitelist(serverId, name);
+      setWhitelist(p => [...p, name]); setWlInput('');
+      showFlash(`${name} 화이트리스트에 추가됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setWlBusy(false); }
+  }
+
+  async function removeWl(name: string) {
+    setWlBusy(true);
+    try {
+      await api.removeWhitelist(serverId, name);
+      setWhitelist(p => p.filter(n => n !== name));
+      showFlash(`${name} 화이트리스트에서 제거됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setWlBusy(false); }
+  }
+
+  async function opAction(deop: boolean) {
+    const name = opInput.trim(); if (!name) return;
+    setOpBusy(true);
+    try {
+      const r = deop ? await api.deopPlayer(serverId, name) : await api.opPlayer(serverId, name);
+      showFlash(r.output || `${name} ${deop ? 'OP 박탈' : 'OP 부여'} 완료`);
+      setOpInput('');
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setOpBusy(false); }
+  }
+
+  return (
+    <section className="panel">
+      <div className="section-title">
+        <div><span className="eyebrow">MANAGE</span><h2>서버 관리</h2></div>
+      </div>
+      {flash && <div className="manage-flash">{flash}</div>}
+      {!active && <div className="notice">서버가 실행 중일 때만 관리 기능을 사용할 수 있습니다.</div>}
+
+      <div className="manage-section">
+        <h3>화이트리스트</h3>
+        <p className="section-copy">등록된 플레이어만 서버에 접속할 수 있습니다. (server.properties에서 white-list=true 필요)</p>
+        <div className="manage-add-row">
+          <input value={wlInput} onChange={e => setWlInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && void addWl()}
+            placeholder="플레이어 이름" disabled={!active || wlBusy}/>
+          <button onClick={() => void addWl()} disabled={!active || wlBusy || !wlInput.trim()}>추가</button>
+        </div>
+        {wlLoading ? <p className="muted">불러오는 중…</p>
+          : whitelist.length === 0 ? <p className="muted">화이트리스트가 비어 있습니다.</p>
+          : <div className="manage-list">
+              {whitelist.map(name => (
+                <div key={name} className="manage-item">
+                  <img src={`https://mc-heads.net/avatar/${encodeURIComponent(name)}/20`} alt={name}
+                    className="manage-avatar" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}/>
+                  <span>{name}</span>
+                  <button className="secondary small" disabled={!active || wlBusy} onClick={() => void removeWl(name)}>제거</button>
+                </div>
+              ))}
+            </div>}
+      </div>
+
+      <div className="manage-section">
+        <h3>OP 권한 관리</h3>
+        <p className="section-copy">OP 플레이어는 서버 내 관리자 명령어를 사용할 수 있습니다.</p>
+        <div className="manage-add-row">
+          <input value={opInput} onChange={e => setOpInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && void opAction(false)}
+            placeholder="플레이어 이름" disabled={!active || opBusy}/>
+          <button onClick={() => void opAction(false)} disabled={!active || opBusy || !opInput.trim()}>OP 부여</button>
+          <button className="secondary" onClick={() => void opAction(true)} disabled={!active || opBusy || !opInput.trim()}>OP 박탈</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const TIME_RANGE_OPTIONS: { label: string; minutes: number }[] = [
   { label: '15분', minutes: 15 },
   { label: '1시간', minutes: 60 },
@@ -340,7 +434,7 @@ function ScheduleForm({ initial, onSave, onCancel }: {
   );
 }
 
-type ServerSubView = 'console' | 'players' | 'overview' | 'metrics' | 'schedule' | 'settings';
+type ServerSubView = 'console' | 'players' | 'manage' | 'overview' | 'metrics' | 'schedule' | 'settings';
 
 type ServerDetailProps = {
   server: Server;
@@ -362,6 +456,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
   const NAV_ITEMS: [ServerSubView, string, string][] = [
     ['console', '▶', '콘솔'],
     ['players', '◉', '플레이어'],
+    ['manage', '⚒', '관리'],
     ['overview', '◫', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
@@ -440,6 +535,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
         )}
         {subView === 'players' && (
           <PlayerPanel serverId={server.id} active={active} />
+        )}
+        {subView === 'manage' && (
+          <ManagePanel serverId={server.id} active={active} />
         )}
         {subView === 'overview' && (
           <>

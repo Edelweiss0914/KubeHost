@@ -98,6 +98,20 @@ class MockKubernetesAdapter:
         cmd = command.lstrip("/").strip().lower()
         if cmd == "list":
             return "There are 2 of a max of 20 players online: Steve, Alex"
+        if cmd == "whitelist list":
+            return "There are 3 whitelisted players: Steve, Alex, Notch"
+        if cmd.startswith("whitelist add "):
+            name = command.strip().split()[-1]
+            return f"Added {name} to the whitelist"
+        if cmd.startswith("whitelist remove "):
+            name = command.strip().split()[-1]
+            return f"Removed {name} from the whitelist"
+        if cmd.startswith("op "):
+            name = command.strip().split()[-1]
+            return f"Made {name} a server operator"
+        if cmd.startswith("deop "):
+            name = command.strip().split()[-1]
+            return f"Made {name} no longer a server operator"
         return "[MOCK] 명령어가 실행됐습니다."
 
     def get_tenant_quota(self, namespace: str) -> dict[str, dict[str, str]]:

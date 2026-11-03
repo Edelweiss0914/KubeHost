@@ -89,6 +89,11 @@ export interface ServerGateway {
   adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
   games(): Promise<Game[]>;
   players(serverId: string): Promise<{ count: number; max: number; names: string[] }>;
+  whitelist(serverId: string): Promise<{ enabled: boolean; names: string[] }>;
+  addWhitelist(serverId: string, name: string): Promise<{ output: string }>;
+  removeWhitelist(serverId: string, name: string): Promise<{ output: string }>;
+  opPlayer(serverId: string, name: string): Promise<{ output: string }>;
+  deopPlayer(serverId: string, name: string): Promise<{ output: string }>;
   listSchedules(serverId: string): Promise<Schedule[]>;
   createSchedule(serverId: string, s: ScheduleInput): Promise<Schedule>;
   updateSchedule(serverId: string, scheduleId: string, s: ScheduleInput): Promise<Schedule>;
@@ -146,6 +151,11 @@ export const api: ServerGateway = {
   adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
   games: () => versioned('/games'),
   players: (id) => versioned(`/servers/${encodeURIComponent(id)}/players`),
+  whitelist: (id) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`),
+  addWhitelist: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`, { method: 'POST', body: JSON.stringify({ name }) }),
+  removeWhitelist: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/whitelist/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  opPlayer: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/ops`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deopPlayer: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/ops/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   listSchedules: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`),
   createSchedule: (serverId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`, {method:'POST', body:JSON.stringify(s)}),
   updateSchedule: (serverId, scheduleId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'PUT', body:JSON.stringify(s)}),

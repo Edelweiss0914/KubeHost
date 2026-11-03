@@ -761,6 +761,65 @@ summary{font-size:13px;color:var(--accent)}
   image-rendering: pixelated;
 }
 
+/* Manage panel (whitelist / ops) */
+.manage-section {
+  margin-bottom: 28px;
+}
+.manage-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.manage-add-row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.manage-add-row input {
+  flex: 1;
+  min-width: 160px;
+}
+.manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.manage-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.manage-item span { flex: 1; }
+.manage-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  image-rendering: pixelated;
+}
+.manage-flash {
+  padding: 10px 14px;
+  background: #14532d44;
+  border: 1px solid #4ade8055;
+  border-radius: 8px;
+  color: #4ade80;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+button.small {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
 .server-card-btn {
   margin-top: auto;
   width: 100%;

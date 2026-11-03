@@ -304,6 +304,68 @@ def server_players(server_id: str, owner: Owner, svc: Service) -> dict:
         return {"count": 0, "max": 0, "names": []}
 
 
+# ── Whitelist & OP management ────────────────────────────────────────────────
+
+def _parse_name_list(output: str) -> list[str]:
+    """Parse comma-separated names from RCON list-style responses."""
+    for marker in ("players:", "whitelisted players:", "operators:"):
+        idx = output.lower().find(marker)
+        if idx != -1:
+            raw = output[idx + len(marker):].strip()
+            return [n.strip() for n in raw.split(",") if n.strip()]
+    return []
+
+
+@router.get("/api/v1/servers/{server_id}/whitelist")
+def get_whitelist(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    if server.status != "running":
+        return {"enabled": False, "names": []}
+    try:
+        out = svc.adapter.rcon(server_id, server.resource_plan.namespace, "whitelist list")
+        return {"enabled": True, "names": _parse_name_list(out)}
+    except Exception:
+        return {"enabled": False, "names": []}
+
+
+class _NameBody(_BaseModel):
+    name: str
+
+
+@router.post("/api/v1/servers/{server_id}/whitelist")
+def add_whitelist(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist add {name}")
+    return {"output": out}
+
+
+@router.delete("/api/v1/servers/{server_id}/whitelist/{name}")
+def remove_whitelist(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist remove {name}")
+    return {"output": out}
+
+
+@router.post("/api/v1/servers/{server_id}/ops")
+def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"op {name}")
+    return {"output": out}
+
+
+@router.delete("/api/v1/servers/{server_id}/ops/{name}")
+def remove_op(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"deop {name}")
+    return {"output": out}
+
+
 # ── Game catalog ──────────────────────────────────────────────────────────────
 
 @router.get("/api/v1/games")
