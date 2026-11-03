@@ -380,7 +380,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
           </section>
         )}
         {subView === 'settings' && (
-          <ServerSettingsPanel serverId={server.id} onClose={() => {}}/>
+          <ServerSettingsPanel serverId={server.id} onClose={() => setSubView('console')}/>
         )}
       </div>
     </div>
