@@ -11,6 +11,30 @@ def _svc(request: Request):  # type: ignore[return]
     return request.app.state.auth_service
 
 
+def _auth_audit(
+    request: Request, actor_id: str, actor_name: str,
+    action: str, target_id: str, target_name: str,
+    result: str = "ok", detail: str = "",
+) -> None:
+    try:
+        from uuid import uuid4
+        from datetime import datetime, timezone
+        repo = request.app.state.server_service.repository
+        repo.save_audit_log({
+            "id": str(uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor_id": actor_id,
+            "actor_name": actor_name,
+            "action": action,
+            "target_id": target_id,
+            "target_name": target_name,
+            "result": result,
+            "detail": detail,
+        })
+    except Exception:
+        pass
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str = Field(min_length=1)
@@ -21,14 +45,21 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)
+
+
 @auth_router.post("/login")
 def login(payload: LoginRequest, request: Request) -> dict[str, str]:
     svc = _svc(request)
     try:
         token, user_id = svc.authenticate(payload.username, payload.password)
         request.app.state.server_service.provision_tenant(user_id)
+        _auth_audit(request, user_id, payload.username, "auth.login", user_id, payload.username)
         return {"token": token}
     except ValueError as exc:
+        _auth_audit(request, "?", payload.username, "auth.login", "?", payload.username, "error", str(exc))
         raise HTTPException(status_code=401, detail=str(exc))
 
 
@@ -73,3 +104,19 @@ def me(request: Request) -> dict[str, object]:
         }
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
+
+
+@auth_router.put("/password", status_code=204)
+def change_password(payload: ChangePasswordRequest, request: Request) -> None:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    token = authorization.removeprefix("Bearer ")
+    svc = _svc(request)
+    try:
+        user_payload = svc.verify_token(token)
+        user_id = str(user_payload["sub"])
+        svc.change_password(user_id, payload.current_password, payload.new_password)
+        _auth_audit(request, user_id, str(user_payload["username"]), "auth.change_password", user_id, str(user_payload["username"]))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

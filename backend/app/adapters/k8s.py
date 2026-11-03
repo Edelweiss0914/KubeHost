@@ -5,7 +5,7 @@ from typing import Literal
 from kubernetes import client, config, utils  # type: ignore[import-untyped]
 from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
 
-from app.models.server import Node, ResourcePlan
+from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
 
 _SHARED_KINDS = {"Namespace", "ResourceQuota", "LimitRange", "NetworkPolicy"}
 
@@ -53,6 +53,45 @@ class K8sAdapter:
                 schedulable=schedulable,
                 cpu_capacity=int(n.status.capacity.get("cpu", 0)),
                 memory_mb_capacity=_parse_memory_mb(n.status.capacity.get("memory", "0Ki")),
+            ))
+        return result
+
+    def list_server_pods(self, server: Server) -> list[ServerPod]:
+        name = self._sts_name(server.id)
+        pods = self._core.list_namespaced_pod(
+            server.resource_plan.namespace,
+            label_selector=f"app.kubernetes.io/name={name}",
+        ).items
+        result: list[ServerPod] = []
+        for pod in pods:
+            labels = pod.metadata.labels or {}
+            if labels.get("app.kubernetes.io/name") != name:
+                continue
+            statuses = {status.name: status for status in (pod.status.container_statuses or [])}
+            containers: list[PodContainer] = []
+            for container in (pod.spec.containers or []):
+                status = statuses.get(container.name)
+                state: Literal["running", "waiting", "terminated", "unknown"] = "unknown"
+                if status and status.state:
+                    if status.state.running:
+                        state = "running"
+                    elif status.state.waiting:
+                        state = "waiting"
+                    elif status.state.terminated:
+                        state = "terminated"
+                containers.append(PodContainer(
+                    name=container.name,
+                    ready=bool(status and status.ready),
+                    state=state,
+                    restart_count=status.restart_count if status else 0,
+                ))
+            result.append(ServerPod(
+                server_id=server.id,
+                name=pod.metadata.name,
+                namespace=server.resource_plan.namespace,
+                node_id=pod.spec.node_name,
+                phase=pod.status.phase or "Unknown",
+                containers=containers,
             ))
         return result
 
@@ -228,6 +267,25 @@ class K8sAdapter:
             return {k: {"used": used.get(k, "0"), "hard": hard[k]} for k in hard}
         except ApiException:
             return {}
+
+    def update_tenant_quota(self, namespace: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
+        cpu_str = str(int(max_cpu)) if max_cpu == int(max_cpu) else str(max_cpu)
+        mem_str = f"{max_memory_mb // 1024}Gi" if max_memory_mb % 1024 == 0 else f"{max_memory_mb}Mi"
+        hard = {
+            "requests.cpu": cpu_str, "limits.cpu": cpu_str,
+            "requests.memory": mem_str, "limits.memory": mem_str,
+            "requests.storage": f"{max_storage_gb}Gi",
+            "persistentvolumeclaims": str(max_servers),
+            "pods": str(max_servers),
+        }
+        body = {"spec": {"hard": hard}}
+        try:
+            self._core.patch_namespaced_resource_quota("tenant-quota", namespace, body)
+        except ApiException as exc:
+            if exc.status == 404:
+                pass  # 네임스페이스/쿼터가 아직 생성되지 않은 경우 무시
+            else:
+                raise
 
     def delete(self, server_id: str, namespace: str, delete_data: bool) -> None:
         name = self._sts_name(server_id)

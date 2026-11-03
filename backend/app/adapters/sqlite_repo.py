@@ -56,6 +56,34 @@ class SQLiteServerRepository:
                     single_use INTEGER NOT NULL DEFAULT 1
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id TEXT PRIMARY KEY,
+                    timestamp TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    actor_name TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    target_name TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT 'ok',
+                    detail TEXT NOT NULL DEFAULT ''
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(timestamp DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_id)"
+            )
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_quotas (
+                    user_id TEXT PRIMARY KEY,
+                    max_cpu REAL NOT NULL DEFAULT 4,
+                    max_memory_mb INTEGER NOT NULL DEFAULT 8192,
+                    max_storage_gb INTEGER NOT NULL DEFAULT 100,
+                    max_servers INTEGER NOT NULL DEFAULT 10
+                )
+            """)
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -196,3 +224,59 @@ class SQLiteServerRepository:
     def delete_invite(self, invite_id: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM invite_codes WHERE id = ?", (invite_id,))
+
+    # ── Audit log methods ─────────────────────────────────────────────────────
+
+    def save_audit_log(self, entry: dict) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO audit_logs (id, timestamp, actor_id, actor_name, action, target_id, target_name, result, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (entry["id"], entry["timestamp"], entry["actor_id"], entry["actor_name"],
+                 entry["action"], entry["target_id"], entry["target_name"],
+                 entry.get("result", "ok"), entry.get("detail", "")),
+            )
+
+    def list_audit_logs(
+        self, limit: int = 100, offset: int = 0,
+        actor_id: str | None = None, action: str | None = None,
+    ) -> list[dict]:
+        conditions = []
+        params: list = []
+        if actor_id:
+            conditions.append("actor_id = ?")
+            params.append(actor_id)
+        if action:
+            conditions.append("action = ?")
+            params.append(action)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        params += [limit, offset]
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT id, timestamp, actor_id, actor_name, action, target_id, target_name, result, detail FROM audit_logs {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                params,
+            ).fetchall()
+        keys = ["id", "timestamp", "actor_id", "actor_name", "action", "target_id", "target_name", "result", "detail"]
+        return [dict(zip(keys, row)) for row in rows]
+
+    def update_user_admin(self, user_id: str, is_admin: bool) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+
+    # ── User quota methods ────────────────────────────────────────────────────
+
+    def get_user_quota(self, user_id: str) -> dict:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT max_cpu, max_memory_mb, max_storage_gb, max_servers FROM user_quotas WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row:
+            return {"max_cpu": row[0], "max_memory_mb": row[1], "max_storage_gb": row[2], "max_servers": row[3]}
+        return {"max_cpu": 4.0, "max_memory_mb": 8192, "max_storage_gb": 100, "max_servers": 10}
+
+    def set_user_quota(self, user_id: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO user_quotas (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers) VALUES (?, ?, ?, ?, ?)",
+                (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers),
+            )

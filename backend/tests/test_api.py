@@ -54,12 +54,40 @@ def test_ownership_for_every_operation(client):
     url = f"/api/v1/servers/{server['id']}"
     client.app.dependency_overrides[current_owner] = lambda: "other-user"
     assert client.get("/api/v1/servers").json() == []
+    assert client.get("/api/v1/topology/pods").json() == []
     assert client.get(url).status_code == 404
     assert client.post(f"{url}/start").status_code == 404
     assert client.post(f"{url}/stop").status_code == 404
     assert client.delete(url).status_code == 404
     client.app.dependency_overrides.clear()
     assert client.get(url).status_code == 200
+
+
+def test_topology_pods_follow_server_state_and_owner(client):
+    server = client.post("/api/v1/servers", json={"name": "Topology demo"}).json()
+    endpoint = "/api/v1/topology/pods"
+    assert client.get(endpoint).json() == []
+
+    client.post(f"/api/v1/servers/{server['id']}/start")
+    pods = client.get(endpoint).json()
+    assert len(pods) == 1
+    pod = pods[0]
+    assert pod == {
+        "server_id": server["id"],
+        "name": f"mc-{server['id'].replace('-', '')}-0",
+        "namespace": server["resource_plan"]["namespace"],
+        "node_id": server["node_id"],
+        "phase": "Running",
+        "containers": [{"name": "minecraft", "ready": True,
+                        "state": "running", "restart_count": 0}],
+        "simulated": True,
+    }
+
+    client.app.dependency_overrides[current_owner] = lambda: "other-user"
+    assert client.get(endpoint).json() == []
+    client.app.dependency_overrides.clear()
+    client.post(f"/api/v1/servers/{server['id']}/stop")
+    assert client.get(endpoint).json() == []
 
 
 def test_quota_counts_retained_storage(client):
@@ -79,3 +107,4 @@ def test_mock_nodes_and_openapi(client):
     assert all(node["mock"] for node in nodes)
     assert not next(node for node in nodes if node["role"] == "control-plane")["schedulable"]
     assert "/api/v1/servers" in client.get("/openapi.json").json()["paths"]
+    assert "/api/v1/topology/pods" in client.get("/openapi.json").json()["paths"]

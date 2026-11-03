@@ -8,22 +8,21 @@ SKIP_BUILD="${1:-}"
 
 echo "=== KubeHost 배포 시작 ==="
 
-# 1. 최신 코드 반영 (원격 추적 브랜치가 없으면 건너뜀)
-echo "[1/5] git pull..."
-git -C "$REPO_DIR" pull origin main 2>/dev/null || echo "      git pull 건너뜀 (원격 미설정)"
+# 1. push 스크립트가 전송한 코드를 그대로 빌드
+echo "[1/5] 전송된 코드 사용"
 
 if [[ "$SKIP_BUILD" != "--skip-build" ]]; then
   # 2. 백엔드 이미지 빌드
   echo "[2/5] 백엔드 이미지 빌드..."
   podman build -t kubehost-backend:latest "$REPO_DIR/backend"
   echo "      containerd에 임포트..."
-  podman save kubehost-backend:latest | k3s ctr images import -
+  podman save kubehost-backend:latest | k3s ctr -n k8s.io images import -
 
   # 3. 프론트엔드 이미지 빌드
   echo "[3/5] 프론트엔드 이미지 빌드..."
   podman build -t kubehost-frontend:latest "$REPO_DIR/frontend"
   echo "      containerd에 임포트..."
-  podman save kubehost-frontend:latest | k3s ctr images import -
+  podman save kubehost-frontend:latest | k3s ctr -n k8s.io images import -
 else
   echo "[2/5] 빌드 생략 (--skip-build)"
   echo "[3/5] 빌드 생략 (--skip-build)"

@@ -4,13 +4,90 @@ import { Status } from '../components/Status';
 import { ServerSettingsPanel } from './ServerSettings';
 import { ServerConsole } from './ServerConsole';
 
-function visibleResourcePlan(plan: Server['resource_plan']): string {
-  return JSON.stringify(plan, (_key, value: unknown) => {
-    if (value && typeof value === 'object' && 'name' in value && value.name === 'RCON_PASSWORD') {
-      return { ...value, value: '[숨김]' };
+type K8sResource = {
+  apiVersion: string
+  kind: string
+  metadata: { name: string; namespace?: string }
+  spec?: Record<string, unknown>
+}
+
+const KIND_BADGE: Record<string, { bg: string; color: string }> = {
+  Namespace:     { bg: '#1a3d5c', color: '#58c9ff' },
+  ResourceQuota: { bg: '#2d2050', color: '#a78bfa' },
+  LimitRange:    { bg: '#14382e', color: '#34d399' },
+  NetworkPolicy: { bg: '#3d2010', color: '#fb923c' },
+  Service:       { bg: '#1a2e54', color: '#60a5fa' },
+  StatefulSet:   { bg: '#3a1040', color: '#f472b6' },
+}
+
+function kindSummary(r: K8sResource): string {
+  const spec = r.spec
+  switch (r.kind) {
+    case 'Namespace':
+      return 'pod-security: restricted'
+    case 'ResourceQuota': {
+      const hard = (spec?.hard ?? {}) as Record<string, string>
+      return `CPU ${hard['limits.cpu'] ?? '?'} · 메모리 ${hard['limits.memory'] ?? '?'} · 스토리지 ${hard['requests.storage'] ?? '?'}`
     }
-    return value;
-  }, 2) ?? '';
+    case 'LimitRange': {
+      const lims = (spec?.limits as Array<Record<string, Record<string, string>>> | undefined)?.[0] ?? {}
+      const def = lims.default ?? {}
+      return `기본 CPU ${def.cpu ?? '?'} · 기본 메모리 ${def.memory ?? '?'}`
+    }
+    case 'NetworkPolicy':
+      return 'Ingress: 게임(25565) + RCON(25575 내부) · Egress: DNS + 외부'
+    case 'Service': {
+      const ports = spec?.ports as Array<Record<string, unknown>> | undefined
+      if (spec?.clusterIP === 'None') return 'Headless · 포트 25565'
+      const np = ports?.[0]?.nodePort
+      return `NodePort · 포트 25565 → ${np ?? '미할당'}`
+    }
+    case 'StatefulSet': {
+      const tplSpec = ((spec?.template as Record<string, unknown> | undefined)?.spec ?? {}) as Record<string, unknown>
+      const node = (tplSpec.nodeSelector as Record<string, string> | undefined)?.['kubernetes.io/hostname'] ?? '?'
+      const vcts = spec?.volumeClaimTemplates as Array<Record<string, unknown>> | undefined
+      const storage = ((vcts?.[0]?.spec as Record<string, unknown> | undefined)
+        ?.resources as Record<string, Record<string, string>> | undefined)
+        ?.requests?.storage ?? '?'
+      return `replicas: 1 · Worker: ${node} · PVC: ${storage} local-path`
+    }
+    default:
+      return ''
+  }
+}
+
+function maskResource(res: unknown): string {
+  return JSON.stringify(res, (_key, value: unknown) => {
+    if (value && typeof value === 'object' && 'name' in value &&
+        (value as Record<string, unknown>).name === 'RCON_PASSWORD') {
+      return { ...(value as object), value: '[숨김]' }
+    }
+    return value
+  }, 2)
+}
+
+function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
+  return (
+    <div className="resource-plan-list">
+      {plan.resources.map((res, i) => {
+        const r = res as K8sResource
+        const badge = KIND_BADGE[r.kind] ?? { bg: 'var(--surface-2)', color: 'var(--muted)' }
+        const summary = kindSummary(r)
+        return (
+          <details key={i} className="resource-plan-item">
+            <summary className="resource-plan-row">
+              <span className="resource-kind-badge" style={{ background: badge.bg, color: badge.color }}>
+                {r.kind}
+              </span>
+              <code className="resource-plan-name">{r.metadata.name}</code>
+              {summary && <span className="resource-plan-desc">{summary}</span>}
+            </summary>
+            <pre className="resource-plan-json">{maskResource(res)}</pre>
+          </details>
+        )
+      })}
+    </div>
+  )
 }
 
 type ServerDetailProps = {
@@ -71,7 +148,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
       <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
       <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
       {server.resource_plan.warnings.map(warning => <p className="muted" key={warning}>{warning}</p>)}
-      <details><summary>리소스 JSON 보기</summary><pre>{visibleResourcePlan(server.resource_plan)}</pre></details>
+      <ResourcePlanViewer plan={server.resource_plan} />
     </section>
     {showSettings && <ServerSettingsPanel serverId={server.id} onClose={() => setShowSettings(false)}/>}
     <ServerConsole serverId={server.id} active={active}/>

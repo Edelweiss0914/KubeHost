@@ -48,6 +48,23 @@ class Node(BaseModel):
     memory_mb_capacity: int
 
 
+class PodContainer(BaseModel):
+    name: str
+    ready: bool
+    state: Literal["running", "waiting", "terminated", "unknown"]
+    restart_count: int
+
+
+class ServerPod(BaseModel):
+    server_id: str
+    name: str
+    namespace: str
+    node_id: str | None
+    phase: str
+    containers: list[PodContainer]
+    simulated: bool = False
+
+
 class ServerSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     difficulty: Literal["peaceful", "easy", "normal", "hard"] = "easy"

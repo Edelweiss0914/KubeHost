@@ -1,6 +1,6 @@
 import type { Health } from '../domain/mode';
 import { apiUrl } from './config';
-import type { Server, ServerInput, ServerSettings, WorkerNode } from '../domain/server';
+import type { Server, ServerInput, ServerSettings, TopologyPod, WorkerNode } from '../domain/server';
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 
@@ -25,6 +25,7 @@ export interface ServerGateway {
   health(): Promise<Health>;
   servers(): Promise<Server[]>;
   nodes(): Promise<WorkerNode[]>;
+  topologyPods(): Promise<TopologyPod[]>;
   server(id: string): Promise<Server>;
   create(input: ServerInput): Promise<Server>;
   action(id: string, action: 'start' | 'stop'): Promise<Server>;
@@ -47,6 +48,13 @@ export interface ServerGateway {
   adminCreateInvite(singleUse: boolean, expiresAt?: string): Promise<{id: string; code: string}>;
   adminRevokeInvite(inviteId: string): Promise<void>;
   adminOverview(): Promise<{user_id: string; username: string; is_admin: boolean; namespace: string; server_count: number; quota: Record<string, unknown>}[]>;
+  adminListAuditLogs(params?: { actor_id?: string; action?: string; limit?: number; offset?: number }): Promise<{id:string; timestamp:string; actor_id:string; actor_name:string; action:string; target_id:string; target_name:string; result:string; detail:string}[]>;
+  adminToggleAdmin(userId: string): Promise<{id: string; is_admin: boolean}>;
+  adminForceStop(serverId: string): Promise<{id: string; status: string}>;
+  adminListAllServers(): Promise<{id:string; name:string; status:string; owner_id:string; owner_name:string; node_id:string; cpu:number; memory_mb:number; created_at:string}[]>;
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
+  adminGetUserQuota(userId: string): Promise<{max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}>;
+  adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -55,6 +63,7 @@ export const api: ServerGateway = {
   health: () => request<Health>('/health'),
   servers: () => versioned('/servers'),
   nodes: () => versioned('/nodes'),
+  topologyPods: () => versioned('/topology/pods'),
   server: id => versioned(`/servers/${encodeURIComponent(id)}`),
   create: input => versioned('/servers', {method:'POST', body:JSON.stringify(input)}),
   action: (id, action) => versioned(`/servers/${encodeURIComponent(id)}/${action}`, {method:'POST'}),
@@ -80,4 +89,18 @@ export const api: ServerGateway = {
   adminCreateInvite: (singleUse, expiresAt) => versioned('/admin/invite-codes', {method:'POST', body:JSON.stringify({single_use:singleUse, expires_at:expiresAt??null})}),
   adminRevokeInvite: (inviteId) => versioned(`/admin/invite-codes/${encodeURIComponent(inviteId)}`, {method:'DELETE'}),
   adminOverview: () => versioned('/admin/overview'),
+  adminListAuditLogs: (params) => {
+    const q = new URLSearchParams();
+    if (params?.actor_id) q.set('actor_id', params.actor_id);
+    if (params?.action) q.set('action', params.action);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    return versioned(`/admin/audit-logs${q.size ? '?' + q : ''}`);
+  },
+  adminToggleAdmin: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/toggle-admin`, {method:'POST'}),
+  adminForceStop: (serverId) => versioned(`/admin/servers/${encodeURIComponent(serverId)}/force-stop`, {method:'POST'}),
+  adminListAllServers: () => versioned('/admin/servers'),
+  changePassword: (currentPassword, newPassword) => versioned('/auth/password', {method:'PUT', body:JSON.stringify({current_password:currentPassword, new_password:newPassword})}),
+  adminGetUserQuota: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`),
+  adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
 };

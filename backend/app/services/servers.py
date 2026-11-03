@@ -58,12 +58,15 @@ class ServerService:
             servers = self.repository.list_by_owner(owner_id)
             retained = self.repository.retained_for(owner_id)
             allocated = servers + retained
-            if (sum(s.cpu for s in servers) + request.cpu > 4
-                    or sum(s.memory_mb for s in servers) + request.memory_mb > 8192
-                    or sum(s.storage_gb for s in allocated) + request.storage_gb > 100
-                    or len(allocated) >= 10):
+            quota = self.repository.get_user_quota(owner_id)
+            if (sum(s.cpu for s in servers) + request.cpu > quota["max_cpu"]
+                    or sum(s.memory_mb for s in servers) + request.memory_mb > quota["max_memory_mb"]
+                    or sum(s.storage_gb for s in allocated) + request.storage_gb > quota["max_storage_gb"]
+                    or len(allocated) >= quota["max_servers"]):
                 raise InvalidOperation(
-                    "Demo tenant resource quota exceeded (4 CPU, 8 GiB RAM, 100 GiB storage, 10 claims)"
+                    f"테넌트 리소스 쿼터를 초과했습니다 "
+                    f"({quota['max_cpu']} CPU, {quota['max_memory_mb']//1024} GiB RAM, "
+                    f"{quota['max_storage_gb']} GiB 스토리지, {quota['max_servers']}개 서버)"
                 )
             server_id = uuid4()
             plan = build_resource_plan(

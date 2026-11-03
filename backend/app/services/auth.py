@@ -102,3 +102,12 @@ class AuthService:
 
     def user_count(self) -> int:
         return self._repo.user_count()  # type: ignore[union-attr]
+
+    def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
+        user: User | None = self._repo.get_user_by_id(user_id)  # type: ignore[union-attr]
+        if not user:
+            raise ValueError("사용자를 찾을 수 없습니다.")
+        if not _pwd.verify(current_password, user.password_hash):
+            raise ValueError("현재 비밀번호가 올바르지 않습니다.")
+        updated = user.model_copy(update={"password_hash": _pwd.hash(new_password)})
+        self._repo.save_user(updated)  # type: ignore[union-attr]

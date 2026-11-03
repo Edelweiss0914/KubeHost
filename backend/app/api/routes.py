@@ -4,10 +4,50 @@ from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
-from app.models.server import DeletionResult, Node, Server, ServerCreate, ServerSettings
+from app.models.server import DeletionResult, Node, Server, ServerCreate, ServerPod, ServerSettings
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
 
 router = APIRouter()
+
+
+def _actor(request: Request) -> tuple[str, str]:
+    """JWT에서 (actor_id, actor_name) 추출. 실패 시 ('?', '?') 반환."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return "?", "?"
+    svc = getattr(request.app.state, "auth_service", None)
+    if svc is None:
+        return "?", "?"
+    try:
+        payload = svc.verify_token(auth.removeprefix("Bearer "))
+        return str(payload["sub"]), str(payload["username"])
+    except Exception:
+        return "?", "?"
+
+
+def _audit(
+    request: Request, actor_id: str, actor_name: str,
+    action: str, target_id: str, target_name: str,
+    result: str = "ok", detail: str = "",
+) -> None:
+    """감사 로그를 SQLite에 기록. 실패해도 주 동작에 영향 없음."""
+    try:
+        from uuid import uuid4
+        from datetime import datetime, timezone
+        repo = request.app.state.server_service.repository
+        repo.save_audit_log({
+            "id": str(uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor_id": actor_id,
+            "actor_name": actor_name,
+            "action": action,
+            "target_id": target_id,
+            "target_name": target_name,
+            "result": result,
+            "detail": detail,
+        })
+    except Exception:
+        pass
 
 
 def current_owner(request: Request, authorization: str = Header(default="")) -> str:
@@ -45,15 +85,26 @@ def nodes(svc: Service) -> list[Node]:
     return svc.adapter.nodes()
 
 
+@router.get("/api/v1/topology/pods", response_model=list[ServerPod])
+def topology_pods(owner: Owner, svc: Service) -> list[ServerPod]:
+    pods: list[ServerPod] = []
+    for server in svc.repository.list_by_owner(owner):
+        pods.extend(svc.adapter.list_server_pods(server))
+    return sorted(pods, key=lambda pod: (pod.node_id or "", pod.namespace, pod.name))
+
+
 @router.get("/api/v1/servers", response_model=list[Server])
 def servers(owner: Owner, svc: Service) -> list[Server]:
     return svc.repository.list_by_owner(owner)
 
 
 @router.post("/api/v1/servers", response_model=Server, status_code=201)
-def create(payload: ServerCreate, owner: Owner, svc: Service) -> Server:
+def create(payload: ServerCreate, owner: Owner, svc: Service, request: Request) -> Server:
     try:
-        return svc.create(owner, payload)
+        server = svc.create(owner, payload)
+        actor_id, actor_name = _actor(request)
+        _audit(request, actor_id, actor_name, "server.create", server.id, server.name)
+        return server
     except InvalidOperation as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -64,13 +115,19 @@ def detail(server_id: str, owner: Owner, svc: Service) -> Server:
 
 
 @router.post("/api/v1/servers/{server_id}/start", response_model=Server)
-def start(server_id: str, owner: Owner, svc: Service) -> Server:
-    return svc.set_state(owner, server_id, "running")
+def start(server_id: str, owner: Owner, svc: Service, request: Request) -> Server:
+    server = svc.set_state(owner, server_id, "running")
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "server.start", server_id, server.name)
+    return server
 
 
 @router.post("/api/v1/servers/{server_id}/stop", response_model=Server)
-def stop(server_id: str, owner: Owner, svc: Service) -> Server:
-    return svc.set_state(owner, server_id, "stopped")
+def stop(server_id: str, owner: Owner, svc: Service, request: Request) -> Server:
+    server = svc.set_state(owner, server_id, "stopped")
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "server.stop", server_id, server.name)
+    return server
 
 
 @router.post("/api/v1/servers/{server_id}/console")
@@ -134,10 +191,18 @@ def delete(
     server_id: str,
     owner: Owner,
     svc: Service,
+    request: Request,
     delete_data: bool = False,
     confirmation: str | None = None,
 ) -> DeletionResult:
-    return svc.delete(owner, server_id, delete_data, confirmation)
+    # 삭제 전에 이름 기록
+    server = svc.repository.get(server_id)
+    server_name = server.name if server else server_id
+    result = svc.delete(owner, server_id, delete_data, confirmation)
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "server.delete", server_id, server_name,
+           detail=f"delete_data={delete_data}")
+    return result
 
 
 @router.get("/api/v1/tenant")

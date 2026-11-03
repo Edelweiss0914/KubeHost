@@ -1,7 +1,7 @@
 """Ports and in-memory adapters. No Kubernetes SDK or network client is present."""
 from typing import Literal
 
-from app.models.server import Node, ResourcePlan, Server
+from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
 
 
 class InMemoryServerRepository:
@@ -40,6 +40,22 @@ class MockKubernetesAdapter:
                 Node(id="kubehost-worker-01", name="kubehost-worker-01", role="worker",
                      schedulable=True, cpu_capacity=8, memory_mb_capacity=16384)]
 
+    def list_server_pods(self, server: Server) -> list[ServerPod]:
+        if server.status not in ("running", "provisioning"):
+            return []
+        name = f"mc-{server.id.replace('-', '')}-0"
+        running = server.status == "running"
+        return [ServerPod(
+            server_id=server.id,
+            name=name,
+            namespace=server.resource_plan.namespace,
+            node_id=server.node_id,
+            phase="Running" if running else "Pending",
+            containers=[PodContainer(name="minecraft", ready=running,
+                                     state="running" if running else "waiting", restart_count=0)],
+            simulated=True,
+        )]
+
     def create(self, plan: ResourcePlan) -> str | None:
         return None
 
@@ -74,3 +90,6 @@ class MockKubernetesAdapter:
             "requests.storage":{"used": "10Gi", "hard": "100Gi"},
             "pods":            {"used": "1",    "hard": "10"},
         }
+
+    def update_tenant_quota(self, namespace: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
+        pass

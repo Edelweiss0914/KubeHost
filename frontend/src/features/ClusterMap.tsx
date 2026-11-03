@@ -1,9 +1,10 @@
-import type { Server, WorkerNode } from '../domain/server';
+import type { Server, TopologyPod, WorkerNode } from '../domain/server';
 import { Status } from '../components/Status';
 
 type Props = {
   nodes: WorkerNode[];
   servers: Server[];
+  pods: TopologyPod[];
   onSelect: (id: string) => void;
 };
 
@@ -22,24 +23,80 @@ function ResourceBar({ label, used, total, unit }: { label: string; used: number
   );
 }
 
-export function ClusterMap({ nodes, servers, onSelect }: Props) {
+function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
+  const visible = new Set(servers.map(server => server.id));
+  const ownedPods = pods.filter(pod => visible.has(pod.server_id));
+  const podServers = new Set(ownedPods.map(pod => pod.server_id));
+  const serverById = new Map(servers.map(server => [server.id, server]));
+  const pendingPods = ownedPods.filter(pod => !pod.node_id || !nodes.some(node => node.id === pod.node_id));
+
+  function renderPod(pod: TopologyPod) {
+    const server = serverById.get(pod.server_id);
+    return <li className="hierarchy-pod" key={`${pod.namespace}/${pod.name}`}>
+      <div className="hierarchy-row">
+        <span className="hierarchy-kind">파드</span>
+        <strong>{pod.name}</strong>
+        <span className="hierarchy-phase">{pod.phase}{pod.simulated ? ' · 모의' : ''}</span>
+      </div>
+      <small>{pod.namespace}</small>
+      <div className="hierarchy-containers">
+        {pod.containers.map(container => <span className="hierarchy-container" key={container.name}>
+          컨테이너 {container.name} · {container.ready ? '준비됨' : container.state}
+        </span>)}
+      </div>
+      {server && <button className="hierarchy-server" onClick={() => onSelect(server.id)}>
+        <span className="hierarchy-kind">게임 서버</span>
+        <strong>{server.name}</strong>
+        <Status value={pod.containers.some(container => container.ready) ? 'running' : pod.phase === 'Failed' ? 'error' : 'provisioning'} />
+        <span aria-hidden="true">↗</span>
+      </button>}
+    </li>;
+  }
+
+  return <section className="panel hierarchy" aria-labelledby="hierarchy-title">
+    <div className="section-title">
+      <div><span className="eyebrow">WORKLOAD TOPOLOGY</span><h2 id="hierarchy-title">클러스터 계층형 토폴로지</h2>
+        <p className="section-copy">클러스터 → 노드 → 파드 → 실행 서버</p></div>
+      <span className="tag">노드 {nodes.length} · 파드 {ownedPods.length} · 서버 {servers.length}</span>
+    </div>
+    <div className="hierarchy-root"><span className="hierarchy-kind">클러스터</span><strong>KubeHost</strong></div>
+    {nodes.length === 0 ? <p className="muted hierarchy-empty">표시할 노드가 없습니다.</p> : <ul className="hierarchy-nodes">
+      {nodes.map(node => {
+        const nodePods = ownedPods.filter(pod => pod.node_id === node.id);
+        const withoutPod = servers.filter(server => server.node_id === node.id && !podServers.has(server.id));
+        return <li className="hierarchy-node" key={node.id}>
+          <div className="hierarchy-row"><span className="hierarchy-kind">{node.role === 'worker' ? 'Worker 노드' : 'Control Plane'}</span>
+            <strong>{node.name}</strong><Status value={node.status}/></div>
+          <small>{nodePods.length}개 파드 · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
+          {nodePods.length > 0 && <ul className="hierarchy-pod-list">{nodePods.map(renderPod)}</ul>}
+          {withoutPod.length > 0 && <div className="hierarchy-unplaced"><span className="hierarchy-kind">파드 없음</span>
+            {withoutPod.map(server => <button key={server.id} onClick={() => onSelect(server.id)}>{server.name} · {server.status === 'stopped' ? '중지됨' : '배치 대기'} ↗</button>)}</div>}
+          {nodePods.length === 0 && withoutPod.length === 0 && <p className="muted hierarchy-empty">표시할 워크로드가 없습니다.</p>}
+        </li>;
+      })}
+    </ul>}
+    {pendingPods.length > 0 && <div className="hierarchy-unscheduled"><h3>노드 배치 대기</h3><ul className="hierarchy-pod-list">{pendingPods.map(renderPod)}</ul></div>}
+  </section>;
+}
+
+export function ClusterMap({ nodes, servers, pods, onSelect }: Props) {
   const workers = nodes.filter(n => n.role === 'worker');
 
   if (workers.length === 0) {
     return (
-      <div className="panel empty">
+      <div className="cluster-page"><div className="panel empty">
         <div className="empty-icon" aria-hidden="true">▧</div>
         <p>표시할 Worker 노드가 없습니다.</p>
-      </div>
+      </div><Hierarchy nodes={nodes} servers={servers} pods={pods} onSelect={onSelect}/></div>
     );
   }
 
   return (
-    <div className="cluster-map">
+    <div className="cluster-page"><div className="cluster-map">
       {workers.map(node => {
-        const pods = servers.filter(s => s.node_id === node.id);
-        const usedCpu = pods.reduce((sum, s) => sum + s.cpu, 0);
-        const usedMem = pods.reduce((sum, s) => sum + s.memory_mb, 0);
+        const assigned = servers.filter(s => s.node_id === node.id);
+        const usedCpu = assigned.reduce((sum, s) => sum + s.cpu, 0);
+        const usedMem = assigned.reduce((sum, s) => sum + s.memory_mb, 0);
 
         return (
           <div key={node.id} className="cluster-node">
@@ -60,15 +117,15 @@ export function ClusterMap({ nodes, servers, onSelect }: Props) {
             </div>
 
             <div className="cluster-pods-label">
-              <span className="eyebrow">PODS</span>
-              <span className="count">{pods.length}개</span>
+              <span className="eyebrow">SERVERS</span>
+              <span className="count">{assigned.length}개</span>
             </div>
 
-            {pods.length === 0 ? (
+            {assigned.length === 0 ? (
               <p className="muted" style={{ fontSize: '12px', marginTop: '8px' }}>배포된 서버가 없습니다.</p>
             ) : (
               <div className="cluster-pods">
-                {pods.map(server => (
+                {assigned.map(server => (
                   <button key={server.id} className="cluster-pod" onClick={() => onSelect(server.id)}>
                     <div className="cluster-pod-top">
                       <span className="cluster-pod-name">{server.name}</span>
@@ -88,6 +145,6 @@ export function ClusterMap({ nodes, servers, onSelect }: Props) {
           </div>
         );
       })}
-    </div>
+    </div><Hierarchy nodes={nodes} servers={servers} pods={pods} onSelect={onSelect}/></div>
   );
 }

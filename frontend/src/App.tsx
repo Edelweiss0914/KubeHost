@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './api/client';
 import { useConsole } from './application/useConsole';
 import type { Server, ServerInput, WorkerNode } from './domain/server';
@@ -37,7 +37,53 @@ function QuotaBar({ label, entry }: { label: string; entry: QuotaEntry }) {
   </div>;
 }
 
-function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, mock }: {
+function TopologyOverview({ nodes, servers, mock, lastUpdated }: { nodes: WorkerNode[]; servers: Server[]; mock: boolean; lastUpdated: Date | null }) {
+  const controlPlane = nodes.find(node => node.role !== 'worker');
+  const workers = nodes.filter(node => node.role === 'worker');
+  const ready = nodes.filter(node => node.status === 'Ready').length;
+
+  return <section className="panel topology-panel" aria-label="클러스터 토폴로지">
+    <div className="section-title">
+      <div>
+        <span className="eyebrow">LIVE TOPOLOGY</span>
+        <h2>클러스터 토폴로지</h2>
+        <p className="section-copy">Control Plane과 Worker의 연결 상태</p>
+      </div>
+      <span className="topology-live"><span className="demo-dot" aria-hidden="true"/>{mock ? 'DEMO' : '15초 갱신'}</span>
+    </div>
+    {nodes.length ? <>
+      <div className="topology-canvas">
+        <div className="topology-core">
+          <span className="topology-core-icon" aria-hidden="true">⌘</span>
+          <div className="topology-core-copy">
+            <span>CONTROL PLANE</span>
+            <strong>{controlPlane?.name ?? 'Control Plane'}</strong>
+            <small>클러스터 제어 노드</small>
+          </div>
+          {controlPlane && <Status value={controlPlane.status}/>}
+        </div>
+        <div className="topology-connector" aria-hidden="true"><span/></div>
+        <div className="topology-workers">
+          {workers.length ? workers.map(node => {
+            const assigned = servers.filter(server => server.node_id === node.id);
+            return <div className="topology-worker" key={node.id}>
+              <div className="topology-worker-head">
+                <span className="topology-worker-icon" aria-hidden="true">◈</span>
+                <Status value={node.status}/>
+              </div>
+              <span className="topology-node-role">WORKER NODE</span>
+              <strong>{node.name}</strong>
+              <small>{assigned.length}개 서버 배치 · {node.cpu_capacity} vCPU</small>
+            </div>;
+          }) : <p className="topology-empty">연결된 Worker가 없습니다.</p>}
+        </div>
+      </div>
+      <div className="topology-footer"><span><i className="topology-legend-dot"/>정상 노드 {ready}/{nodes.length}</span><span>마지막 동기화 {lastUpdated ? lastUpdated.toLocaleTimeString('ko-KR') : '대기 중'}</span></div>
+    </> : <p className="topology-empty">표시할 노드가 없습니다.</p>}
+  </section>;
+}
+
+function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, mock, lastUpdated }: {
   servers: Server[];
   nodes: WorkerNode[];
   retainedCount: number;
@@ -45,37 +91,29 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
   onSelect: (id: string) => void;
   onCreate: () => void;
   mock: boolean;
+  lastUpdated: Date | null;
 }) {
   const running = servers.filter(server => server.status === 'running').length;
   const provisioning = servers.filter(server => server.status === 'provisioning').length;
-  const readyWorkers = nodes.filter(node => node.role === 'worker' && node.status === 'Ready').length;
   const recent = [...servers].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 4);
 
-  return <>
+  return <div className="mission-grid">
     <section className="hero">
       <div className="hero-copy">
-        <span className="eyebrow">KUBEHOST CONTROL CENTER</span>
-        <h2>서버 운영을 한눈에</h2>
-        <p>게임 서버와 Worker 상태를 확인하고, 필요한 작업을 바로 시작하세요.</p>
+        <span className="eyebrow">KUBEHOST / MISSION CONTROL</span>
+        <h2>클러스터의 모든 흐름을<br/>한 화면에서.</h2>
+        <p>노드 상태와 워크로드를 실시간으로 살피고 다음 배포를 준비하세요.</p>
       </div>
-      <div className="hero-actions"><button onClick={onCreate}>+ 서버 만들기</button></div>
+      <div className="hero-actions"><button onClick={onCreate}>새 서버 배포 <span aria-hidden="true">↗</span></button></div>
     </section>
+    <TopologyOverview nodes={nodes} servers={servers} mock={mock} lastUpdated={lastUpdated}/>
     <div className="stats">
-      <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">현재 관리 중인 인스턴스</p></article>
+      <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
       <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">{mock ? '모의 실행 상태' : '서비스 제공 중'}</p></article>
-      <article><span className="stat-icon" aria-hidden="true">◷</span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 및 시작 진행 중</p></article>
-      <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존된 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
+      <article><span className="stat-icon" aria-hidden="true">◷</span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 진행 중</p></article>
+      <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
     </div>
-    <div className="dashboard-grid">
-      <section className="panel">
-        <div className="section-title"><div><span className="eyebrow">INFRASTRUCTURE</span><h2>노드 현황</h2><p className="section-copy">사용 가능한 Worker {readyWorkers}개 · 전체 노드 {nodes.length}개</p></div><span className="tag">{mock ? '데모 데이터' : '클러스터'}</span></div>
-        {nodes.length ? nodes.map(node => <div className="node" key={node.id}>
-          <span className="node-icon" aria-hidden="true">▧</span>
-          <div><strong>{node.name}</strong><small>{node.role === 'worker' ? 'Worker · 게임 배포 대상' : 'Control Plane · NoSchedule'}</small></div>
-          <Status value={node.status}/>
-        </div>) : <p className="muted">표시할 노드가 없습니다.</p>}
-      </section>
-      <section className="panel">
+    <section className="panel mission-activity">
         <div className="section-title"><div><span className="eyebrow">ACTIVITY</span><h2>최근 서버</h2><p className="section-copy">가장 최근에 생성한 서버입니다.</p></div><span className="tag">최근 {recent.length}개</span></div>
         {recent.length ? <ul className="activity">{recent.map(server => <li key={server.id}>
           <span className="demo-dot"/>
@@ -85,9 +123,8 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
           </div>
           <Status value={server.status}/>
         </li>)}</ul> : <p className="muted">아직 생성한 서버가 없습니다. 첫 서버를 만들어 보세요.</p>}
-      </section>
-    </div>
-    {tenant && <section className="panel" style={{marginTop:'24px'}}>
+    </section>
+    {tenant && <section className="panel mission-quota">
       <div className="section-title">
         <div><span className="eyebrow">TENANT</span><h2>내 네임스페이스</h2>
           <p className="section-copy" style={{fontFamily:'monospace',fontSize:'12px'}}>{tenant.namespace}</p>
@@ -101,7 +138,73 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
         {tenant.quota['pods'] && <QuotaBar label="파드" entry={tenant.quota['pods']}/>}
       </div>
     </section>}
-  </>;
+  </div>;
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { dialogRef.current?.showModal(); }, []);
+
+  function handleClick(e: React.MouseEvent<HTMLDialogElement>) {
+    if (e.target === dialogRef.current) onClose();
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (next !== confirm) { setError('새 비밀번호가 일치하지 않습니다.'); return; }
+    if (next.length < 8) { setError('새 비밀번호는 8자 이상이어야 합니다.'); return; }
+    setSaving(true); setError('');
+    try {
+      await api.changePassword(current, next);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '변경 실패');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
+      <div className="settings-dialog-inner">
+        <div className="section-title">
+          <div><span className="eyebrow">ACCOUNT</span><h2>비밀번호 변경</h2></div>
+          <button className="secondary" onClick={onClose}>닫기</button>
+        </div>
+        {done ? (
+          <>
+            <p role="status" className="notice">비밀번호가 변경됐습니다.</p>
+            <div className="actions"><button onClick={onClose}>닫기</button></div>
+          </>
+        ) : (
+          <form onSubmit={e => void submit(e)}>
+            <div className="form-grid">
+              <label className="full">현재 비밀번호
+                <input type="password" value={current} onChange={e => setCurrent(e.target.value)} required autoFocus/>
+              </label>
+              <label className="full">새 비밀번호
+                <input type="password" value={next} onChange={e => setNext(e.target.value)} required minLength={8}/>
+              </label>
+              <label className="full">새 비밀번호 확인
+                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required/>
+              </label>
+            </div>
+            {error && <div role="alert" className="error">{error}</div>}
+            <div className="actions">
+              <button type="submit" disabled={saving}>{saving ? '변경 중…' : '변경'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </dialog>
+  );
 }
 
 type Theme = 'light' | 'dark';
@@ -116,7 +219,7 @@ function initialTheme(): Theme {
 }
 
 export function App() {
-  const { health, mode, servers, retained, nodes, tenant, loading, error, refresh } = useConsole();
+  const { health, mode, servers, retained, nodes, topologyPods, tenant, loading, error, lastUpdated, refresh } = useConsole();
   const [auth, setAuth] = useState<{ token: string; username: string } | null>(getStoredAuth);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
@@ -126,10 +229,11 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
+  const [showChangePw, setShowChangePw] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0b1220' : '#f3f6f9');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#080d1e' : '#edf2fb');
     try { window.localStorage.setItem('kubehost-theme', theme); } catch { /* Storage is optional. */ }
   }, [theme]);
 
@@ -143,6 +247,14 @@ export function App() {
       setCurrentUserId('');
     }
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if ((view !== 'dashboard' && view !== 'cluster') || (mode === 'real' && !auth)) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void refresh(true);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [auth, mode, refresh, view]);
 
   // Real mode: require login. Mock mode: skip auth.
   if (mode === 'real' && !auth) {
@@ -266,6 +378,7 @@ export function App() {
         <div className="profile">
           <span className="avatar">{auth ? auth.username[0].toUpperCase() : 'D'}</span>
           <div>{auth ? auth.username : '데모 워크스페이스'}<small>{auth ? `로그인됨 · ${mode}` : `인증: ${health?.authentication ?? '확인 불가'} · 데모`}</small></div>
+          {auth && <button className="text-button" style={{fontSize:'11px'}} onClick={() => setShowChangePw(true)}>비밀번호 변경</button>}
           {auth && <button className="text-button" style={{marginLeft:'auto',fontSize:'11px'}} onClick={() => {
             try { localStorage.removeItem('kubehost-token'); localStorage.removeItem('kubehost-username'); } catch { /* ignore */ }
             setAuth(null);
@@ -299,9 +412,9 @@ export function App() {
         {busy && <p role="status" className="muted">요청을 처리하는 중…</p>}
         {loading ? <div className="panel loading" role="status">콘솔 데이터를 불러오는 중…</div> : error ?
           <div className="panel error" role="alert"><h2>데이터를 불러오지 못했습니다</h2><p>{error}</p><button onClick={() => void refreshView()}>다시 시도</button></div> : <>
-            {view === 'dashboard' && <Dashboard mock={mock} servers={servers} nodes={nodes} retainedCount={retained.length} tenant={tenant} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
+            {view === 'dashboard' && <Dashboard mock={mock} servers={servers} nodes={nodes} retainedCount={retained.length} tenant={tenant} lastUpdated={lastUpdated} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
             {(view === 'dashboard' || view === 'servers') && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
-            {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} onSelect={id => void open(id)}/>}
+            {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}
             {view === 'admin' && isAdmin && <AdminPage currentUserId={currentUserId}/>}
             {view === 'detail' && selected && <ServerDetail
@@ -316,5 +429,6 @@ export function App() {
         <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>
       </main>
     </div>
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)}/>}
   </div>;
 }
