@@ -1577,64 +1577,106 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .metrics-chart-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
 .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem; }
 
-/* === Server sub-nav bar === */
-.sub-nav-bar{
-  display:flex;
-  align-items:center;
-  gap:4px;
-  width:min(1460px,calc(100% - 48px));
-  margin:10px auto 0;
-  padding:6px 10px;
-  background:color-mix(in srgb,var(--sidebar) 85%,transparent);
-  border:1px solid var(--border);
-  border-radius:13px;
-  font-size:12px;
-  backdrop-filter:blur(8px);
-  flex-wrap:wrap}
-.sub-nav-back{
-  color:var(--muted);
-  font-size:13px;
-  padding:5px 8px;
-  border-radius:7px;
-  flex:none}
-.sub-nav-back:hover{color:var(--text) !important;background:rgba(255,255,255,.07) !important}
-.sub-nav-server-name{
-  color:var(--text);
-  font-weight:600;
-  font-size:12px;
-  padding:0 6px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  max-width:160px}
-.sub-nav-divider{
-  display:inline-block;
-  width:1px;
-  height:18px;
-  background:var(--border);
-  margin:0 3px;
-  flex:none}
-.sub-nav-btn{
-  background:none !important;
-  color:var(--muted) !important;
-  border-color:transparent !important;
-  padding:7px 11px;
-  font-size:12px;
-  border-radius:9px;
-  font-weight:500;
-  white-space:nowrap}
-.sub-nav-btn:hover{background:rgba(255,255,255,.07) !important;color:var(--text) !important}
-.sub-nav-btn.active{
-  color:#f6f8ff !important;
-  border-color:#7772d8 !important;
-  background:linear-gradient(115deg,#2156a4,#5944a5) !important;
-  box-shadow:0 4px 14px #5162da38;
-  font-weight:600}
-
-/* === Server detail header === */
-.server-detail-header{margin-bottom:23px}
-.server-detail-header-info{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:15px}
+/* === Pelican-style server detail layout === */
+.server-detail-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.server-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  position: sticky;
+  top: 110px;
+}
+.server-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.server-sidebar-back {
+  font-size: 11px;
+  color: var(--muted);
+  align-self: flex-start;
+}
+.server-sidebar-back:hover { color: var(--text) !important; }
+.server-sidebar-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.server-sidebar-icon {
+  font-size: 22px;
+  color: var(--accent);
+  line-height: 1;
+  flex: none;
+}
+.server-sidebar-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+}
+.server-sidebar-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.server-sidebar-controls button {
+  font-size: 11px;
+  padding: 7px 8px;
+  justify-content: center;
+}
+.server-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 2px;
+}
+.server-sidebar-nav button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+}
+.server-sidebar-nav button:hover { background: rgba(255,255,255,.05); color: var(--text); }
+.server-sidebar-nav button.active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.server-sidebar-sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.server-sidebar-danger {
+  color: #f87171 !important;
+  font-size: 12px !important;
+}
+.server-sidebar-danger:hover { background: rgba(248,113,113,.1) !important; }
+.server-delete-form {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.server-delete-form p { color: var(--muted); margin: 0 0 10px; font-size: 11px; }
+.server-delete-form .actions { margin-top: 14px; }
+.server-content { min-width: 0; }
+@media (max-width: 900px) {
+  .server-detail-layout { grid-template-columns: 1fr; }
+  .server-sidebar { position: static; }
+}

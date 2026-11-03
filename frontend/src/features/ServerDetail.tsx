@@ -7,8 +7,6 @@ import { api } from '../api/client';
 import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
 import { MetricsChart } from '../components/MetricsChart';
 
-type ServerSubView = 'overview' | 'console' | 'settings' | 'schedule' | 'metrics';
-
 type K8sResource = {
   apiVersion: string
   kind: string
@@ -250,16 +248,18 @@ function ScheduleForm({ initial, onSave, onCancel }: {
   );
 }
 
+type ServerSubView = 'console' | 'overview' | 'metrics' | 'schedule' | 'settings';
+
 type ServerDetailProps = {
   server: Server;
   busy: boolean;
   onAction: (action: 'start' | 'stop') => void;
   onDelete: (deleteData: boolean, confirmation: string) => void;
   onBack: () => void;
-  subView: ServerSubView;
 };
 
-export function ServerDetail({ server, busy, onAction, onDelete, subView }: ServerDetailProps) {
+export function ServerDetail({ server, busy, onAction, onDelete, onBack }: ServerDetailProps) {
+  const [subView, setSubView] = useState<ServerSubView>('console');
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -267,68 +267,122 @@ export function ServerDetail({ server, busy, onAction, onDelete, subView }: Serv
   const canStop = server.status === 'running' || server.status === 'provisioning';
   const active = server.status === 'running' || server.status === 'provisioning';
 
-  return <>
-    <div className="server-detail-header panel">
-      <div className="server-detail-header-info">
-        <div>
-          <span className="eyebrow">MINECRAFT JAVA / PAPER</span>
-          <h2 style={{margin:'6px 0 2px'}}>{server.name}</h2>
-          <p className="detail-meta" style={{margin:0}}>{server.node_id} · {new Date(server.created_at).toLocaleString('ko-KR')}</p>
-        </div>
-        <Status value={server.status}/>
-      </div>
-      <div className="actions" style={{marginTop:'14px'}}>
-        <button disabled={busy || !canStart} onClick={() => onAction('start')}>시작</button>
-        <button className="secondary" disabled={busy || !canStop} onClick={() => onAction('stop')}>중지</button>
-        <button className="danger" disabled={busy} onClick={() => setDeleting(true)}>서버 삭제</button>
-      </div>
-      {deleting && <form className="delete-box" onSubmit={event => { event.preventDefault(); onDelete(deleteData, confirmation); }}>
-        <h3>서버를 삭제할까요?</h3>
-        <p>기본값은 데이터 보존입니다. Worker의 로컬 PVC는 명시적으로 삭제하지 않는 한 유지됩니다.</p>
-        <label className="checkbox"><input type="checkbox" checked={deleteData} onChange={event => setDeleteData(event.target.checked)}/>저장 데이터도 함께 삭제 (PVC 삭제 · 복구 불가)</label>
-        {deleteData && <label>확인을 위해 서버 이름 입력
-          <input value={confirmation} onChange={event => setConfirmation(event.target.value)} placeholder={server.name}/>
-        </label>}
-        <div className="actions">
-          <button type="button" className="secondary" onClick={() => setDeleting(false)} disabled={busy}>취소</button>
-          <button className="danger" disabled={busy || (deleteData && confirmation !== server.name)}>
-            {busy ? '처리 중…' : deleteData ? '서버와 데이터 삭제 확인' : '서버 삭제 · 데이터 보존'}
-          </button>
-        </div>
-      </form>}
-    </div>
+  const NAV_ITEMS: [ServerSubView, string, string][] = [
+    ['console', '▶', '콘솔'],
+    ['overview', '◫', '서버 정보'],
+    ['metrics', '▦', '메트릭'],
+    ['schedule', '◷', '스케줄'],
+    ['settings', '⚙', '설정'],
+  ];
 
-    {subView === 'overview' && (
-      <section className="panel detail-overview">
-        <div className="section-title"><div><span className="eyebrow">서버 정보</span><h2>상세 정보</h2></div></div>
-        <dl className="details-grid">
-          <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
-          <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
-          <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
-          <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
-          <div><dt>접속 주소</dt><dd><code>{server.connection ?? '할당 중'}</code></dd></div>
-          <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
-        </dl>
-        <section className="panel" style={{marginTop:'20px'}}>
-          <div className="section-title"><div><span className="eyebrow">배포된 리소스</span><h2>Kubernetes 리소스 계획</h2></div></div>
-          <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
-          <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
-          {server.resource_plan.warnings.map(warning => <p className="muted" key={warning}>{warning}</p>)}
-          <ResourcePlanViewer plan={server.resource_plan} />
-        </section>
-      </section>
-    )}
-    {subView === 'console' && <ServerConsole serverId={server.id} active={active}/>}
-    {subView === 'settings' && <ServerSettingsPanel serverId={server.id} onClose={() => {}}/>}
-    {subView === 'schedule' && (
-      <section className="panel">
-        <SchedulePanel serverId={server.id} />
-      </section>
-    )}
-    {subView === 'metrics' && (
-      <section className="panel">
-        <ServerMetricsPanel serverId={server.id} />
-      </section>
-    )}
-  </>;
+  return (
+    <div className="server-detail-layout">
+      {/* Left server-specific sidebar */}
+      <aside className="server-sidebar">
+        <div className="server-sidebar-header">
+          <button className="text-button server-sidebar-back" onClick={onBack}>← 목록</button>
+          <div className="server-sidebar-identity">
+            <span className="server-sidebar-icon" aria-hidden="true">⬡</span>
+            <div>
+              <strong className="server-sidebar-name">{server.name}</strong>
+              <div style={{marginTop:'5px'}}><Status value={server.status}/></div>
+            </div>
+          </div>
+          <div className="server-sidebar-controls">
+            <button disabled={busy || !canStart} onClick={() => onAction('start')}>▶ 시작</button>
+            <button className="secondary" disabled={busy || !canStop} onClick={() => onAction('stop')}>■ 중지</button>
+          </div>
+        </div>
+        <nav className="server-sidebar-nav" aria-label="서버 메뉴">
+          {NAV_ITEMS.map(([sv, icon, label]) => (
+            <button
+              key={sv}
+              className={subView === sv ? 'active' : ''}
+              aria-current={subView === sv ? 'page' : undefined}
+              onClick={() => setSubView(sv)}
+            >
+              <span aria-hidden="true">{icon}</span>{label}
+            </button>
+          ))}
+          <hr className="server-sidebar-sep"/>
+          <button
+            className="server-sidebar-danger"
+            disabled={busy}
+            onClick={() => setDeleting(d => !d)}
+          >
+            <span aria-hidden="true">✕</span>서버 삭제
+          </button>
+        </nav>
+        {deleting && (
+          <form className="server-delete-form" onSubmit={e => { e.preventDefault(); onDelete(deleteData, confirmation); }}>
+            <p>기본값은 데이터 보존입니다.</p>
+            <label className="checkbox">
+              <input type="checkbox" checked={deleteData} onChange={e => setDeleteData(e.target.checked)}/>
+              저장 데이터도 삭제 (복구 불가)
+            </label>
+            {deleteData && (
+              <label>서버 이름 입력 확인
+                <input value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder={server.name}/>
+              </label>
+            )}
+            <div className="actions">
+              <button type="button" className="secondary" onClick={() => setDeleting(false)} disabled={busy}>취소</button>
+              <button className="danger" disabled={busy || (deleteData && confirmation !== server.name)}>
+                {busy ? '처리 중…' : deleteData ? '데이터 포함 삭제' : '서버 삭제'}
+              </button>
+            </div>
+          </form>
+        )}
+      </aside>
+
+      {/* Right content area */}
+      <div className="server-content">
+        {subView === 'console' && (
+          <div className="panel">
+            <div className="section-title detail-summary">
+              <div><span className="eyebrow">CONSOLE</span><h2>서버 콘솔</h2></div>
+            </div>
+            <ServerConsole serverId={server.id} active={active}/>
+          </div>
+        )}
+        {subView === 'overview' && (
+          <>
+            <section className="panel">
+              <div className="section-title detail-summary">
+                <div><span className="eyebrow">SERVER INFO</span><h2>서버 정보</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
+              </div>
+              <dl className="details-grid">
+                <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
+                <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
+                <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
+                <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
+                <div><dt>접속 주소</dt><dd><code>{server.connection ?? '할당 중'}</code></dd></div>
+                <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
+              </dl>
+            </section>
+            <section className="panel">
+              <div className="section-title"><div><span className="eyebrow">배포된 리소스</span><h2>Kubernetes 리소스 계획</h2></div></div>
+              <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
+              <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
+              {server.resource_plan.warnings.map(w => <p className="muted" key={w}>{w}</p>)}
+              <ResourcePlanViewer plan={server.resource_plan}/>
+            </section>
+          </>
+        )}
+        {subView === 'metrics' && (
+          <section className="panel">
+            <ServerMetricsPanel serverId={server.id}/>
+          </section>
+        )}
+        {subView === 'schedule' && (
+          <section className="panel">
+            <SchedulePanel serverId={server.id}/>
+          </section>
+        )}
+        {subView === 'settings' && (
+          <ServerSettingsPanel serverId={server.id} onClose={() => {}}/>
+        )}
+      </div>
+    </div>
+  );
 }
