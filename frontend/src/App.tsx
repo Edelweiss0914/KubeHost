@@ -42,13 +42,12 @@ function QuotaBar({ label, entry }: { label: string; entry: QuotaEntry }) {
 }
 
 
-function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate, mock }: {
+function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
   servers: Server[];
   retainedCount: number;
   tenant: TenantInfo | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
-  mock: boolean;
 }) {
   const [nsMetrics, setNsMetrics] = useState<NamespaceMetrics | null>(null);
   useEffect(() => {
@@ -73,7 +72,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate, mock }:
     </section>
     <div className="stats">
       <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
-      <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">{mock ? '모의 실행 상태' : '서비스 제공 중'}</p></article>
+      <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">서비스 제공 중</p></article>
       <article><span className="stat-icon" aria-hidden="true">◷</span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 진행 중</p></article>
       <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
     </div>
@@ -210,7 +209,7 @@ function initialTheme(): Theme {
 }
 
 export function App() {
-  const { health, mode, servers, retained, nodes, topologyPods, tenant, loading, error, refresh } = useConsole();
+  const { servers, retained, nodes, topologyPods, tenant, loading, error, refresh } = useConsole();
   const [auth, setAuth] = useState<{ token: string; username: string } | null>(getStoredAuth);
   const [showLogin, setShowLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -230,7 +229,7 @@ export function App() {
     setShowSessionExpired(true);
   }
 
-  const sessionRemaining = useInactivityTimer(handleAutoLogout, !!auth && mode === 'real');
+  const sessionRemaining = useInactivityTimer(handleAutoLogout, !!auth);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -250,12 +249,12 @@ export function App() {
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if ((view !== 'dashboard' && view !== 'cluster' && view !== 'servers' && view !== 'detail') || (mode === 'real' && !auth)) return;
+    if ((view !== 'dashboard' && view !== 'cluster' && view !== 'servers' && view !== 'detail') || !auth) return;
     const timer = window.setInterval(() => {
       if (!document.hidden) void refresh(true);
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [auth, mode, refresh, view]);
+  }, [auth, refresh, view]);
 
   // polling 후 servers 배열이 갱신되면 selected도 함께 업데이트
   useEffect(() => {
@@ -266,7 +265,7 @@ export function App() {
   }, [servers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real mode: require login. Mock mode: skip auth.
-  if (mode === 'real' && !auth) {
+  if (!auth) {
     function handleLogin(token: string, username: string) {
       try { localStorage.setItem('kubehost-token', token); localStorage.setItem('kubehost-username', username); } catch { /* ignore */ }
       setAuth({ token, username });
@@ -281,8 +280,6 @@ export function App() {
       </>
     );
   }
-  const mock = mode === 'mock';
-  const modeLabel = mode === 'mock' ? 'MOCK MODE' : mode === 'real' ? 'KUBERNETES' : 'MODE UNKNOWN';
 
   function navigate(next: View) {
     setView(next);
@@ -392,10 +389,10 @@ export function App() {
         </button>}
       </nav>
       <div className="sidebar-footer">
-        <div className="environment-pill"><span className="demo-dot"/> {modeLabel}<small>{mock ? '모의 환경 · 클러스터 변경 없음' : mode === 'real' ? 'K3s API 연결' : '연결 상태 확인 필요'}</small></div>
+        <div className="environment-pill"><span className="demo-dot"/> KUBERNETES<small>K3s API 연결</small></div>
         <div className="profile">
           <span className="avatar">{auth ? auth.username[0].toUpperCase() : 'D'}</span>
-          <div>{auth ? auth.username : '데모 워크스페이스'}<small>{auth ? `로그인됨 · ${mode}` : `인증: ${health?.authentication ?? '확인 불가'} · 데모`}</small></div>
+          <div>{auth.username}<small>로그인됨 · K3s</small></div>
           {auth && <button className="text-button" style={{fontSize:'11px'}} onClick={() => setShowChangePw(true)}>비밀번호 변경</button>}
           {auth && <button className="text-button" style={{marginLeft:'auto',fontSize:'11px'}} onClick={() => {
             try { localStorage.removeItem('kubehost-token'); localStorage.removeItem('kubehost-username'); } catch { /* ignore */ }
@@ -408,8 +405,8 @@ export function App() {
       <header className="topbar">
         <span>워크스페이스 <span className="muted">/</span> <strong>{titles[view]}</strong></span>
         <div className="topbar-actions">
-          <span className="topbar-status"><span className="demo-dot"/>{mode === 'real' ? '클러스터 연결' : mode === 'mock' ? '데모 환경' : '연결 확인 필요'}</span>
-          {auth && mode === 'real' && (
+          <span className="topbar-status"><span className="demo-dot"/>클러스터 연결</span>
+          {auth && (
             <span
               className={`session-timer${sessionRemaining < 120000 ? sessionRemaining < 60000 ? ' session-timer-urgent' : ' session-timer-warn' : ''}`}
               aria-label={`세션 만료까지 ${formatRemaining(sessionRemaining)}`}
@@ -433,7 +430,7 @@ export function App() {
         {busy && <p role="status" className="muted">요청을 처리하는 중…</p>}
         {loading ? <div className="panel loading" role="status">콘솔 데이터를 불러오는 중…</div> : error ?
           <div className="panel error" role="alert"><h2>데이터를 불러오지 못했습니다</h2><p>{error}</p><button onClick={() => void refreshView()}>다시 시도</button></div> : <>
-            {view === 'dashboard' && <Dashboard mock={mock} servers={servers} retainedCount={retained.length} tenant={tenant} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
+            {view === 'dashboard' && <Dashboard servers={servers} retainedCount={retained.length} tenant={tenant} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
             {(view === 'dashboard' || view === 'servers') && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
             {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}
