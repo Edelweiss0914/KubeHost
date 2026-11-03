@@ -1098,7 +1098,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   border:1px solid var(--accent-border);
   border-radius:5px;
   padding:3px 9px;
-  font-family:'JetBrains Mono',monospace;
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
 }
 
 /* ── Steps ─────────────────────────────────────────────────── */
@@ -1145,6 +1145,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   font-size:11px;
   font-weight:700;
   letter-spacing:1.5px;
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
   color:var(--accent);
   background:var(--accent-bg);
   border:1px solid var(--accent-border);
@@ -1237,13 +1238,13 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   flex-wrap:wrap;
   gap:10px;
   padding:28px clamp(20px,5vw,80px);
-  border-top:1px solid var(--border);
+  border-top:1px solid rgba(255,255,255,.08);
   font-size:12px;
-  color:var(--subtle);
+  color:#8095b4;
 }
 .landing-footer-brand{
   font-weight:700;
-  color:var(--text);
+  color:#e7edf5;
   letter-spacing:-.3px;
 }
 
