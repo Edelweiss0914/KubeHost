@@ -177,13 +177,104 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
   const [opBusy, setOpBusy] = useState(false);
   const [flash, setFlash] = useState('');
 
+  // JVM
+  const [jvmMb, setJvmMb] = useState(1536);
+  const [jvmLoading, setJvmLoading] = useState(true);
+  const [jvmBusy, setJvmBusy] = useState(false);
+
+  // server.properties
+  const [props, setProps] = useState('');
+  const [propsLoading, setPropsLoading] = useState(true);
+  const [propsBusy, setPropsBusy] = useState(false);
+
+  // Backups
+  const [backups, setBackups] = useState<string[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(true);
+  const [backupBusy, setBackupBusy] = useState(false);
+
+  // Plugins
+  const [plugins, setPlugins] = useState<string[]>([]);
+  const [pluginsLoading, setPluginsLoading] = useState(true);
+  const [pluginBusy, setPluginBusy] = useState(false);
+
   const showFlash = (msg: string) => { setFlash(msg); setTimeout(() => setFlash(''), 3000); };
 
   useEffect(() => {
     api.listOps(serverId).then(r => setOps(r.names)).catch(() => {});
+    api.getJvm(serverId).then(r => setJvmMb(r.memory_mb)).catch(() => {}).finally(() => setJvmLoading(false));
+    api.getProperties(serverId).then(r => setProps(r.content)).catch(() => {}).finally(() => setPropsLoading(false));
+    api.listBackups(serverId).then(r => setBackups(r.backups)).catch(() => {}).finally(() => setBackupsLoading(false));
+    api.listPlugins(serverId).then(r => setPlugins(r.plugins)).catch(() => {}).finally(() => setPluginsLoading(false));
     if (!active) { setWlLoading(false); return; }
     api.whitelist(serverId).then(r => setWhitelist(r.names)).catch(() => {}).finally(() => setWlLoading(false));
   }, [serverId, active]);
+
+  async function saveJvm() {
+    setJvmBusy(true);
+    try {
+      await api.setJvm(serverId, jvmMb);
+      showFlash(`JVM 메모리 ${jvmMb} MiB로 설정됨 (재시작 필요)`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setJvmBusy(false); }
+  }
+
+  async function saveProps() {
+    setPropsBusy(true);
+    try {
+      await api.setProperties(serverId, props);
+      showFlash('server.properties 저장됨 (재시작 필요)');
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setPropsBusy(false); }
+  }
+
+  async function doCreateBackup() {
+    setBackupBusy(true);
+    try {
+      const r = await api.createBackup(serverId);
+      setBackups(p => [...p, r.filename]);
+      showFlash(`백업 생성됨: ${r.filename}`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setBackupBusy(false); }
+  }
+
+  async function doRestoreBackup(filename: string) {
+    setBackupBusy(true);
+    try {
+      await api.restoreBackup(serverId, filename);
+      showFlash(`${filename} 복원 완료 (재시작 필요)`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setBackupBusy(false); }
+  }
+
+  async function doDeleteBackup(filename: string) {
+    setBackupBusy(true);
+    try {
+      await api.deleteBackup(serverId, filename);
+      setBackups(p => p.filter(f => f !== filename));
+      showFlash(`${filename} 삭제됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setBackupBusy(false); }
+  }
+
+  async function doUploadPlugin(file: File) {
+    setPluginBusy(true);
+    try {
+      const r = await api.uploadPlugin(serverId, file);
+      setPlugins(p => p.includes(r.filename) ? p : [...p, r.filename]);
+      showFlash(`${r.filename} 업로드됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setPluginBusy(false); }
+  }
+
+  async function doDeletePlugin(filename: string) {
+    setPluginBusy(true);
+    try {
+      await api.deletePlugin(serverId, filename);
+      setPlugins(p => p.filter(f => f !== filename));
+      showFlash(`${filename} 삭제됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setPluginBusy(false); }
+  }
 
   async function addWl() {
     const name = wlInput.trim(); if (!name) return;
@@ -236,7 +327,80 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
         <div><span className="eyebrow">MANAGE</span><h2>서버 관리</h2></div>
       </div>
       {flash && <div className="manage-flash">{flash}</div>}
-      {!active && <div className="notice">서버가 실행 중일 때만 관리 기능을 사용할 수 있습니다.</div>}
+
+      {/* JVM Memory */}
+      <div className="manage-section">
+        <h3>JVM 메모리</h3>
+        <p className="section-copy">서버에 할당할 JVM 힙 메모리를 설정합니다. 변경 후 서버 재시작이 필요합니다.</p>
+        {jvmLoading ? <p className="muted">불러오는 중…</p> : (
+          <div className="manage-add-row">
+            <input type="number" min={512} max={8192} step={256} value={jvmMb}
+              onChange={e => setJvmMb(Number(e.target.value))} disabled={jvmBusy}/>
+            <span className="muted">MiB</span>
+            <button onClick={() => void saveJvm()} disabled={jvmBusy}>저장</button>
+          </div>
+        )}
+      </div>
+
+      {/* server.properties */}
+      <div className="manage-section">
+        <h3>server.properties</h3>
+        <p className="section-copy">서버 설정 파일을 직접 편집합니다. 저장 후 서버 재시작이 필요합니다.</p>
+        {propsLoading ? <p className="muted">불러오는 중…</p> : (
+          <>
+            <textarea className="properties-editor" rows={14} value={props}
+              onChange={e => setProps(e.target.value)} disabled={propsBusy}/>
+            <div style={{ marginTop: '8px' }}>
+              <button onClick={() => void saveProps()} disabled={propsBusy}>저장</button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Backups */}
+      <div className="manage-section">
+        <h3>월드 백업</h3>
+        <p className="section-copy">월드 데이터를 tar.gz로 백업하고 복원할 수 있습니다.</p>
+        <div style={{ marginBottom: '10px' }}>
+          <button onClick={() => void doCreateBackup()} disabled={backupBusy}>백업 생성</button>
+        </div>
+        {backupsLoading ? <p className="muted">불러오는 중…</p>
+          : backups.length === 0 ? <p className="muted">저장된 백업이 없습니다.</p>
+          : <div className="backup-list">
+              {backups.map(f => (
+                <div key={f} className="backup-item">
+                  <span className="backup-name">{f}</span>
+                  <div className="backup-actions">
+                    <button className="secondary small" disabled={backupBusy} onClick={() => void doRestoreBackup(f)}>복원</button>
+                    <button className="secondary small" disabled={backupBusy} onClick={() => void doDeleteBackup(f)}>삭제</button>
+                  </div>
+                </div>
+              ))}
+            </div>}
+      </div>
+
+      {/* Plugins */}
+      <div className="manage-section">
+        <h3>플러그인</h3>
+        <p className="section-copy">.jar 플러그인 파일을 업로드하거나 삭제합니다.</p>
+        <div style={{ marginBottom: '10px' }}>
+          <input type="file" accept=".jar" disabled={pluginBusy}
+            onChange={e => { const f = e.target.files?.[0]; if (f) void doUploadPlugin(f); e.target.value = ''; }}/>
+        </div>
+        {pluginsLoading ? <p className="muted">불러오는 중…</p>
+          : plugins.length === 0 ? <p className="muted">설치된 플러그인이 없습니다.</p>
+          : <div className="plugin-list">
+              {plugins.map(f => (
+                <div key={f} className="plugin-item">
+                  <span className="plugin-name">{f}</span>
+                  <button className="secondary small" disabled={pluginBusy} onClick={() => void doDeletePlugin(f)}>삭제</button>
+                </div>
+              ))}
+            </div>}
+      </div>
+
+      {/* Whitelist */}
+      {!active && <div className="notice">서버가 실행 중일 때만 화이트리스트/OP 관리를 사용할 수 있습니다.</div>}
 
       <div className="manage-section">
         <h3>화이트리스트</h3>
