@@ -80,7 +80,7 @@ export function Login({ onLogin, onClose }: Props) {
         </button>
       )}
       <div className="login-brand">
-        <span className="brand-mark">K</span>
+        <img src="/kubehost-icon.png" alt="" width={40} height={40} style={{borderRadius:'8px'}}/>
         <span className="login-title">KubeHost</span>
       </div>
       <p className="login-sub">게임 서버 운영 플랫폼</p>

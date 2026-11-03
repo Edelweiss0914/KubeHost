@@ -16,7 +16,7 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── Nav ─────────────────────────────────────────────── */}
       <nav className="landing-nav" aria-label="사이트 메뉴">
         <a className="landing-nav-brand" href="#hero" onClick={e => e.preventDefault()}>
-          <span className="landing-brand-mark">K</span>
+          <img src="/kubehost-icon.png" alt="" width={32} height={32} style={{borderRadius:'6px'}}/>
           <span className="landing-brand-name">KubeHost</span>
         </a>
         <div className="landing-nav-right">
