@@ -47,7 +47,7 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
       {server && <button className="hierarchy-server" onClick={() => onSelect(server.id)}>
         <span className="hierarchy-kind">게임 서버</span>
         <strong>{server.name}</strong>
-        <Status value={pod.containers.some(container => container.ready) ? 'running' : pod.phase === 'Failed' ? 'error' : 'provisioning'} />
+        <Status value={server.status === 'stopped' ? 'stopped' : pod.containers.some(container => container.ready) ? 'running' : pod.phase === 'Failed' ? 'error' : 'provisioning'} />
         <span aria-hidden="true">↗</span>
       </button>}
     </li>;
