@@ -277,6 +277,33 @@ def delete_schedule(server_id: str, schedule_id: str, owner: Owner, svc: Service
     svc.repository.delete_schedule(schedule_id)
 
 
+# ── Player list ──────────────────────────────────────────────────────────────
+
+import re as _re
+
+
+def _parse_player_list(output: str) -> dict:
+    """Parse Minecraft RCON /list output into structured data."""
+    m = _re.search(r"There are (\d+) of a max of (\d+) players online:(.*)", output)
+    if m:
+        names_raw = m.group(3).strip()
+        names = [n.strip() for n in names_raw.split(",") if n.strip()]
+        return {"count": int(m.group(1)), "max": int(m.group(2)), "names": names}
+    return {"count": 0, "max": 0, "names": []}
+
+
+@router.get("/api/v1/servers/{server_id}/players")
+def server_players(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    if server.status != "running":
+        return {"count": 0, "max": 0, "names": []}
+    try:
+        output = svc.adapter.rcon(server_id, server.resource_plan.namespace, "list")
+        return _parse_player_list(output)
+    except Exception:
+        return {"count": 0, "max": 0, "names": []}
+
+
 # ── Game catalog ──────────────────────────────────────────────────────────────
 
 @router.get("/api/v1/games")

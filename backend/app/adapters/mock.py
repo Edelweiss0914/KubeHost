@@ -95,6 +95,9 @@ class MockKubernetesAdapter:
         pass
 
     def rcon(self, server_id: str, namespace: str, command: str) -> str:
+        cmd = command.lstrip("/").strip().lower()
+        if cmd == "list":
+            return "There are 2 of a max of 20 players online: Steve, Alex"
         return "[MOCK] 명령어가 실행됐습니다."
 
     def get_tenant_quota(self, namespace: str) -> dict[str, dict[str, str]]:

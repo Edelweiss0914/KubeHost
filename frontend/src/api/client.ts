@@ -88,6 +88,7 @@ export interface ServerGateway {
   adminGetUserQuota(userId: string): Promise<{max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}>;
   adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
   games(): Promise<Game[]>;
+  players(serverId: string): Promise<{ count: number; max: number; names: string[] }>;
   listSchedules(serverId: string): Promise<Schedule[]>;
   createSchedule(serverId: string, s: ScheduleInput): Promise<Schedule>;
   updateSchedule(serverId: string, scheduleId: string, s: ScheduleInput): Promise<Schedule>;
@@ -144,6 +145,7 @@ export const api: ServerGateway = {
   adminGetUserQuota: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`),
   adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
   games: () => versioned('/games'),
+  players: (id) => versioned(`/servers/${encodeURIComponent(id)}/players`),
   listSchedules: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`),
   createSchedule: (serverId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`, {method:'POST', body:JSON.stringify(s)}),
   updateSchedule: (serverId, scheduleId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'PUT', body:JSON.stringify(s)}),
