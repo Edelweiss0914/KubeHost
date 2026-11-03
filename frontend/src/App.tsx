@@ -249,7 +249,7 @@ export function App() {
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if ((view !== 'dashboard' && view !== 'cluster') || (mode === 'real' && !auth)) return;
+    if ((view !== 'dashboard' && view !== 'cluster' && view !== 'servers' && view !== 'detail') || (mode === 'real' && !auth)) return;
     const timer = window.setInterval(() => {
       if (!document.hidden) void refresh(true);
     }, 15000);
