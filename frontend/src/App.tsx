@@ -400,24 +400,6 @@ export function App() {
         <button className={view === 'servers' || view === 'create' || view === 'detail' ? 'active' : ''} aria-current={view === 'servers' || view === 'create' || view === 'detail' ? 'page' : undefined} onClick={() => navigate('servers')}>
           ▤ <span>게임 서버</span><span className="nav-count">{servers.length}</span>
         </button>
-        {view === 'detail' && selected && (
-          <div className="sub-nav">
-            <div className="sub-nav-label">{selected.name}</div>
-            {([
-              ['overview', '◫ 서버 정보'],
-              ['console', '▶ 콘솔'],
-              ['settings', '⚙ 설정'],
-              ['schedule', '◷ 스케줄'],
-              ['metrics', '▦ 메트릭'],
-            ] as [ServerSubView, string][]).map(([sv, label]) => (
-              <button
-                key={sv}
-                className={`sub-nav-item ${serverSubView === sv ? 'active' : ''}`}
-                onClick={() => setServerSubView(sv)}
-              >{label}</button>
-            ))}
-          </div>
-        )}
         <button className={view === 'cluster' ? 'active' : ''} aria-current={view === 'cluster' ? 'page' : undefined} onClick={() => navigate('cluster')}>
           ▧ <span>클러스터 맵</span>
         </button>
@@ -449,6 +431,27 @@ export function App() {
           </div>
         </div>
       </header>
+      {view === 'detail' && selected && (
+        <div className="sub-nav-bar">
+          <button className="text-button sub-nav-back" onClick={() => navigate('servers')}>← <span>서버 목록</span></button>
+          <span className="sub-nav-divider"/>
+          <span className="sub-nav-server-name">{selected.name}</span>
+          <span className="sub-nav-divider"/>
+          {([
+            ['overview', '◫ 서버 정보'],
+            ['console', '▶ 콘솔'],
+            ['settings', '⚙ 설정'],
+            ['schedule', '◷ 스케줄'],
+            ['metrics', '▦ 메트릭'],
+          ] as [ServerSubView, string][]).map(([sv, label]) => (
+            <button
+              key={sv}
+              className={`sub-nav-btn ${serverSubView === sv ? 'active' : ''}`}
+              onClick={() => setServerSubView(sv)}
+            >{label}</button>
+          ))}
+        </div>
+      )}
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
           <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '배포할 Worker와 리소스를 선택하세요.' : view === 'cluster' ? 'Worker 노드와 배포된 파드의 배치를 시각적으로 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>

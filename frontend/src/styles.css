@@ -1577,36 +1577,59 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .metrics-chart-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
 .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem; }
 
-/* === Pelican-style sub-nav === */
-.sub-nav{
-  margin-top:6px;
-  padding-left:16px;
-  border-left:2px solid #2c4841;
-  display:grid;
-  gap:3px}
-.sub-nav-label{
-  font-size:9px;
-  color:#4a6070;
-  letter-spacing:1.2px;
+/* === Server sub-nav bar === */
+.sub-nav-bar{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  width:min(1460px,calc(100% - 48px));
+  margin:10px auto 0;
+  padding:6px 10px;
+  background:color-mix(in srgb,var(--sidebar) 85%,transparent);
+  border:1px solid var(--border);
+  border-radius:13px;
+  font-size:12px;
+  backdrop-filter:blur(8px);
+  flex-wrap:wrap}
+.sub-nav-back{
+  color:var(--muted);
+  font-size:13px;
+  padding:5px 8px;
+  border-radius:7px;
+  flex:none}
+.sub-nav-back:hover{color:var(--text) !important;background:rgba(255,255,255,.07) !important}
+.sub-nav-server-name{
+  color:var(--text);
   font-weight:600;
-  padding:4px 10px 6px;
+  font-size:12px;
+  padding:0 6px;
+  white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap}
-.sub-nav-item{
+  max-width:160px}
+.sub-nav-divider{
+  display:inline-block;
+  width:1px;
+  height:18px;
+  background:var(--border);
+  margin:0 3px;
+  flex:none}
+.sub-nav-btn{
   background:none !important;
-  color:#6d8299 !important;
+  color:var(--muted) !important;
   border-color:transparent !important;
-  text-align:left;
-  display:flex;
-  gap:10px;
-  align-items:center;
-  padding:9px 10px;
+  padding:7px 11px;
   font-size:12px;
-  font-weight:400;
-  border-radius:6px}
-.sub-nav-item:hover{background:#192232 !important;color:#a8c4d4 !important}
-.sub-nav-item.active{background:#182e2b !important;color:#7dd4b0 !important;font-weight:600}
+  border-radius:9px;
+  font-weight:500;
+  white-space:nowrap}
+.sub-nav-btn:hover{background:rgba(255,255,255,.07) !important;color:var(--text) !important}
+.sub-nav-btn.active{
+  color:#f6f8ff !important;
+  border-color:#7772d8 !important;
+  background:linear-gradient(115deg,#2156a4,#5944a5) !important;
+  box-shadow:0 4px 14px #5162da38;
+  font-weight:600}
 
 /* === Server detail header === */
 .server-detail-header{margin-bottom:23px}
