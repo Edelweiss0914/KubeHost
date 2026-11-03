@@ -6,22 +6,22 @@ type LandingProps = {
 };
 
 const GAMES = [
-  '⚔️  Valheim',
-  '🌿  Terraria',
-  '🦕  ARK: Survival',
-  '🔫  Rust',
-  '🎮  CS2',
-  '🔧  Garry\'s Mod',
-  '🧟  7 Days to Die',
-  '⚙️  Factorio',
-  '🏭  Satisfactory',
-  '🧟  Project Zomboid',
-  '🐾  Palworld',
-  '🧛  V Rising',
-  '🌲  Don\'t Starve Together',
-  '🚀  Space Engineers',
-  '⭐  Starbound',
-  '🏗️  Team Fortress 2',
+  { name: 'Valheim',              id: 892970  },
+  { name: 'Terraria',             id: 105600  },
+  { name: 'ARK: Survival',        id: 346110  },
+  { name: 'Rust',                 id: 252490  },
+  { name: 'CS2',                  id: 730     },
+  { name: "Garry's Mod",          id: 4000    },
+  { name: '7 Days to Die',        id: 251570  },
+  { name: 'Factorio',             id: 427520  },
+  { name: 'Satisfactory',         id: 526870  },
+  { name: 'Project Zomboid',      id: 108600  },
+  { name: 'Palworld',             id: 1623730 },
+  { name: 'V Rising',             id: 1604030 },
+  { name: "Don't Starve Together",id: 322330  },
+  { name: 'Space Engineers',      id: 244850  },
+  { name: 'Starbound',            id: 211820  },
+  { name: 'Team Fortress 2',      id: 440     },
 ];
 
 const STACK = [
@@ -170,7 +170,15 @@ export function Landing({ onEnter }: LandingProps) {
         <div className="landing-marquee">
           <div className="landing-marquee-track">
             {[...GAMES, ...GAMES].map((g, i) => (
-              <span className="landing-marquee-item" key={i}>{g}</span>
+              <span className="landing-marquee-item" key={i}>
+                <img
+                  src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/capsule_sm_120.jpg`}
+                  alt={g.name}
+                  className="landing-marquee-img"
+                  loading="lazy"
+                />
+                {g.name}
+              </span>
             ))}
           </div>
         </div>
