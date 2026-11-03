@@ -2,17 +2,24 @@ import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { defaultSettings, type ServerSettings } from '../domain/server';
 
+const VERSIONS = ['LATEST', '1.21.4', '1.21.1', '1.20.6', '1.20.4', '1.16.5', '1.14.4', '1.12.2'] as const;
+
 type ServerSettingsProps = {
   serverId: string;
+  currentVersion: string;
+  onVersionSaved: () => void;
   onClose: () => void;
 };
 
-export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) {
+export function ServerSettingsPanel({ serverId, currentVersion, onVersionSaved, onClose }: ServerSettingsProps) {
   const [settings, setSettings] = useState<ServerSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [version, setVersion] = useState(currentVersion);
+  const [versionSaving, setVersionSaving] = useState(false);
+  const [versionMsg, setVersionMsg] = useState('');
 
   useEffect(() => {
     api.getSettings(serverId)
@@ -38,6 +45,19 @@ export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) 
     setSettings(prev => ({ ...prev, [key]: value }));
   }
 
+  async function saveVersion() {
+    setVersionSaving(true); setVersionMsg('');
+    try {
+      await api.setVersion(serverId, version);
+      setVersionMsg('버전이 변경됐습니다. 파드가 재시작 중입니다.');
+      onVersionSaved();
+    } catch (e) {
+      setVersionMsg(e instanceof Error ? e.message : '버전 변경 실패');
+    } finally {
+      setVersionSaving(false);
+    }
+  }
+
   async function save() {
     setSaving(true); setError(''); setSaved(false);
     try {
@@ -58,6 +78,22 @@ export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) 
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
         <p className="muted notice">설정 저장 시 파드가 재시작됩니다. 접속 중인 플레이어는 연결이 끊깁니다.</p>
+
+        {/* Version upgrade */}
+        <div className="manage-section" style={{marginBottom: '28px'}}>
+          <h3>서버 버전</h3>
+          <p className="section-copy">버전 변경 후 서버가 재시작됩니다. 다운그레이드 시 월드 데이터가 손상될 수 있으니 <strong>백업 후 진행</strong>하세요.</p>
+          <div className="manage-add-row">
+            <select value={version} onChange={e => setVersion(e.target.value)}>
+              {VERSIONS.map(v => <option key={v} value={v}>{v === 'LATEST' ? 'LATEST (최신)' : v}</option>)}
+            </select>
+            <button onClick={() => void saveVersion()} disabled={versionSaving || version === currentVersion}>
+              {versionSaving ? '변경 중…' : '버전 변경'}
+            </button>
+          </div>
+          {versionMsg && <p className={`notice${versionMsg.includes('실패') ? ' error' : ''}`} role="status">{versionMsg}</p>}
+        </div>
+
         {loading ? <p className="muted">설정 불러오는 중…</p> : <>
           <div className="form-grid">
             <label>난이도

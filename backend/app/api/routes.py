@@ -560,3 +560,25 @@ def delete_plugin(server_id: str, filename: str, owner: Owner, svc: Service) -> 
         svc.adapter.delete_plugin(server_id, server.resource_plan.namespace, filename)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ── Version upgrade ───────────────────────────────────────────────────────────
+
+_ALLOWED_VERSIONS = {"LATEST", "1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.16.5", "1.14.4", "1.12.2"}
+
+
+class _VersionBody(_BaseModel):
+    version: str
+
+
+@router.put("/api/v1/servers/{server_id}/version", status_code=204)
+def set_version(server_id: str, body: _VersionBody, owner: Owner, svc: Service, request: Request) -> None:
+    if body.version not in _ALLOWED_VERSIONS:
+        raise HTTPException(status_code=422, detail="지원하지 않는 버전입니다.")
+    server = svc.get(owner, server_id)
+    svc.adapter.set_version(server_id, server.resource_plan.namespace, body.version)
+    updated = server.model_copy(update={"version": body.version})
+    svc.repository.save(updated)
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "server.version", server_id, server.name,
+           detail=f"version={body.version}")

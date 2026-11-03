@@ -110,6 +110,7 @@ export interface ServerGateway {
   listPlugins(id: string): Promise<{ plugins: string[] }>;
   uploadPlugin(id: string, file: File): Promise<{ filename: string }>;
   deletePlugin(id: string, filename: string): Promise<void>;
+  setVersion(id: string, version: string): Promise<void>;
   serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
   namespaceMetrics(minutes?: number): Promise<NamespaceMetrics>;
   clusterMetrics(): Promise<ClusterMetrics>;
@@ -196,6 +197,7 @@ export const api: ServerGateway = {
     });
   },
   deletePlugin: (id, filename) => versioned(`/servers/${encodeURIComponent(id)}/plugins/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+  setVersion: (id, version) => versioned(`/servers/${encodeURIComponent(id)}/version`, { method: 'PUT', body: JSON.stringify({ version }) }),
   serverMetrics: (serverId, minutes = 60) => versioned(`/metrics/server/${encodeURIComponent(serverId)}?minutes=${minutes}`),
   namespaceMetrics: (minutes = 60) => versioned(`/metrics/namespace?minutes=${minutes}`),
   clusterMetrics: () => versioned('/metrics/cluster'),
