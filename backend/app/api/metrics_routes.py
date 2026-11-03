@@ -1,5 +1,6 @@
 """Prometheus metrics proxy endpoints."""
 import os
+import time
 from typing import Annotated
 
 import httpx
@@ -82,8 +83,8 @@ def server_metrics(
     namespace = server.resource_plan.namespace
     pod_prefix = f"mc-{server_id.replace('-', '')}"
 
-    end = "now"
-    start = f"now-{minutes}m"
+    end = int(time.time())
+    start = end - minutes * 60
 
     cpu = _prom_query_range(
         f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{pod_prefix}.*",container!="",container!="POD"}}[2m])',
@@ -106,8 +107,8 @@ def namespace_metrics(auth: Auth, request: Request, minutes: int = 60) -> dict:
     from uuid import NAMESPACE_URL, uuid5
     namespace = f"tenant-{uuid5(NAMESPACE_URL, auth).hex}"
 
-    end = "now"
-    start = f"now-{minutes}m"
+    end = int(time.time())
+    start = end - minutes * 60
 
     cpu = _prom_query_range(
         f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",container!="",container!="POD"}}[2m]))',
@@ -140,31 +141,42 @@ def cluster_metrics(request: Request, authorization: str = Header(default="")) -
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 
-    # 노드별 CPU 사용률
+    # node_exporter 레이블: instance=IP:9100, node label은 없을 수 있음
+    # kube_node_info로 node명 ↔ internal IP 매핑
+    node_info = _prom_query('kube_node_info')
+    # {node: "k3s-server", internal_ip: "100.x.x.x"}
+    ip_to_node: dict[str, str] = {}
+    for r in node_info:
+        node_name = r["metric"].get("node", "")
+        internal_ip = r["metric"].get("internal_ip", "")
+        if node_name and internal_ip:
+            ip_to_node[internal_ip] = node_name
+
+    def instance_to_name(instance: str) -> str:
+        ip = instance.split(":")[0]
+        return ip_to_node.get(ip, ip)
+
     cpu_results = _prom_query(
-        'sum by(node) (rate(node_cpu_seconds_total{mode!="idle"}[2m])) / sum by(node) (rate(node_cpu_seconds_total[2m])) * 100'
+        'sum by(instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m])) / sum by(instance) (rate(node_cpu_seconds_total[2m])) * 100'
     )
-    # 노드별 메모리 사용률
     mem_results = _prom_query(
         '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
     )
-    # 노드별 메모리 절대값
     mem_used = _prom_query('node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes')
     mem_total = _prom_query('node_memory_MemTotal_bytes')
 
-    def extract(results: list[dict], label_key: str = "node") -> dict[str, float]:
+    def extract(results: list[dict]) -> dict[str, float]:
         out = {}
         for r in results:
-            key = r["metric"].get(label_key) or r["metric"].get("instance", "unknown")
-            # instance는 보통 "ip:port" 형태
-            key = key.split(":")[0]
+            instance = r["metric"].get("instance", "unknown")
+            key = instance_to_name(instance)
             val = r["value"][1] if r.get("value") else "0"
             out[key] = round(float(val), 2)
         return out
 
     return {
         "cpu_pct": extract(cpu_results),
-        "mem_pct": extract(mem_results, "instance"),
-        "mem_used_bytes": extract(mem_used, "instance"),
-        "mem_total_bytes": extract(mem_total, "instance"),
+        "mem_pct": extract(mem_results),
+        "mem_used_bytes": extract(mem_used),
+        "mem_total_bytes": extract(mem_total),
     }
