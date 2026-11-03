@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { api } from '../api/client';
+import { wsApiUrl } from '../api/config';
 
 type Line = { type: 'cmd' | 'rcon' | 'log' | 'err'; text: string };
 
@@ -15,7 +16,6 @@ export function ServerConsole({ serverId, active }: ServerConsoleProps) {
   const [loaded, setLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevLogsRef = useRef<string[]>([]);
-  const initialized = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -23,37 +23,70 @@ export function ServerConsole({ serverId, active }: ServerConsoleProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let ws: WebSocket | null = null;
+    let pollId: number | null = null;
 
-    async function pollLogs() {
-      try {
-        const result = await api.logs(serverId, 300);
+    function startPolling() {
+      async function poll() {
         if (cancelled) return;
-        const fresh = result.lines;
-        const prev = prevLogsRef.current;
-
-        if (!initialized.current) {
-          initialized.current = true;
-          prevLogsRef.current = fresh;
-          setLines(fresh.map(text => ({ type: 'log' as const, text })));
-          setLoaded(true);
-          return;
-        }
-
-        if (fresh.length === 0) return;
-        const lastPrev = prev[prev.length - 1];
-        if (lastPrev && fresh[fresh.length - 1] === lastPrev) return;
-        const lastIdx = lastPrev ? fresh.lastIndexOf(lastPrev) : -1;
-        const added = lastIdx >= 0 ? fresh.slice(lastIdx + 1) : fresh.slice(Math.max(0, fresh.length - 50));
-        if (added.length > 0) {
-          prevLogsRef.current = fresh;
-          setLines(p => [...p, ...added.map(text => ({ type: 'log' as const, text }))]);
-        }
-      } catch { /* silent */ }
+        try {
+          const result = await api.logs(serverId, 300);
+          if (cancelled) return;
+          const fresh = result.lines;
+          const prev = prevLogsRef.current;
+          if (prev.length === 0) {
+            prevLogsRef.current = fresh;
+            setLines(fresh.map(text => ({ type: 'log' as const, text })));
+            setLoaded(true);
+            return;
+          }
+          if (!fresh.length || fresh[fresh.length - 1] === prev[prev.length - 1]) return;
+          const lastIdx = prev.length ? fresh.lastIndexOf(prev[prev.length - 1]) : -1;
+          const added = lastIdx >= 0 ? fresh.slice(lastIdx + 1) : fresh.slice(Math.max(0, fresh.length - 50));
+          if (added.length > 0) {
+            prevLogsRef.current = fresh;
+            setLines(p => [...p, ...added.map(text => ({ type: 'log' as const, text }))]);
+          }
+        } catch { /* silent */ }
+      }
+      poll();
+      pollId = window.setInterval(poll, 3000);
     }
 
-    pollLogs();
-    const id = setInterval(pollLogs, 3000);
-    return () => { cancelled = true; clearInterval(id); };
+    try {
+      const token = localStorage.getItem('kubehost-token') ?? '';
+      const url = wsApiUrl(`/api/v1/servers/${encodeURIComponent(serverId)}/logs/stream`) +
+        (token ? `?token=${encodeURIComponent(token)}` : '');
+      ws = new WebSocket(url);
+
+      ws.onmessage = (event) => {
+        if (cancelled) return;
+        try {
+          const msg: { type: string; lines?: string[] } = JSON.parse(event.data);
+          if (msg.type === 'init' && msg.lines) {
+            prevLogsRef.current = msg.lines;
+            setLines(msg.lines.map(text => ({ type: 'log' as const, text })));
+            setLoaded(true);
+          } else if (msg.type === 'append' && msg.lines?.length) {
+            prevLogsRef.current = [...prevLogsRef.current, ...msg.lines];
+            setLines(p => [...p, ...msg.lines!.map(text => ({ type: 'log' as const, text }))]);
+          }
+        } catch { /* ignore malformed frames */ }
+      };
+
+      ws.onerror = () => {
+        ws = null;
+        if (!cancelled) startPolling();
+      };
+    } catch {
+      startPolling();
+    }
+
+    return () => {
+      cancelled = true;
+      ws?.close();
+      if (pollId !== null) clearInterval(pollId);
+    };
   }, [serverId]);
 
   async function send(event: FormEvent) {

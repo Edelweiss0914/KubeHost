@@ -1,8 +1,9 @@
 """HTTP translation only."""
+import asyncio
 from typing import Annotated
 from uuid import NAMESPACE_URL, uuid5
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from app.models.server import DeletionResult, Node, Server, ServerCreate, ServerPod, ServerSettings
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
@@ -274,3 +275,78 @@ def delete_schedule(server_id: str, schedule_id: str, owner: Owner, svc: Service
     if server is None or server.owner_id != owner:
         raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
     svc.repository.delete_schedule(schedule_id)
+
+
+# ── Game catalog ──────────────────────────────────────────────────────────────
+
+@router.get("/api/v1/games")
+def list_games(svc: Service) -> list[dict]:
+    return svc.repository.list_games()  # type: ignore[attr-defined]
+
+
+# ── WebSocket log streaming ───────────────────────────────────────────────────
+
+def _diff_log_lines(prev: list[str], current: list[str]) -> list[str]:
+    """Return lines in `current` that appear after the last line of `prev`."""
+    if not current or current == prev:
+        return []
+    if not prev:
+        return current
+    last = prev[-1]
+    for i in range(len(current) - 1, -1, -1):
+        if current[i] == last:
+            return current[i + 1:]
+    return current[-50:]
+
+
+@router.websocket("/api/v1/servers/{server_id}/logs/stream")
+async def stream_logs(
+    server_id: str,
+    websocket: WebSocket,
+    token: str = Query(default=""),
+) -> None:
+    mode: str = getattr(websocket.app.state, "mode", "mock")
+    svc: ServerService = websocket.app.state.server_service
+
+    await websocket.accept()
+
+    # Auth (skip in mock mode)
+    owner_id: str | None = None
+    if mode != "mock":
+        auth_svc = websocket.app.state.auth_service
+        try:
+            payload = auth_svc.verify_token(token)
+            owner_id = str(payload["sub"])
+        except Exception:
+            await websocket.close(code=4001)
+            return
+
+    prev_lines: list[str] = []
+    try:
+        while True:
+            server = svc.repository.get(server_id)
+            if server is None or (owner_id is not None and server.owner_id != owner_id):
+                await websocket.close(code=4004)
+                return
+
+            lines: list[str] = await asyncio.to_thread(
+                svc.adapter.logs, server_id, server.resource_plan.namespace, 300
+            )
+
+            if not prev_lines:
+                await websocket.send_json({"type": "init", "lines": lines})
+                prev_lines = lines[:]
+            else:
+                new_lines = _diff_log_lines(prev_lines, lines)
+                if new_lines:
+                    await websocket.send_json({"type": "append", "lines": new_lines})
+                    prev_lines = lines[:]
+
+            await asyncio.sleep(2)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
