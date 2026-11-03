@@ -34,8 +34,35 @@ class K8sAdapter:
     def _sts_name(self, server_id: str) -> str:
         return f"mc-{server_id.replace('-', '')}"
 
+    def _node_allocations(self) -> dict[str, tuple[int, int]]:
+        """Return {node_name: (cpu_millicores, memory_mb)} summed from all pod requests."""
+        allocs: dict[str, tuple[int, int]] = {}
+        try:
+            pods = self._core.list_pod_for_all_namespaces(field_selector="status.phase!=Failed,status.phase!=Succeeded").items
+        except Exception:
+            return allocs
+        for pod in pods:
+            node = pod.spec.node_name
+            if not node:
+                continue
+            cpu_m, mem_mb = allocs.get(node, (0, 0))
+            for container in (pod.spec.containers or []):
+                req = (container.resources.requests or {}) if container.resources else {}
+                raw_cpu = req.get("cpu", "0")
+                if raw_cpu.endswith("m"):
+                    cpu_m += int(raw_cpu[:-1])
+                else:
+                    try:
+                        cpu_m += int(float(raw_cpu) * 1000)
+                    except ValueError:
+                        pass
+                mem_mb += _parse_memory_mb(req.get("memory", "0Ki"))
+            allocs[node] = (cpu_m, mem_mb)
+        return allocs
+
     def nodes(self) -> list[Node]:
         result = []
+        allocs = self._node_allocations()
         for n in self._core.list_node().items:
             taints = n.spec.taints or []
             schedulable = not any(t.effect == "NoSchedule" for t in taints)
@@ -45,6 +72,7 @@ class K8sAdapter:
             node_status: Literal["Ready", "NotReady"] = (
                 "Ready" if (ready and ready.status == "True") else "NotReady"
             )
+            cpu_m, mem_mb = allocs.get(n.metadata.name, (0, 0))
             result.append(Node(
                 id=n.metadata.name,
                 name=n.metadata.name,
@@ -53,6 +81,8 @@ class K8sAdapter:
                 schedulable=schedulable,
                 cpu_capacity=int(n.status.capacity.get("cpu", 0)),
                 memory_mb_capacity=_parse_memory_mb(n.status.capacity.get("memory", "0Ki")),
+                cpu_requested_m=cpu_m,
+                memory_mb_requested=mem_mb,
             ))
         return result
 
