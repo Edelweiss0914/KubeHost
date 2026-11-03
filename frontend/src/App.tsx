@@ -3,13 +3,14 @@ import { api, ApiError } from './api/client';
 import type { NamespaceMetrics } from './api/client';
 import { MetricsChart } from './components/MetricsChart';
 import { useConsole } from './application/useConsole';
-import type { Server, ServerInput, WorkerNode } from './domain/server';
+import type { Server, ServerInput } from './domain/server';
 import { Status } from './components/Status';
 import { CreateServer } from './features/CreateServer';
 import { ServerList } from './features/ServerList';
 import { ServerDetail } from './features/ServerDetail';
 import { ClusterMap } from './features/ClusterMap';
 import { Login } from './features/Login';
+import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
 
 function getStoredAuth(): { token: string; username: string } | null {
@@ -39,61 +40,14 @@ function QuotaBar({ label, entry }: { label: string; entry: QuotaEntry }) {
   </div>;
 }
 
-function TopologyOverview({ nodes, servers, mock, lastUpdated }: { nodes: WorkerNode[]; servers: Server[]; mock: boolean; lastUpdated: Date | null }) {
-  const controlPlane = nodes.find(node => node.role !== 'worker');
-  const workers = nodes.filter(node => node.role === 'worker');
-  const ready = nodes.filter(node => node.status === 'Ready').length;
 
-  return <section className="panel topology-panel" aria-label="클러스터 토폴로지">
-    <div className="section-title">
-      <div>
-        <span className="eyebrow">LIVE TOPOLOGY</span>
-        <h2>클러스터 토폴로지</h2>
-        <p className="section-copy">Control Plane과 Worker의 연결 상태</p>
-      </div>
-      <span className="topology-live"><span className="demo-dot" aria-hidden="true"/>{mock ? 'DEMO' : '15초 갱신'}</span>
-    </div>
-    {nodes.length ? <>
-      <div className="topology-canvas">
-        <div className="topology-core">
-          <span className="topology-core-icon" aria-hidden="true">⌘</span>
-          <div className="topology-core-copy">
-            <span>CONTROL PLANE</span>
-            <strong>{controlPlane?.name ?? 'Control Plane'}</strong>
-            <small>클러스터 제어 노드</small>
-          </div>
-          {controlPlane && <Status value={controlPlane.status}/>}
-        </div>
-        <div className="topology-connector" aria-hidden="true"><span/></div>
-        <div className="topology-workers">
-          {workers.length ? workers.map(node => {
-            const assigned = servers.filter(server => server.node_id === node.id);
-            return <div className="topology-worker" key={node.id}>
-              <div className="topology-worker-head">
-                <span className="topology-worker-icon" aria-hidden="true">◈</span>
-                <Status value={node.status}/>
-              </div>
-              <span className="topology-node-role">WORKER NODE</span>
-              <strong>{node.name}</strong>
-              <small>{assigned.length}개 서버 배치 · {node.cpu_capacity} vCPU</small>
-            </div>;
-          }) : <p className="topology-empty">연결된 Worker가 없습니다.</p>}
-        </div>
-      </div>
-      <div className="topology-footer"><span><i className="topology-legend-dot"/>정상 노드 {ready}/{nodes.length}</span><span>마지막 동기화 {lastUpdated ? lastUpdated.toLocaleTimeString('ko-KR') : '대기 중'}</span></div>
-    </> : <p className="topology-empty">표시할 노드가 없습니다.</p>}
-  </section>;
-}
-
-function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, mock, lastUpdated }: {
+function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate, mock }: {
   servers: Server[];
-  nodes: WorkerNode[];
   retainedCount: number;
   tenant: TenantInfo | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
   mock: boolean;
-  lastUpdated: Date | null;
 }) {
   const [nsMetrics, setNsMetrics] = useState<NamespaceMetrics | null>(null);
   useEffect(() => {
@@ -116,7 +70,6 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
       </div>
       <div className="hero-actions"><button onClick={onCreate}>새 서버 배포 <span aria-hidden="true">↗</span></button></div>
     </section>
-    <TopologyOverview nodes={nodes} servers={servers} mock={mock} lastUpdated={lastUpdated}/>
     <div className="stats">
       <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
       <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">{mock ? '모의 실행 상태' : '서비스 제공 중'}</p></article>
@@ -241,8 +194,9 @@ function initialTheme(): Theme {
 }
 
 export function App() {
-  const { health, mode, servers, retained, nodes, topologyPods, tenant, loading, error, lastUpdated, refresh } = useConsole();
+  const { health, mode, servers, retained, nodes, topologyPods, tenant, loading, error, refresh } = useConsole();
   const [auth, setAuth] = useState<{ token: string; username: string } | null>(getStoredAuth);
+  const [showLogin, setShowLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -288,10 +242,19 @@ export function App() {
 
   // Real mode: require login. Mock mode: skip auth.
   if (mode === 'real' && !auth) {
-    return <Login onLogin={(token, username) => {
+    function handleLogin(token: string, username: string) {
       try { localStorage.setItem('kubehost-token', token); localStorage.setItem('kubehost-username', username); } catch { /* ignore */ }
       setAuth({ token, username });
-    }}/>;
+      setShowLogin(false);
+    }
+    return (
+      <>
+        <Landing onEnter={() => setShowLogin(true)} />
+        {showLogin && (
+          <Login onLogin={handleLogin} onClose={() => setShowLogin(false)} />
+        )}
+      </>
+    );
   }
   const mock = mode === 'mock';
   const modeLabel = mode === 'mock' ? 'MOCK MODE' : mode === 'real' ? 'KUBERNETES' : 'MODE UNKNOWN';
@@ -432,17 +395,12 @@ export function App() {
           <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '배포할 Worker와 리소스를 선택하세요.' : view === 'cluster' ? 'Worker 노드와 배포된 파드의 배치를 시각적으로 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
           <button className="secondary" onClick={() => void refreshView()} disabled={loading || busy}>↻ 새로고침</button>
         </div>
-        <div className={`demo-banner ${mode === 'real' ? 'is-real' : mode === 'mock' ? 'is-mock' : 'is-unknown'}`}>
-          <span aria-hidden="true">◈</span>
-          <div><strong>{mock ? '데모 환경에서 작업 중' : mode === 'real' ? 'K3s 클러스터에 연결됨' : 'API 연결 상태를 확인하세요'}</strong><p>{mock ? '표시된 서버와 노드는 모의 데이터이며 클러스터를 변경하지 않습니다.' : mode === 'real' ? '이 화면의 작업은 실제 클러스터에 반영됩니다. 저장 데이터는 Worker에 위치합니다.' : '연결 상태를 확인한 뒤 작업을 진행하세요.'}</p></div>
-          <span className="tag">{modeLabel}</span>
-        </div>
         {notice && <p role="status" className="notice">{notice}</p>}
         {actionError && <div role="alert" className="error">{actionError}</div>}
         {busy && <p role="status" className="muted">요청을 처리하는 중…</p>}
         {loading ? <div className="panel loading" role="status">콘솔 데이터를 불러오는 중…</div> : error ?
           <div className="panel error" role="alert"><h2>데이터를 불러오지 못했습니다</h2><p>{error}</p><button onClick={() => void refreshView()}>다시 시도</button></div> : <>
-            {view === 'dashboard' && <Dashboard mock={mock} servers={servers} nodes={nodes} retainedCount={retained.length} tenant={tenant} lastUpdated={lastUpdated} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
+            {view === 'dashboard' && <Dashboard mock={mock} servers={servers} retainedCount={retained.length} tenant={tenant} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
             {(view === 'dashboard' || view === 'servers') && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
             {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}

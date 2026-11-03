@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { defaultSettings, type ServerSettings } from '../domain/server';
 
@@ -8,16 +8,11 @@ type ServerSettingsProps = {
 };
 
 export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [settings, setSettings] = useState<ServerSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
 
   useEffect(() => {
     api.getSettings(serverId)
@@ -55,13 +50,8 @@ export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) 
     }
   }
 
-  // 배경(backdrop) 클릭 시 닫기
-  function handleClick(e: React.MouseEvent<HTMLDialogElement>) {
-    if (e.target === dialogRef.current) onClose();
-  }
-
   return (
-    <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
+    <div className="panel">
       <div className="settings-dialog-inner">
         <div className="section-title">
           <div><span className="eyebrow">SERVER CONFIG</span><h2>서버 설정</h2></div>
@@ -122,6 +112,6 @@ export function ServerSettingsPanel({ serverId, onClose }: ServerSettingsProps) 
           </div>
         </>}
       </div>
-    </dialog>
+    </div>
   );
 }
