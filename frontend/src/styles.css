@@ -1896,6 +1896,87 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   font-family:'DM Sans','Noto Sans KR',sans-serif;
 }
 
+/* ── Session Timer ─────────────────────────────────────────── */
+.session-timer{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:12px;
+  font-weight:600;
+  font-family:'JetBrains Mono',monospace;
+  color:var(--muted);
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:4px 10px;
+  letter-spacing:.5px;
+  transition:color .3s,border-color .3s,background .3s;
+}
+.session-timer-warn{
+  color:#f59e0b;
+  border-color:rgba(245,158,11,.35);
+  background:rgba(245,158,11,.08);
+}
+.session-timer-urgent{
+  color:#ef4444;
+  border-color:rgba(239,68,68,.4);
+  background:rgba(239,68,68,.1);
+  animation:session-pulse 1s ease-in-out infinite;
+}
+@keyframes session-pulse{
+  0%,100%{opacity:1}
+  50%{opacity:.6}
+}
+
+/* ── Session Expired Modal ─────────────────────────────────── */
+.session-expired-dialog{
+  border:none;
+  border-radius:16px;
+  padding:0;
+  background:var(--surface);
+  color:var(--text);
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+  max-width:360px;
+  width:90%;
+}
+.session-expired-dialog::backdrop{
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(4px);
+}
+.session-expired-inner{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  padding:40px 32px 32px;
+  gap:12px;
+}
+.session-expired-icon{
+  font-size:40px;
+  line-height:1;
+  margin-bottom:4px;
+  filter:grayscale(.3);
+}
+.session-expired-title{
+  font-size:18px;
+  font-weight:700;
+  margin:0;
+  color:var(--text);
+}
+.session-expired-msg{
+  font-size:14px;
+  color:var(--muted);
+  margin:0;
+  line-height:1.6;
+}
+.session-expired-btn{
+  margin-top:8px;
+  width:100%;
+  padding:11px;
+  font-size:14px;
+  font-weight:700;
+}
+
 /* ── Footer ────────────────────────────────────────────────── */
 .landing-footer{
   display:flex;
