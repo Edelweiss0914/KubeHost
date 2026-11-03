@@ -963,7 +963,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   gap:6px;
   padding:12px 16px;
   background:#0e1825;
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid rgba(255,255,255,.08);
 }
 .landing-terminal-dot{
   width:11px;
@@ -977,7 +977,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
 .landing-terminal-title{
   margin-left:auto;
   font-size:11px;
-  color:var(--subtle);
+  color:#6b82a8;
   font-family:'JetBrains Mono',monospace;
 }
 .landing-terminal-body{
@@ -998,11 +998,11 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   user-select:none;
 }
 .landing-terminal-cmd{color:#c9d8f0}
-.landing-terminal-info{color:var(--subtle);padding-left:16px}
+.landing-terminal-info{color:#6b82a8;padding-left:16px}
 .landing-terminal-ok{color:#79e0b0;padding-left:16px}
-.landing-terminal-muted{color:var(--subtle);padding-left:16px}
+.landing-terminal-muted{color:#6b82a8;padding-left:16px}
 .landing-terminal-running{color:#79e0b0}
-.landing-terminal-cursor{color:var(--subtle)}
+.landing-terminal-cursor{color:#6b82a8}
 @keyframes landing-blink{0%,100%{opacity:1}50%{opacity:0}}
 .landing-cursor-blink{
   display:inline-block;
