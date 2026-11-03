@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './api/client';
+import type { NamespaceMetrics } from './api/client';
+import { MetricsChart } from './components/MetricsChart';
 import { useConsole } from './application/useConsole';
 import type { Server, ServerInput, WorkerNode } from './domain/server';
 import { Status } from './components/Status';
@@ -93,6 +95,9 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
   mock: boolean;
   lastUpdated: Date | null;
 }) {
+  const [nsMetrics, setNsMetrics] = useState<NamespaceMetrics | null>(null);
+  useEffect(() => { api.namespaceMetrics(60).then(setNsMetrics).catch(() => {}); }, []);
+
   const running = servers.filter(server => server.status === 'running').length;
   const provisioning = servers.filter(server => server.status === 'provisioning').length;
   const recent = [...servers].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 4);
@@ -138,6 +143,18 @@ function Dashboard({ servers, nodes, retainedCount, tenant, onSelect, onCreate, 
         {tenant.quota['pods'] && <QuotaBar label="파드" entry={tenant.quota['pods']}/>}
       </div>
     </section>}
+    {nsMetrics && (
+      <section className="panel metrics-panel">
+        <div className="section-title">
+          <div><span className="eyebrow">NAMESPACE METRICS</span><h2>리소스 사용 추이</h2></div>
+          <span className="muted" style={{fontSize:'12px'}}>최근 1시간</span>
+        </div>
+        <div className="metrics-grid">
+          <MetricsChart title="CPU (cores)" data={nsMetrics.cpu} color="#79aaff" unit="cpu" />
+          <MetricsChart title="메모리" data={nsMetrics.memory_bytes} color="#34d399" unit="bytes" />
+        </div>
+      </section>
+    )}
   </div>;
 }
 

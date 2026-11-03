@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router
 from app.api.auth_routes import auth_router
 from app.api.admin_routes import admin_router
+from app.api.metrics_routes import metrics_router
 from app.services.scheduler import SchedulerService
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
 
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     application.include_router(router)
     application.include_router(auth_router)
     application.include_router(admin_router)
+    application.include_router(metrics_router)
     return application
 
 

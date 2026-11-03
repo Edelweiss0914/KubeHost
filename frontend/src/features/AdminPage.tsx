@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
+import type { ClusterMetrics } from '../api/client';
 import type { WorkerNode } from '../domain/server';
 
 type User = { id: string; username: string; is_admin: boolean; created_at: string };
@@ -381,6 +382,7 @@ function OverviewTab() {
   const [error, setError] = useState('');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [forceStopping, setForceStopping] = useState('');
+  const [clusterMetrics, setClusterMetrics] = useState<ClusterMetrics | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -389,6 +391,7 @@ function OverviewTab() {
       .then(([ov, servers, nd]) => { setOverview(ov); setAllServers(servers); setNodes(nd); })
       .catch(e => setError(e instanceof Error ? e.message : '불러오기 실패'))
       .finally(() => setLoading(false));
+    api.clusterMetrics().then(setClusterMetrics).catch(() => {});
   };
 
   useEffect(load, []);
@@ -408,6 +411,24 @@ function OverviewTab() {
   return (
     <>
     <ClusterSummary nodes={nodes} servers={allServers}/>
+    {clusterMetrics && Object.keys(clusterMetrics.cpu_pct).length > 0 && (
+      <div className="metrics-panel">
+        <div className="section-title">
+          <div><span className="eyebrow">CLUSTER METRICS</span><h2>노드 리소스 현황</h2></div>
+        </div>
+        <div className="metrics-grid">
+          {Object.entries(clusterMetrics.cpu_pct).map(([node, pct]) => (
+            <div key={node} className="metric-card">
+              <span className="eyebrow">{node}</span>
+              <div style={{display:'flex',gap:'2rem',marginTop:'.5rem'}}>
+                <div><small className="muted">CPU</small><strong style={{display:'block'}}>{pct.toFixed(1)}%</strong></div>
+                <div><small className="muted">메모리</small><strong style={{display:'block'}}>{(clusterMetrics.mem_pct[node] ?? 0).toFixed(1)}%</strong></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
       <thead>
         <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>

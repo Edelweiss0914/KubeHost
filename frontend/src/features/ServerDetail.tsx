@@ -4,7 +4,8 @@ import { Status } from '../components/Status';
 import { ServerSettingsPanel } from './ServerSettings';
 import { ServerConsole } from './ServerConsole';
 import { api } from '../api/client';
-import type { Schedule, ScheduleInput } from '../api/client';
+import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
+import { MetricsChart } from '../components/MetricsChart';
 
 type K8sResource = {
   apiVersion: string
@@ -93,6 +94,33 @@ function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
 }
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+function ServerMetricsPanel({ serverId }: { serverId: string }) {
+  const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.serverMetrics(serverId, 60)
+      .then(setMetrics)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [serverId]);
+
+  return (
+    <div className="metrics-panel">
+      <div className="section-title">
+        <div><span className="eyebrow">METRICS</span><h2>리소스 사용량</h2></div>
+        <span className="muted" style={{fontSize:'12px'}}>최근 1시간</span>
+      </div>
+      {loading ? <p className="muted">불러오는 중…</p> : (
+        <div className="metrics-grid">
+          <MetricsChart title="CPU (cores)" data={metrics?.cpu ?? []} color="#79aaff" unit="cpu" />
+          <MetricsChart title="메모리" data={metrics?.memory_bytes ?? []} color="#34d399" unit="bytes" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SchedulePanel({ serverId }: { serverId: string }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -281,6 +309,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
       <ResourcePlanViewer plan={server.resource_plan} />
     </section>
     {showSettings && <ServerSettingsPanel serverId={server.id} onClose={() => setShowSettings(false)}/>}
+    <section className="panel">
+      <ServerMetricsPanel serverId={server.id} />
+    </section>
     <section className="panel">
       <SchedulePanel serverId={server.id} />
     </section>

@@ -16,6 +16,16 @@ export type Schedule = {
 
 export type ScheduleInput = Omit<Schedule, 'id' | 'server_id'>;
 
+export type MetricPoint = { t: number; v: number };
+export type ServerMetrics = { cpu: MetricPoint[]; memory_bytes: MetricPoint[] };
+export type NamespaceMetrics = { namespace: string; cpu: MetricPoint[]; memory_bytes: MetricPoint[] };
+export type ClusterMetrics = {
+  cpu_pct: Record<string, number>;
+  mem_pct: Record<string, number>;
+  mem_used_bytes: Record<string, number>;
+  mem_total_bytes: Record<string, number>;
+};
+
 function getToken(): string { try { return localStorage.getItem('kubehost-token') ?? ''; } catch { return ''; } }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -71,6 +81,9 @@ export interface ServerGateway {
   createSchedule(serverId: string, s: ScheduleInput): Promise<Schedule>;
   updateSchedule(serverId: string, scheduleId: string, s: ScheduleInput): Promise<Schedule>;
   deleteSchedule(serverId: string, scheduleId: string): Promise<void>;
+  serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
+  namespaceMetrics(minutes?: number): Promise<NamespaceMetrics>;
+  clusterMetrics(): Promise<ClusterMetrics>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -123,4 +136,7 @@ export const api: ServerGateway = {
   createSchedule: (serverId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`, {method:'POST', body:JSON.stringify(s)}),
   updateSchedule: (serverId, scheduleId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'PUT', body:JSON.stringify(s)}),
   deleteSchedule: (serverId, scheduleId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'DELETE'}),
+  serverMetrics: (serverId, minutes = 60) => versioned(`/metrics/server/${encodeURIComponent(serverId)}?minutes=${minutes}`),
+  namespaceMetrics: (minutes = 60) => versioned(`/metrics/namespace?minutes=${minutes}`),
+  clusterMetrics: () => versioned('/metrics/cluster'),
 };

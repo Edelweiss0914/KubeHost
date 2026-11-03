@@ -1567,3 +1567,12 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .day-btn { padding: .375rem .625rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; min-height: unset; transform: none !important; }
 .day-btn:hover { background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent-border); transform: none !important; }
 .day-btn.selected { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+
+/* ── Metrics ──────────────────────────────────────────────────────────── */
+.metrics-panel { margin-top: 1.5rem; }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+@media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } }
+.metrics-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem 1rem; }
+.metrics-chart .eyebrow { display: block; margin-bottom: .5rem; }
+.metrics-chart-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem; }
