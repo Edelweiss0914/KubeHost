@@ -698,13 +698,13 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
 /* ═══════════════════════════════════════════════════════════
    LANDING PAGE  — prefix: landing-
    ═══════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
 .landing-page{
   min-height:100vh;
-  background:var(--page);
-  color:var(--text);
-  font-family:'Sora','Noto Sans KR',sans-serif;
+  background:#0b1220;
+  background:var(--page,#0b1220);
+  color:#e7edf5;
+  color:var(--text,#e7edf5);
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
   overflow-x:hidden;
 }
 
@@ -832,7 +832,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   letter-spacing:2px;
   color:var(--accent);
   margin-bottom:20px;
-  font-family:'JetBrains Mono',monospace;
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
 }
 .landing-hero-h1{
   font-size:clamp(36px,5.5vw,68px);
