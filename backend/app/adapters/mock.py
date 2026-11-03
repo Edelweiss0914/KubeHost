@@ -9,6 +9,7 @@ class InMemoryServerRepository:
     def __init__(self) -> None:
         self._servers: dict[str, Server] = {}
         self.retained: dict[str, Server] = {}
+        self._ops: dict[str, list[str]] = {}
 
     def list_by_owner(self, owner_id: str) -> list[Server]:
         return [s.model_copy(deep=True) for s in self._servers.values() if s.owner_id == owner_id]
@@ -45,6 +46,18 @@ class InMemoryServerRepository:
 
     def list_games(self) -> list[dict]:
         return list(self._GAMES)
+
+    def list_ops(self, server_id: str) -> list[str]:
+        return list(self._ops.get(server_id, []))
+
+    def add_op(self, server_id: str, player_name: str) -> None:
+        self._ops.setdefault(server_id, [])
+        if player_name not in self._ops[server_id]:
+            self._ops[server_id].append(player_name)
+
+    def remove_op(self, server_id: str, player_name: str) -> None:
+        if server_id in self._ops:
+            self._ops[server_id] = [n for n in self._ops[server_id] if n != player_name]
 
 
 class MockKubernetesAdapter:

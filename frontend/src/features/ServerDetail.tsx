@@ -172,6 +172,7 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
   const [wlLoading, setWlLoading] = useState(true);
   const [wlInput, setWlInput] = useState('');
   const [wlBusy, setWlBusy] = useState(false);
+  const [ops, setOps] = useState<string[]>([]);
   const [opInput, setOpInput] = useState('');
   const [opBusy, setOpBusy] = useState(false);
   const [flash, setFlash] = useState('');
@@ -179,6 +180,7 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
   const showFlash = (msg: string) => { setFlash(msg); setTimeout(() => setFlash(''), 3000); };
 
   useEffect(() => {
+    api.listOps(serverId).then(r => setOps(r.names)).catch(() => {});
     if (!active) { setWlLoading(false); return; }
     api.whitelist(serverId).then(r => setWhitelist(r.names)).catch(() => {}).finally(() => setWlLoading(false));
   }, [serverId, active]);
@@ -210,9 +212,22 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
     try {
       const r = deop ? await api.deopPlayer(serverId, name) : await api.opPlayer(serverId, name);
       showFlash(r.output || `${name} ${deop ? 'OP 박탈' : 'OP 부여'} 완료`);
+      if (deop) setOps(p => p.filter(n => n !== name));
+      else setOps(p => p.includes(name) ? p : [...p, name]);
       setOpInput('');
     } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
     finally { setOpBusy(false); }
+  }
+
+  function PlayerRow({ name, onRemove, busy }: { name: string; onRemove: () => void; busy: boolean }) {
+    return (
+      <div className="manage-item">
+        <img src={`https://mc-heads.net/avatar/${encodeURIComponent(name)}/20`} alt={name}
+          className="manage-avatar" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}/>
+        <span>{name}</span>
+        <button className="secondary small" disabled={busy} onClick={onRemove}>제거</button>
+      </div>
+    );
   }
 
   return (
@@ -236,12 +251,7 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
           : whitelist.length === 0 ? <p className="muted">화이트리스트가 비어 있습니다.</p>
           : <div className="manage-list">
               {whitelist.map(name => (
-                <div key={name} className="manage-item">
-                  <img src={`https://mc-heads.net/avatar/${encodeURIComponent(name)}/20`} alt={name}
-                    className="manage-avatar" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}/>
-                  <span>{name}</span>
-                  <button className="secondary small" disabled={!active || wlBusy} onClick={() => void removeWl(name)}>제거</button>
-                </div>
+                <PlayerRow key={name} name={name} busy={!active || wlBusy} onRemove={() => void removeWl(name)}/>
               ))}
             </div>}
       </div>
@@ -254,8 +264,23 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
             onKeyDown={e => e.key === 'Enter' && void opAction(false)}
             placeholder="플레이어 이름" disabled={!active || opBusy}/>
           <button onClick={() => void opAction(false)} disabled={!active || opBusy || !opInput.trim()}>OP 부여</button>
-          <button className="secondary" onClick={() => void opAction(true)} disabled={!active || opBusy || !opInput.trim()}>OP 박탈</button>
         </div>
+        {ops.length > 0 && (
+          <div className="manage-list">
+            {ops.map(name => (
+              <PlayerRow key={name} name={name} busy={!active || opBusy} onRemove={async () => {
+                setOpBusy(true);
+                try {
+                  const r = await api.deopPlayer(serverId, name);
+                  setOps(p => p.filter(n => n !== name));
+                  showFlash(r.output || `${name} OP 박탈 완료`);
+                } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+                finally { setOpBusy(false); }
+              }}/>
+            ))}
+          </div>
+        )}
+        {ops.length === 0 && <p className="muted">등록된 OP가 없습니다.</p>}
       </div>
     </section>
   );

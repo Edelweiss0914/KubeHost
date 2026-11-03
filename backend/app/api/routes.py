@@ -349,6 +349,13 @@ def remove_whitelist(server_id: str, name: str, owner: Owner, svc: Service) -> d
     return {"output": out}
 
 
+@router.get("/api/v1/servers/{server_id}/ops")
+def list_ops(server_id: str, owner: Owner, svc: Service) -> dict:
+    svc.get(owner, server_id)  # ownership check
+    names = svc.repository.list_ops(server_id)  # type: ignore[attr-defined]
+    return {"names": names}
+
+
 @router.post("/api/v1/servers/{server_id}/ops")
 def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
     name = body.name.strip()
@@ -356,6 +363,7 @@ def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
         raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
     server = svc.get(owner, server_id)
     out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"op {name}")
+    svc.repository.add_op(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
 
@@ -363,6 +371,7 @@ def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
 def remove_op(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
     out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"deop {name}")
+    svc.repository.remove_op(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
 

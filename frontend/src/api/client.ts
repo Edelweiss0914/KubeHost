@@ -92,6 +92,7 @@ export interface ServerGateway {
   whitelist(serverId: string): Promise<{ enabled: boolean; names: string[] }>;
   addWhitelist(serverId: string, name: string): Promise<{ output: string }>;
   removeWhitelist(serverId: string, name: string): Promise<{ output: string }>;
+  listOps(serverId: string): Promise<{ names: string[] }>;
   opPlayer(serverId: string, name: string): Promise<{ output: string }>;
   deopPlayer(serverId: string, name: string): Promise<{ output: string }>;
   listSchedules(serverId: string): Promise<Schedule[]>;
@@ -154,6 +155,7 @@ export const api: ServerGateway = {
   whitelist: (id) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`),
   addWhitelist: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`, { method: 'POST', body: JSON.stringify({ name }) }),
   removeWhitelist: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/whitelist/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  listOps: (id) => versioned(`/servers/${encodeURIComponent(id)}/ops`),
   opPlayer: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/ops`, { method: 'POST', body: JSON.stringify({ name }) }),
   deopPlayer: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/ops/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   listSchedules: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`),

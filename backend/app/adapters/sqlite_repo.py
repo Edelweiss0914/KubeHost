@@ -110,6 +110,14 @@ class SQLiteServerRepository:
                 )
             """)
             self._seed_games(conn)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS server_ops (
+                    server_id TEXT NOT NULL,
+                    player_name TEXT NOT NULL,
+                    added_at TEXT NOT NULL,
+                    PRIMARY KEY (server_id, player_name)
+                )
+            """)
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -347,6 +355,31 @@ class SQLiteServerRepository:
             conn.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
 
     # ── Game catalog methods ──────────────────────────────────────────────────
+
+    # ── Ops methods ───────────────────────────────────────────────────────────
+
+    def list_ops(self, server_id: str) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT player_name FROM server_ops WHERE server_id = ? ORDER BY added_at",
+                (server_id,),
+            ).fetchall()
+        return [r[0] for r in rows]
+
+    def add_op(self, server_id: str, player_name: str) -> None:
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO server_ops (server_id, player_name, added_at) VALUES (?, ?, ?)",
+                (server_id, player_name, datetime.now(timezone.utc).isoformat()),
+            )
+
+    def remove_op(self, server_id: str, player_name: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM server_ops WHERE server_id = ? AND player_name = ?",
+                (server_id, player_name),
+            )
 
     def _seed_games(self, conn: sqlite3.Connection) -> None:
         games = [
