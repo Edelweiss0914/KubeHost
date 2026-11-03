@@ -63,9 +63,11 @@ class InMemoryServerRepository:
 class MockKubernetesAdapter:
     def nodes(self) -> list[Node]:
         return [Node(id="mock-control-plane", name="mock-control-plane", role="control-plane",
-                     schedulable=False, cpu_capacity=4, memory_mb_capacity=8192),
+                     schedulable=False, cpu_capacity=4, memory_mb_capacity=8192,
+                     cpu_requested_m=0, memory_mb_requested=0),
                 Node(id="kubehost-worker-01", name="kubehost-worker-01", role="worker",
-                     schedulable=True, cpu_capacity=8, memory_mb_capacity=16384)]
+                     schedulable=True, cpu_capacity=8, memory_mb_capacity=16384,
+                     cpu_requested_m=2000, memory_mb_requested=4096)]
 
     def list_server_pods(self, server: Server) -> list[ServerPod]:
         if server.status not in ("running", "provisioning"):

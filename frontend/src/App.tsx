@@ -13,6 +13,7 @@ import { ClusterMap } from './features/ClusterMap';
 import { Login } from './features/Login';
 import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
+import { useToast, ToastContainer } from './components/Toast';
 
 function getStoredAuth(): { token: string; username: string } | null {
   try {
@@ -222,6 +223,8 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [showChangePw, setShowChangePw] = useState(false);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToast();
+  const prevServersRef = useRef<Map<string, string>>(new Map());
 
   function handleAutoLogout() {
     try { localStorage.removeItem('kubehost-token'); localStorage.removeItem('kubehost-username'); } catch { /* ignore */ }
@@ -256,8 +259,22 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [auth, refresh, view]);
 
-  // polling 후 servers 배열이 갱신되면 selected도 함께 업데이트
+  // polling 후 servers 배열이 갱신되면 selected도 함께 업데이트 + 이벤트 토스트
   useEffect(() => {
+    const prev = prevServersRef.current;
+    for (const server of servers) {
+      const prevStatus = prev.get(server.id);
+      if (prevStatus && prevStatus !== server.status) {
+        const label = server.name;
+        if (server.status === 'running')       pushToast(`${label} 서버가 실행됐습니다.`, 'success');
+        else if (server.status === 'stopped')  pushToast(`${label} 서버가 중지됐습니다.`, 'info');
+        else if (server.status === 'error')    pushToast(`${label} 서버에 오류가 발생했습니다.`, 'error');
+        else if (server.status === 'provisioning') pushToast(`${label} 서버를 프로비저닝 중입니다.`, 'info');
+      }
+    }
+    const next = new Map(servers.map(s => [s.id, s.status]));
+    prevServersRef.current = next;
+
     if (selected) {
       const updated = servers.find(s => s.id === selected.id);
       if (updated && updated.status !== selected.status) setSelected(updated);
@@ -451,5 +468,6 @@ export function App() {
       {showSessionExpired && (
         <SessionExpiredModal onRelogin={() => { setShowSessionExpired(false); setShowLogin(true); }}/>
       )}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
   </div>;
 }

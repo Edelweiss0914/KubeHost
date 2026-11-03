@@ -46,6 +46,8 @@ class Node(BaseModel):
     schedulable: bool
     cpu_capacity: int
     memory_mb_capacity: int
+    cpu_requested_m: int = 0
+    memory_mb_requested: int = 0
 
 
 class PodContainer(BaseModel):

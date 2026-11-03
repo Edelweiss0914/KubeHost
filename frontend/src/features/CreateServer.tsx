@@ -145,6 +145,18 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             </select>
             <small id="node-hint">{errors.node_id ?? '게임 서버는 Worker 노드에 배포됩니다.'}</small>
           </label>
+          {(() => {
+            const selectedNode = workers.find(n => n.id === input.node_id);
+            if (!selectedNode) return null;
+            const cpuAvailM = selectedNode.cpu_capacity * 1000 - selectedNode.cpu_requested_m;
+            const memAvailMb = selectedNode.memory_mb_capacity - selectedNode.memory_mb_requested;
+            const cpuNeedM = input.cpu * 1000;
+            const warnings: string[] = [];
+            if (cpuNeedM > cpuAvailM) warnings.push(`CPU 부족: 필요 ${input.cpu} vCPU, 가용 ${(cpuAvailM / 1000).toFixed(1)} vCPU`);
+            if (input.memory_mb > memAvailMb) warnings.push(`메모리 부족: 필요 ${input.memory_mb} MiB, 가용 ${memAvailMb} MiB`);
+            if (!warnings.length) return null;
+            return <div className="resource-warning" role="alert">{warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>;
+          })()}
         </div>
       </div>
       <div className="form-section">
