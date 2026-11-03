@@ -5,31 +5,34 @@ type LandingProps = {
   onEnter: () => void;
 };
 
-const GAMES = [
-  { name: 'Valheim',              id: 892970  },
-  { name: 'Terraria',             id: 105600  },
-  { name: 'ARK: Survival',        id: 346110  },
-  { name: 'Rust',                 id: 252490  },
-  { name: 'CS2',                  id: 730     },
-  { name: "Garry's Mod",          id: 4000    },
-  { name: '7 Days to Die',        id: 251570  },
-  { name: 'Factorio',             id: 427520  },
-  { name: 'Satisfactory',         id: 526870  },
-  { name: 'Project Zomboid',      id: 108600  },
-  { name: 'Palworld',             id: 1623730 },
-  { name: 'V Rising',             id: 1604030 },
-  { name: "Don't Starve Together",id: 322330  },
-  { name: 'Space Engineers',      id: 244850  },
-  { name: 'Starbound',            id: 211820  },
-  { name: 'Team Fortress 2',      id: 440     },
+const GAMES_ROW1 = [
+  { name: 'Valheim',               id: 892970  },
+  { name: 'Terraria',              id: 105600  },
+  { name: 'ARK: Survival',         id: 346110  },
+  { name: 'Rust',                  id: 252490  },
+  { name: 'CS2',                   id: 730     },
+  { name: "Garry's Mod",           id: 4000    },
+  { name: '7 Days to Die',         id: 251570  },
+  { name: 'Factorio',              id: 427520  },
+];
+
+const GAMES_ROW2 = [
+  { name: 'Satisfactory',          id: 526870  },
+  { name: 'Project Zomboid',       id: 108600  },
+  { name: 'Palworld',              id: 1623730 },
+  { name: 'V Rising',              id: 1604030 },
+  { name: "Don't Starve Together", id: 322330  },
+  { name: 'Space Engineers',       id: 244850  },
+  { name: 'Starbound',             id: 211820  },
+  { name: 'Team Fortress 2',       id: 440     },
 ];
 
 const STACK = [
-  { icon: '⎈', name: 'K3s',        desc: '경량 Kubernetes' },
-  { icon: '⚡', name: 'FastAPI',    desc: 'Python 백엔드' },
-  { icon: '⚛', name: 'React',      desc: '프론트엔드' },
-  { icon: '◉', name: 'Prometheus', desc: '메트릭 수집' },
-  { icon: '▦', name: 'StatefulSet',desc: '영속 스토리지' },
+  { icon: '⎈', name: 'K3s',         desc: '경량 Kubernetes' },
+  { icon: '⚡', name: 'FastAPI',     desc: 'Python 백엔드' },
+  { icon: '⚛', name: 'React',       desc: '프론트엔드' },
+  { icon: '◉', name: 'Prometheus',  desc: '메트릭 수집' },
+  { icon: '▦', name: 'StatefulSet', desc: '영속 스토리지' },
   { icon: '⌨', name: 'Console',     desc: '서버 제어' },
 ];
 
@@ -52,6 +55,26 @@ const FAQ = [
   },
 ];
 
+function MarqueeRow({ games, reverse }: { games: typeof GAMES_ROW1; reverse?: boolean }) {
+  return (
+    <div className="landing-marquee">
+      <div className={`landing-marquee-track${reverse ? ' landing-marquee-reverse' : ''}`}>
+        {[...games, ...games].map((g, i) => (
+          <span className="landing-marquee-item" key={i}>
+            <img
+              src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/capsule_sm_120.jpg`}
+              alt={g.name}
+              className="landing-marquee-img"
+              loading="lazy"
+            />
+            {g.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Landing({ onEnter }: LandingProps) {
   useEffect(() => {
     const els = document.querySelectorAll<HTMLElement>('.landing-reveal');
@@ -59,26 +82,29 @@ export function Landing({ onEnter }: LandingProps) {
       entries => entries.forEach(e => {
         if (e.isIntersecting) { e.target.classList.add('landing-reveal-visible'); io.unobserve(e.target); }
       }),
-      { threshold: 0.12 }
+      { threshold: 0.1 }
     );
     els.forEach(el => io.observe(el));
     return () => io.disconnect();
   }, []);
 
   function handleBackdrop(e: MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) {
-      // no-op
-    }
+    if (e.target === e.currentTarget) { /* no-op */ }
   }
 
   return (
     <div className="landing-page" onClick={handleBackdrop}>
+
       {/* ── Nav ─────────────────────────────────────────────── */}
       <nav className="landing-nav" aria-label="사이트 메뉴">
         <a className="landing-nav-brand" href="#hero" onClick={e => e.preventDefault()}>
           <img src="/kubehost-icon.png" alt="" width={32} height={32} style={{borderRadius:'6px'}}/>
           <span className="landing-brand-name">KubeHost</span>
         </a>
+        <div className="landing-nav-links">
+          <a href="#features" className="landing-nav-link">기능</a>
+          <a href="#faq" className="landing-nav-link">FAQ</a>
+        </div>
         <div className="landing-nav-right">
           <span className="landing-nav-badge">BETA</span>
           <button className="landing-nav-cta" onClick={onEnter}>
@@ -88,22 +114,22 @@ export function Landing({ onEnter }: LandingProps) {
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="landing-hero" id="hero" aria-labelledby="hero-headline">
+      <section className="landing-hero landing-hero-enter" id="hero" aria-labelledby="hero-headline">
         <div className="landing-hero-grid-overlay" aria-hidden="true" />
         <div className="landing-hero-orb landing-hero-orb-1" aria-hidden="true" />
         <div className="landing-hero-orb landing-hero-orb-2" aria-hidden="true" />
 
         <div className="landing-hero-content">
-          <span className="landing-eyebrow">K3S · KUBERNETES · GAME SERVERS</span>
-          <h1 id="hero-headline" className="landing-hero-h1">
+          <span className="landing-eyebrow landing-hero-enter-1">K3S · KUBERNETES · GAME SERVERS</span>
+          <h1 id="hero-headline" className="landing-hero-h1 landing-hero-enter-2">
             게임 서버를 K8s로,<br />
             <span className="landing-accent-text">단 몇 초 만에.</span>
           </h1>
-          <p className="landing-hero-sub">
+          <p className="landing-hero-sub landing-hero-enter-3">
             Kubernetes 위에서 동작하는 게임 서버 호스팅 플랫폼.<br />
             배포부터 모니터링까지.
           </p>
-          <div className="landing-hero-actions">
+          <div className="landing-hero-actions landing-hero-enter-4">
             <button className="landing-btn-primary" onClick={onEnter}>
               지금 시작하기
               <span className="landing-btn-arrow" aria-hidden="true">↗</span>
@@ -112,25 +138,25 @@ export function Landing({ onEnter }: LandingProps) {
               기능 살펴보기
             </a>
           </div>
-          <div className="landing-hero-stats" aria-label="플랫폼 지표">
+          <div className="landing-hero-stats landing-hero-enter-5" aria-label="플랫폼 지표">
             <div className="landing-hero-stat">
-              <strong>K3s</strong>
-              <span>경량 Kubernetes</span>
+              <strong>16+</strong>
+              <span>지원 게임</span>
             </div>
             <div className="landing-hero-stat-divider" aria-hidden="true" />
             <div className="landing-hero-stat">
-              <strong>StatefulSet</strong>
-              <span>영속 스토리지 보장</span>
+              <strong>수초</strong>
+              <span>서버 배포 시간</span>
             </div>
             <div className="landing-hero-stat-divider" aria-hidden="true" />
             <div className="landing-hero-stat">
-              <strong>Prometheus</strong>
-              <span>실시간 메트릭</span>
+              <strong>실시간</strong>
+              <span>메트릭 모니터링</span>
             </div>
           </div>
         </div>
 
-        <div className="landing-hero-terminal" aria-label="배포 미리보기">
+        <div className="landing-hero-terminal landing-hero-enter-6" aria-label="배포 미리보기">
           <div className="landing-terminal-bar">
             <span className="landing-terminal-dot landing-terminal-dot-r" />
             <span className="landing-terminal-dot landing-terminal-dot-y" />
@@ -164,39 +190,12 @@ export function Landing({ onEnter }: LandingProps) {
         </div>
       </section>
 
-      {/* ── Games Marquee ────────────────────────────────────── */}
+      {/* ── Games Marquee (2 rows) ────────────────────────────── */}
       <div className="landing-marquee-wrap" aria-label="지원 게임 목록">
         <p className="landing-marquee-label">SUPPORTED GAMES</p>
-        <div className="landing-marquee">
-          <div className="landing-marquee-track">
-            {[...GAMES, ...GAMES].map((g, i) => (
-              <span className="landing-marquee-item" key={i}>
-                <img
-                  src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/capsule_sm_120.jpg`}
-                  alt={g.name}
-                  className="landing-marquee-img"
-                  loading="lazy"
-                />
-                {g.name}
-              </span>
-            ))}
-          </div>
-        </div>
+        <MarqueeRow games={GAMES_ROW1} />
+        <MarqueeRow games={GAMES_ROW2} reverse />
       </div>
-
-      {/* ── Tech Stack ───────────────────────────────────────── */}
-      <section className="landing-stack landing-reveal" aria-label="기술 스택">
-        <p className="landing-stack-label">BUILT WITH</p>
-        <div className="landing-stack-grid">
-          {STACK.map(s => (
-            <div className="landing-stack-item" key={s.name}>
-              <span className="landing-stack-icon" aria-hidden="true">{s.icon}</span>
-              <span className="landing-stack-name">{s.name}</span>
-              <span className="landing-stack-desc">{s.desc}</span>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* ── Features ─────────────────────────────────────────── */}
       <section className="landing-features landing-reveal" id="features" aria-labelledby="features-heading">
@@ -219,7 +218,6 @@ export function Landing({ onEnter }: LandingProps) {
               <li>PVC 자동 프로비저닝</li>
             </ul>
           </article>
-
           <article className="landing-feature-card" tabIndex={0}>
             <div className="landing-feature-icon" aria-hidden="true">◷</div>
             <h3 className="landing-feature-title">자동 스케줄</h3>
@@ -232,7 +230,6 @@ export function Landing({ onEnter }: LandingProps) {
               <li>자동 재시작</li>
             </ul>
           </article>
-
           <article className="landing-feature-card" tabIndex={0}>
             <div className="landing-feature-icon" aria-hidden="true">▧</div>
             <h3 className="landing-feature-title">실시간 메트릭</h3>
@@ -245,69 +242,6 @@ export function Landing({ onEnter }: LandingProps) {
               <li>리소스 쿼터</li>
             </ul>
           </article>
-        </div>
-      </section>
-
-      {/* ── Dashboard Mockup ─────────────────────────────────── */}
-      <section className="landing-mockup-section landing-reveal" aria-labelledby="mockup-heading">
-        <div className="landing-section-header">
-          <span className="landing-eyebrow">DASHBOARD</span>
-          <h2 id="mockup-heading" className="landing-section-h2">
-            한눈에 보는 관리 콘솔
-          </h2>
-        </div>
-        <div className="landing-mockup" role="img" aria-label="관리 콘솔 UI 미리보기">
-          <div className="lm-titlebar">
-            <span className="lm-dot lm-dot-r" /><span className="lm-dot lm-dot-y" /><span className="lm-dot lm-dot-g" />
-            <span className="lm-url">kubehost.local</span>
-          </div>
-          <div className="lm-body">
-            {/* sidebar */}
-            <aside className="lm-sidebar">
-              <div className="lm-nav-pill">
-                <span className="lm-nav-brand">KubeHost</span>
-              </div>
-              <div className="lm-server-list">
-                <div className="lm-server-item lm-active">
-                  <span className="lm-status-dot lm-green" />my-world
-                </div>
-                <div className="lm-server-item">
-                  <span className="lm-status-dot lm-gray" />survival
-                </div>
-                <div className="lm-server-item lm-add-btn">+ 서버 추가</div>
-              </div>
-            </aside>
-            {/* main */}
-            <div className="lm-main">
-              <div className="lm-server-header">
-                <span className="lm-server-title">my-world</span>
-                <span className="lm-badge-running">Running</span>
-              </div>
-              <div className="lm-metrics-row">
-                <div className="lm-metric-card">
-                  <span className="lm-metric-label">CPU</span>
-                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-cpu" /></div>
-                  <span className="lm-metric-val">67%</span>
-                </div>
-                <div className="lm-metric-card">
-                  <span className="lm-metric-label">Memory</span>
-                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-mem" /></div>
-                  <span className="lm-metric-val">1.1 GB</span>
-                </div>
-                <div className="lm-metric-card">
-                  <span className="lm-metric-label">Players</span>
-                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-pl" /></div>
-                  <span className="lm-metric-val">3 / 20</span>
-                </div>
-              </div>
-              <div className="lm-console-box">
-                <div className="lm-console-line">[INFO] Starting game server...</div>
-                <div className="lm-console-line lm-console-ok">[DONE] Server started on :7777</div>
-                <div className="lm-console-line">[INFO] 3 players online</div>
-                <div className="lm-console-cursor">█</div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -352,13 +286,70 @@ export function Landing({ onEnter }: LandingProps) {
         </ol>
       </section>
 
+      {/* ── Dashboard Mockup ─────────────────────────────────── */}
+      <section className="landing-mockup-section landing-reveal" aria-labelledby="mockup-heading">
+        <div className="landing-section-header">
+          <span className="landing-eyebrow">DASHBOARD</span>
+          <h2 id="mockup-heading" className="landing-section-h2">
+            한눈에 보는 관리 콘솔
+          </h2>
+        </div>
+        <div className="landing-mockup" role="img" aria-label="관리 콘솔 UI 미리보기">
+          <div className="lm-titlebar">
+            <span className="lm-dot lm-dot-r" /><span className="lm-dot lm-dot-y" /><span className="lm-dot lm-dot-g" />
+            <span className="lm-url">kubehost.local</span>
+          </div>
+          <div className="lm-body">
+            <aside className="lm-sidebar">
+              <div className="lm-nav-pill"><span className="lm-nav-brand">KubeHost</span></div>
+              <div className="lm-server-list">
+                <div className="lm-server-item lm-active">
+                  <span className="lm-status-dot lm-green" />my-world
+                </div>
+                <div className="lm-server-item">
+                  <span className="lm-status-dot lm-gray" />survival
+                </div>
+                <div className="lm-server-item lm-add-btn">+ 서버 추가</div>
+              </div>
+            </aside>
+            <div className="lm-main">
+              <div className="lm-server-header">
+                <span className="lm-server-title">my-world</span>
+                <span className="lm-badge-running">Running</span>
+              </div>
+              <div className="lm-metrics-row">
+                <div className="lm-metric-card">
+                  <span className="lm-metric-label">CPU</span>
+                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-cpu" /></div>
+                  <span className="lm-metric-val">67%</span>
+                </div>
+                <div className="lm-metric-card">
+                  <span className="lm-metric-label">Memory</span>
+                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-mem" /></div>
+                  <span className="lm-metric-val">1.1 GB</span>
+                </div>
+                <div className="lm-metric-card">
+                  <span className="lm-metric-label">Players</span>
+                  <div className="lm-bar-track"><div className="lm-bar-fill lm-bar-pl" /></div>
+                  <span className="lm-metric-val">3 / 20</span>
+                </div>
+              </div>
+              <div className="lm-console-box">
+                <div className="lm-console-line">[INFO] Starting game server...</div>
+                <div className="lm-console-line lm-console-ok">[DONE] Server started on :7777</div>
+                <div className="lm-console-line">[INFO] 3 players online</div>
+                <div className="lm-console-cursor">█</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── FAQ ──────────────────────────────────────────────── */}
-      <section className="landing-faq landing-reveal" aria-labelledby="faq-heading">
+      <section className="landing-faq landing-reveal" id="faq" aria-labelledby="faq-heading">
         <div className="landing-section-header">
           <span className="landing-eyebrow">FAQ</span>
-          <h2 id="faq-heading" className="landing-section-h2">
-            자주 묻는 질문
-          </h2>
+          <h2 id="faq-heading" className="landing-section-h2">자주 묻는 질문</h2>
         </div>
         <dl className="landing-faq-list">
           {FAQ.map((item, i) => (
@@ -370,14 +361,26 @@ export function Landing({ onEnter }: LandingProps) {
         </dl>
       </section>
 
+      {/* ── Tech Stack ───────────────────────────────────────── */}
+      <section className="landing-stack landing-reveal" aria-label="기술 스택">
+        <p className="landing-stack-label">BUILT WITH</p>
+        <div className="landing-stack-grid">
+          {STACK.map(s => (
+            <div className="landing-stack-item" key={s.name}>
+              <span className="landing-stack-icon" aria-hidden="true">{s.icon}</span>
+              <span className="landing-stack-name">{s.name}</span>
+              <span className="landing-stack-desc">{s.desc}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── CTA ──────────────────────────────────────────────── */}
       <section className="landing-cta landing-reveal" aria-labelledby="cta-heading">
         <div className="landing-cta-inner">
           <div className="landing-cta-orb" aria-hidden="true" />
           <span className="landing-eyebrow">ACCESS</span>
-          <h2 id="cta-heading" className="landing-cta-h2">
-            초대 코드가 있으신가요?
-          </h2>
+          <h2 id="cta-heading" className="landing-cta-h2">초대 코드가 있으신가요?</h2>
           <p className="landing-cta-sub">
             현재 초대 코드를 통한 가입만 허용합니다.<br />
             관리자에게 코드를 요청하세요.
