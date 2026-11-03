@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { MouseEvent } from 'react';
 
 type LandingProps = {
@@ -33,6 +34,18 @@ const FAQ = [
 ];
 
 export function Landing({ onEnter }: LandingProps) {
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>('.landing-reveal');
+    const io = new IntersectionObserver(
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('landing-reveal-visible'); io.unobserve(e.target); }
+      }),
+      { threshold: 0.12 }
+    );
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   function handleBackdrop(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) {
       // no-op
@@ -133,7 +146,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── Tech Stack ───────────────────────────────────────── */}
-      <section className="landing-stack" aria-label="기술 스택">
+      <section className="landing-stack landing-reveal" aria-label="기술 스택">
         <p className="landing-stack-label">BUILT WITH</p>
         <div className="landing-stack-grid">
           {STACK.map(s => (
@@ -147,7 +160,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── Features ─────────────────────────────────────────── */}
-      <section className="landing-features" id="features" aria-labelledby="features-heading">
+      <section className="landing-features landing-reveal" id="features" aria-labelledby="features-heading">
         <div className="landing-section-header">
           <span className="landing-eyebrow">CORE FEATURES</span>
           <h2 id="features-heading" className="landing-section-h2">
@@ -197,7 +210,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── Dashboard Mockup ─────────────────────────────────── */}
-      <section className="landing-mockup-section" aria-labelledby="mockup-heading">
+      <section className="landing-mockup-section landing-reveal" aria-labelledby="mockup-heading">
         <div className="landing-section-header">
           <span className="landing-eyebrow">DASHBOARD</span>
           <h2 id="mockup-heading" className="landing-section-h2">
@@ -260,7 +273,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── How it works ─────────────────────────────────────── */}
-      <section className="landing-steps" aria-labelledby="steps-heading">
+      <section className="landing-steps landing-reveal" aria-labelledby="steps-heading">
         <div className="landing-section-header">
           <span className="landing-eyebrow">HOW IT WORKS</span>
           <h2 id="steps-heading" className="landing-section-h2">
@@ -301,7 +314,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── FAQ ──────────────────────────────────────────────── */}
-      <section className="landing-faq" aria-labelledby="faq-heading">
+      <section className="landing-faq landing-reveal" aria-labelledby="faq-heading">
         <div className="landing-section-header">
           <span className="landing-eyebrow">FAQ</span>
           <h2 id="faq-heading" className="landing-section-h2">
@@ -319,7 +332,7 @@ export function Landing({ onEnter }: LandingProps) {
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <section className="landing-cta" aria-labelledby="cta-heading">
+      <section className="landing-cta landing-reveal" aria-labelledby="cta-heading">
         <div className="landing-cta-inner">
           <div className="landing-cta-orb" aria-hidden="true" />
           <span className="landing-eyebrow">ACCESS</span>

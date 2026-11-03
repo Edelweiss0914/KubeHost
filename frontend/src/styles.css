@@ -1230,6 +1230,17 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   padding:0 36px;
 }
 
+/* ── Scroll reveal animation ───────────────────────────────── */
+.landing-reveal{
+  opacity:0;
+  transform:translateY(32px);
+  transition:opacity .6s ease, transform .6s ease;
+}
+.landing-reveal-visible{
+  opacity:1;
+  transform:translateY(0);
+}
+
 /* ── Terminal line animation ───────────────────────────────── */
 @keyframes landing-line-appear{
   from{opacity:0;transform:translateX(-10px)}
