@@ -189,15 +189,16 @@ function ScheduleForm({ initial, onSave, onCancel }: {
     <div className="schedule-form panel">
       <h3>{initial ? '스케줄 편집' : '새 스케줄'}</h3>
       <div className="form-grid">
-        <label className="full">요일 <small>선택 안 하면 매일 적용</small>
+        <div className="full">
+          <span style={{fontSize:'13px'}}>요일 <small>선택 안 하면 매일 적용</small></span>
           <div className="day-picker">
-            {['월','화','수','목','금','토','일'].map((label, i) => (
+            {['월','화','수','목','금','토','일'].map((dayLabel, i) => (
               <button key={i} type="button"
                 className={`day-btn ${days.includes(i) ? 'selected' : ''}`}
-                onClick={() => toggleDay(i)}>{label}</button>
+                onClick={() => toggleDay(i)}>{dayLabel}</button>
             ))}
           </div>
-        </label>
+        </div>
         <label>시작 시간
           <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}/>
           <small>비워두면 자동 시작 없음</small>
