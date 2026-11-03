@@ -342,6 +342,17 @@ class K8sAdapter:
                         if exc.status != 404:
                             raise
 
+    # ── Version upgrade ───────────────────────────────────────────────────────
+    def set_version(self, server_id: str, namespace: str, version: str) -> None:
+        name = self._sts_name(server_id)
+        sts = self._apps.read_namespaced_stateful_set(name, namespace)
+        current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
+        current["VERSION"] = version
+        new_env = [{"name": k, "value": v} for k, v in current.items()]
+        self._apps.patch_namespaced_stateful_set(name, namespace, {
+            "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
+        })
+
     # ── Pod exec helper ──────────────────────────────────────────────────────
     def _exec_in_pod(self, server_id: str, namespace: str, command: list[str],
                      stdin_data: bytes | None = None) -> str:

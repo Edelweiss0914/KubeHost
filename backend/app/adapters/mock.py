@@ -194,4 +194,7 @@ class MockKubernetesAdapter:
         if server_id in self._plugins:
             self._plugins[server_id] = [f for f in self._plugins[server_id] if f != filename]
 
+    def set_version(self, server_id: str, namespace: str, version: str) -> None:
+        pass  # DB update handled by route layer
+
 
