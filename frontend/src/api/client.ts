@@ -4,6 +4,18 @@ import type { Server, ServerInput, ServerSettings, TopologyPod, WorkerNode } fro
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 
+export type Schedule = {
+  id: string;
+  server_id: string;
+  days: number[];  // 0=월~6=일, 빈 배열=매일
+  start_time: string | null;
+  stop_time: string | null;
+  enabled: boolean;
+  timezone: string;
+};
+
+export type ScheduleInput = Omit<Schedule, 'id' | 'server_id'>;
+
 function getToken(): string { try { return localStorage.getItem('kubehost-token') ?? ''; } catch { return ''; } }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,6 +67,10 @@ export interface ServerGateway {
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
   adminGetUserQuota(userId: string): Promise<{max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}>;
   adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
+  listSchedules(serverId: string): Promise<Schedule[]>;
+  createSchedule(serverId: string, s: ScheduleInput): Promise<Schedule>;
+  updateSchedule(serverId: string, scheduleId: string, s: ScheduleInput): Promise<Schedule>;
+  deleteSchedule(serverId: string, scheduleId: string): Promise<void>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -103,4 +119,8 @@ export const api: ServerGateway = {
   changePassword: (currentPassword, newPassword) => versioned('/auth/password', {method:'PUT', body:JSON.stringify({current_password:currentPassword, new_password:newPassword})}),
   adminGetUserQuota: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`),
   adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
+  listSchedules: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`),
+  createSchedule: (serverId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`, {method:'POST', body:JSON.stringify(s)}),
+  updateSchedule: (serverId, scheduleId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'PUT', body:JSON.stringify(s)}),
+  deleteSchedule: (serverId, scheduleId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'DELETE'}),
 };

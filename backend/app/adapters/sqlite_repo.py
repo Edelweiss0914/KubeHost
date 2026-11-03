@@ -84,6 +84,20 @@ class SQLiteServerRepository:
                     max_servers INTEGER NOT NULL DEFAULT 10
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS schedules (
+                    id TEXT PRIMARY KEY,
+                    server_id TEXT NOT NULL,
+                    days TEXT NOT NULL DEFAULT '[]',
+                    start_time TEXT,
+                    stop_time TEXT,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    timezone TEXT NOT NULL DEFAULT 'Asia/Seoul'
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_schedules_server ON schedules(server_id)"
+            )
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -280,3 +294,42 @@ class SQLiteServerRepository:
                 "INSERT OR REPLACE INTO user_quotas (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers) VALUES (?, ?, ?, ?, ?)",
                 (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers),
             )
+
+    # ── Schedule methods ──────────────────────────────────────────────────────────
+
+    def _row_to_schedule(self, row: tuple) -> dict:
+        import json
+        return {
+            "id": row[0], "server_id": row[1],
+            "days": json.loads(row[2]), "start_time": row[3],
+            "stop_time": row[4], "enabled": bool(row[5]), "timezone": row[6],
+        }
+
+    def list_schedules(self, server_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, server_id, days, start_time, stop_time, enabled, timezone FROM schedules WHERE server_id = ?",
+                (server_id,),
+            ).fetchall()
+        return [self._row_to_schedule(r) for r in rows]
+
+    def list_all_schedules(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, server_id, days, start_time, stop_time, enabled, timezone FROM schedules WHERE enabled = 1"
+            ).fetchall()
+        return [self._row_to_schedule(r) for r in rows]
+
+    def save_schedule(self, schedule: dict) -> None:
+        import json
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO schedules (id, server_id, days, start_time, stop_time, enabled, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (schedule["id"], schedule["server_id"], json.dumps(schedule["days"]),
+                 schedule.get("start_time"), schedule.get("stop_time"),
+                 int(schedule.get("enabled", True)), schedule.get("timezone", "Asia/Seoul")),
+            )
+
+    def delete_schedule(self, schedule_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))

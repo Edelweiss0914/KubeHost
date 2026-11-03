@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { ServerSettingsPanel } from './ServerSettings';
 import { ServerConsole } from './ServerConsole';
+import { api } from '../api/client';
+import type { Schedule, ScheduleInput } from '../api/client';
 
 type K8sResource = {
   apiVersion: string
@@ -90,6 +92,133 @@ function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
   )
 }
 
+const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+function SchedulePanel({ serverId }: { serverId: string }) {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Schedule | null>(null);
+
+  useEffect(() => {
+    api.listSchedules(serverId)
+      .then(setSchedules)
+      .finally(() => setLoading(false));
+  }, [serverId]);
+
+  async function handleDelete(scheduleId: string) {
+    await api.deleteSchedule(serverId, scheduleId);
+    setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+  }
+
+  async function handleSave(input: ScheduleInput, id?: string) {
+    if (id) {
+      const updated = await api.updateSchedule(serverId, id, input);
+      setSchedules(prev => prev.map(s => s.id === id ? updated : s));
+    } else {
+      const created = await api.createSchedule(serverId, input);
+      setSchedules(prev => [...prev, created]);
+    }
+    setShowForm(false);
+    setEditing(null);
+  }
+
+  return (
+    <div className="schedule-panel">
+      <div className="section-title">
+        <div><span className="eyebrow">AUTOMATION</span><h2>자동 스케줄</h2></div>
+        <button onClick={() => { setEditing(null); setShowForm(true); }}>+ 추가</button>
+      </div>
+      {loading ? <p className="muted">불러오는 중…</p> : (
+        <>
+          {schedules.length === 0 && <p className="muted">등록된 스케줄이 없습니다.</p>}
+          <div className="schedule-list">
+            {schedules.map(s => (
+              <div key={s.id} className={`schedule-item ${s.enabled ? '' : 'disabled'}`}>
+                <div className="schedule-days">
+                  {s.days.length === 0
+                    ? <span className="tag">매일</span>
+                    : s.days.map(d => <span key={d} className="tag">{DAY_LABELS[d]}</span>)
+                  }
+                </div>
+                <div className="schedule-times">
+                  {s.start_time && <span>▶ {s.start_time}</span>}
+                  {s.stop_time && <span>■ {s.stop_time}</span>}
+                </div>
+                <div className="schedule-actions">
+                  <button className="secondary" onClick={() => { setEditing(s); setShowForm(true); }}>편집</button>
+                  <button className="secondary" onClick={() => void handleDelete(s.id)}>삭제</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {showForm && (
+            <ScheduleForm
+              initial={editing}
+              onSave={input => void handleSave(input, editing?.id)}
+              onCancel={() => { setShowForm(false); setEditing(null); }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ScheduleForm({ initial, onSave, onCancel }: {
+  initial: Schedule | null;
+  onSave: (input: ScheduleInput) => void;
+  onCancel: () => void;
+}) {
+  const [days, setDays] = useState<number[]>(initial?.days ?? []);
+  const [startTime, setStartTime] = useState(initial?.start_time ?? '');
+  const [stopTime, setStopTime] = useState(initial?.stop_time ?? '');
+  const [enabled, setEnabled] = useState(initial?.enabled ?? true);
+  const [error, setError] = useState('');
+
+  function toggleDay(d: number) {
+    setDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
+  }
+
+  function submit() {
+    if (!startTime && !stopTime) { setError('시작 또는 종료 시간 중 하나는 입력해야 합니다.'); return; }
+    onSave({ days, start_time: startTime || null, stop_time: stopTime || null, enabled, timezone: 'Asia/Seoul' });
+  }
+
+  return (
+    <div className="schedule-form panel">
+      <h3>{initial ? '스케줄 편집' : '새 스케줄'}</h3>
+      <div className="form-grid">
+        <label className="full">요일 <small>선택 안 하면 매일 적용</small>
+          <div className="day-picker">
+            {['월','화','수','목','금','토','일'].map((label, i) => (
+              <button key={i} type="button"
+                className={`day-btn ${days.includes(i) ? 'selected' : ''}`}
+                onClick={() => toggleDay(i)}>{label}</button>
+            ))}
+          </div>
+        </label>
+        <label>시작 시간
+          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}/>
+          <small>비워두면 자동 시작 없음</small>
+        </label>
+        <label>종료 시간
+          <input type="time" value={stopTime} onChange={e => setStopTime(e.target.value)}/>
+          <small>비워두면 자동 종료 없음</small>
+        </label>
+        <label className="checkbox">
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/> 활성화
+        </label>
+      </div>
+      {error && <div role="alert" className="error">{error}</div>}
+      <div className="actions">
+        <button type="button" className="secondary" onClick={onCancel}>취소</button>
+        <button type="button" onClick={submit}>저장</button>
+      </div>
+    </div>
+  );
+}
+
 type ServerDetailProps = {
   server: Server;
   busy: boolean;
@@ -151,6 +280,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
       <ResourcePlanViewer plan={server.resource_plan} />
     </section>
     {showSettings && <ServerSettingsPanel serverId={server.id} onClose={() => setShowSettings(false)}/>}
+    <section className="panel">
+      <SchedulePanel serverId={server.id} />
+    </section>
     <ServerConsole serverId={server.id} active={active}/>
   </>;
 }

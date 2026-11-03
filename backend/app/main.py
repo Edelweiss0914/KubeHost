@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router
 from app.api.auth_routes import auth_router
 from app.api.admin_routes import admin_router
+from app.services.scheduler import SchedulerService
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
 
 
@@ -47,6 +48,19 @@ def create_app() -> FastAPI:
     application.state.server_service = ServerService(repository, adapter, mode=mode)  # type: ignore[arg-type]
     application.state.auth_service = auth_service
     application.state.mode = mode
+
+    @application.on_event("startup")
+    def _start_scheduler() -> None:
+        svc = application.state.server_service
+        scheduler = SchedulerService(svc, svc.repository)
+        scheduler.start()
+        application.state.scheduler = scheduler
+
+    @application.on_event("shutdown")
+    def _stop_scheduler() -> None:
+        scheduler = getattr(application.state, "scheduler", None)
+        if scheduler is not None:
+            scheduler.stop()
 
     @application.exception_handler(ServerNotFound)
     async def missing(request: Request, exc: ServerNotFound) -> JSONResponse:

@@ -210,3 +210,67 @@ def tenant_info(owner: Owner, svc: Service) -> dict[str, object]:
     namespace = f"tenant-{uuid5(NAMESPACE_URL, owner).hex}"
     quota = svc.adapter.get_tenant_quota(namespace)
     return {"namespace": namespace, "quota": quota}
+
+
+from uuid import uuid4 as _uuid4
+from pydantic import BaseModel as _BaseModel
+
+
+class ScheduleIn(_BaseModel):
+    days: list[int] = []  # 0=월~6=일, 빈 배열=매일
+    start_time: str | None = None  # "HH:MM"
+    stop_time: str | None = None
+    enabled: bool = True
+    timezone: str = "Asia/Seoul"
+
+
+@router.get("/api/v1/servers/{server_id}/schedules")
+def list_schedules(server_id: str, owner: Owner, svc: Service) -> list[dict]:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    return svc.repository.list_schedules(server_id)
+
+
+@router.post("/api/v1/servers/{server_id}/schedules", status_code=201)
+def create_schedule(server_id: str, payload: ScheduleIn, owner: Owner, svc: Service) -> dict:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    schedule = {
+        "id": str(_uuid4()),
+        "server_id": server_id,
+        "days": payload.days,
+        "start_time": payload.start_time,
+        "stop_time": payload.stop_time,
+        "enabled": payload.enabled,
+        "timezone": payload.timezone,
+    }
+    svc.repository.save_schedule(schedule)
+    return schedule
+
+
+@router.put("/api/v1/servers/{server_id}/schedules/{schedule_id}", status_code=200)
+def update_schedule(server_id: str, schedule_id: str, payload: ScheduleIn, owner: Owner, svc: Service) -> dict:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    schedule = {
+        "id": schedule_id,
+        "server_id": server_id,
+        "days": payload.days,
+        "start_time": payload.start_time,
+        "stop_time": payload.stop_time,
+        "enabled": payload.enabled,
+        "timezone": payload.timezone,
+    }
+    svc.repository.save_schedule(schedule)
+    return schedule
+
+
+@router.delete("/api/v1/servers/{server_id}/schedules/{schedule_id}", status_code=204)
+def delete_schedule(server_id: str, schedule_id: str, owner: Owner, svc: Service) -> None:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    svc.repository.delete_schedule(schedule_id)
