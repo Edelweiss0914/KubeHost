@@ -256,6 +256,14 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [auth, mode, refresh, view]);
 
+  // polling 후 servers 배열이 갱신되면 selected도 함께 업데이트
+  useEffect(() => {
+    if (selected) {
+      const updated = servers.find(s => s.id === selected.id);
+      if (updated && updated.status !== selected.status) setSelected(updated);
+    }
+  }, [servers]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Real mode: require login. Mock mode: skip auth.
   if (mode === 'real' && !auth) {
     return <Login onLogin={(token, username) => {
