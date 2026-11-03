@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { api, type Game } from '../api/client';
 import { defaults, validate, type ServerInput, type WorkerNode } from '../domain/server';
 
 type CreateServerProps = {
@@ -33,6 +34,11 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   const defaultWorkerId = workers[0]?.id;
   const [input, setInput] = useState<ServerInput>({ ...defaults, node_id: defaultWorkerId ?? '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [games, setGames] = useState<Game[]>([]);
+
+  useEffect(() => {
+    api.games().then(setGames).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (defaultWorkerId) setInput(previous => previous.node_id ? previous : { ...previous, node_id: defaultWorkerId });
@@ -71,7 +77,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
   return <section className="panel create-panel">
     <div className="section-title">
-      <div><span className="eyebrow">SERVER PROVISIONING</span><h2>새 Minecraft 서버</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
+      <div><span className="eyebrow">SERVER PROVISIONING</span><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
       <span className="tag">Paper</span>
     </div>
     <form onSubmit={submit} noValidate>
@@ -82,20 +88,32 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
         <div style={{ marginBottom: '20px' }}>
           <label style={{ marginBottom: '10px', display: 'block' }}>게임 선택</label>
           <div className="game-picker-grid">
-            <div className="game-picker-card selected" role="radio" aria-checked="true" tabIndex={0}>
-              <span className="game-picker-icon" aria-hidden="true">⛏</span>
-              <div>
-                <strong>Minecraft Java</strong>
-                <small>Paper</small>
-              </div>
-            </div>
-            <div className="game-picker-card disabled" role="radio" aria-checked="false" aria-disabled="true" tabIndex={-1}>
-              <span className="game-picker-icon" aria-hidden="true">+</span>
-              <div>
-                <strong>더 많은 게임</strong>
-                <small>예정...</small>
-              </div>
-            </div>
+            {games.length === 0
+              ? <div className="game-picker-card selected" role="radio" aria-checked="true" tabIndex={0}>
+                  <span className="game-picker-icon" aria-hidden="true">⛏</span>
+                  <div><strong>Minecraft Java</strong><small>Paper</small></div>
+                </div>
+              : games.map(game => (
+                  <div
+                    key={game.slug}
+                    className={`game-picker-card${input.game === game.slug ? ' selected' : ''}${!game.supported ? ' disabled' : ''}`}
+                    role="radio"
+                    aria-checked={input.game === game.slug}
+                    aria-disabled={!game.supported}
+                    tabIndex={game.supported ? 0 : -1}
+                    onClick={() => { if (game.supported && game.slug === 'minecraft-java') set('game', 'minecraft-java'); }}
+                    onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && game.supported && game.slug === 'minecraft-java') set('game', 'minecraft-java'); }}
+                  >
+                    {game.image_url
+                      ? <img src={game.image_url} alt={game.name} className="game-picker-img" />
+                      : <span className="game-picker-icon" aria-hidden="true">⛏</span>}
+                    <div>
+                      <strong>{game.name}</strong>
+                      <small>{game.supported ? game.description : '예정...'}</small>
+                    </div>
+                  </div>
+                ))
+            }
           </div>
         </div>
 

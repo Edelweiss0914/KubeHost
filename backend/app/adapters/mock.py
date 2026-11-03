@@ -32,6 +32,20 @@ class InMemoryServerRepository:
     def retained_for(self, owner_id: str) -> list[Server]:
         return [s.model_copy(deep=True) for s in self.retained.values() if s.owner_id == owner_id]
 
+    _GAMES: list[dict] = [
+        {"id": "mc-java",  "slug": "minecraft-java",  "name": "Minecraft Java",         "steam_app_id": None,    "image_url": None, "description": "Paper 서버", "supported": True},
+        {"id": "cs2",      "slug": "cs2",              "name": "Counter-Strike 2",        "steam_app_id": 730,     "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/730/capsule_sm_120.jpg",     "description": "팀 기반 FPS",      "supported": False},
+        {"id": "valheim",  "slug": "valheim",          "name": "Valheim",                 "steam_app_id": 892970,  "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/892970/capsule_sm_120.jpg",  "description": "바이킹 서바이벌",  "supported": False},
+        {"id": "terraria", "slug": "terraria",         "name": "Terraria",                "steam_app_id": 105600,  "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/105600/capsule_sm_120.jpg",  "description": "2D 어드벤처",      "supported": False},
+        {"id": "pz",       "slug": "project-zomboid",  "name": "Project Zomboid",         "steam_app_id": 108600,  "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/108600/capsule_sm_120.jpg",  "description": "좀비 서바이벌",    "supported": False},
+        {"id": "rust",     "slug": "rust",             "name": "Rust",                    "steam_app_id": 252490,  "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/252490/capsule_sm_120.jpg",  "description": "PvP 서바이벌",     "supported": False},
+        {"id": "7d2d",     "slug": "7-days-to-die",    "name": "7 Days to Die",           "steam_app_id": 251570,  "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/251570/capsule_sm_120.jpg",  "description": "좀비 타워 디펜스", "supported": False},
+        {"id": "ark",      "slug": "ark-asa",          "name": "ARK: Survival Ascended",  "steam_app_id": 2399830, "image_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/2399830/capsule_sm_120.jpg", "description": "공룡 서바이벌",    "supported": False},
+    ]
+
+    def list_games(self) -> list[dict]:
+        return list(self._GAMES)
+
 
 class MockKubernetesAdapter:
     def nodes(self) -> list[Node]:
@@ -93,3 +107,5 @@ class MockKubernetesAdapter:
 
     def update_tenant_quota(self, namespace: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
         pass
+
+

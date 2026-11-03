@@ -877,6 +877,13 @@ button.resource-plan-card.selected .resource-plan-tag {
 .game-picker-card.disabled .game-picker-icon {
   background: var(--surface);
 }
+.game-picker-img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
 .game-picker-card strong {
   font-size: 13px;
   font-weight: 700;

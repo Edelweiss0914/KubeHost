@@ -98,6 +98,18 @@ class SQLiteServerRepository:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_schedules_server ON schedules(server_id)"
             )
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS games (
+                    id TEXT PRIMARY KEY,
+                    slug TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    steam_app_id INTEGER,
+                    image_url TEXT,
+                    description TEXT NOT NULL DEFAULT '',
+                    supported INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            self._seed_games(conn)
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -333,3 +345,41 @@ class SQLiteServerRepository:
     def delete_schedule(self, schedule_id: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
+
+    # ── Game catalog methods ──────────────────────────────────────────────────
+
+    def _seed_games(self, conn: sqlite3.Connection) -> None:
+        games = [
+            ("mc-java",  "minecraft-java",      "Minecraft Java",          None,    None, "Paper 서버",       1),
+            ("cs2",      "cs2",                  "Counter-Strike 2",         730,    None, "팀 기반 FPS",      0),
+            ("valheim",  "valheim",              "Valheim",               892970,    None, "바이킹 서바이벌",  0),
+            ("terraria", "terraria",             "Terraria",              105600,    None, "2D 어드벤처",      0),
+            ("pz",       "project-zomboid",      "Project Zomboid",       108600,    None, "좀비 서바이벌",    0),
+            ("rust",     "rust",                 "Rust",                  252490,    None, "PvP 서바이벌",     0),
+            ("7d2d",     "7-days-to-die",        "7 Days to Die",         251570,    None, "좀비 타워 디펜스", 0),
+            ("ark",      "ark-asa",              "ARK: Survival Ascended",2399830,   None, "공룡 서바이벌",    0),
+        ]
+        for g in games:
+            conn.execute(
+                "INSERT OR IGNORE INTO games (id, slug, name, steam_app_id, image_url, description, supported) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                g,
+            )
+
+    def list_games(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, slug, name, steam_app_id, image_url, description, supported FROM games ORDER BY supported DESC, name"
+            ).fetchall()
+        result = []
+        for r in rows:
+            steam_id = r[3]
+            img = r[4] or (
+                f"https://cdn.cloudflare.steamstatic.com/steam/apps/{steam_id}/capsule_sm_120.jpg"
+                if steam_id else None
+            )
+            result.append({
+                "id": r[0], "slug": r[1], "name": r[2],
+                "steam_app_id": steam_id, "image_url": img,
+                "description": r[5], "supported": bool(r[6]),
+            })
+        return result

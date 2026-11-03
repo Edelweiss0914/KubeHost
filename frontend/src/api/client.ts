@@ -4,6 +4,16 @@ import type { Server, ServerInput, ServerSettings, TopologyPod, WorkerNode } fro
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 
+export type Game = {
+  id: string;
+  slug: string;
+  name: string;
+  steam_app_id: number | null;
+  image_url: string | null;
+  description: string;
+  supported: boolean;
+};
+
 export type Schedule = {
   id: string;
   server_id: string;
@@ -77,6 +87,7 @@ export interface ServerGateway {
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
   adminGetUserQuota(userId: string): Promise<{max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}>;
   adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
+  games(): Promise<Game[]>;
   listSchedules(serverId: string): Promise<Schedule[]>;
   createSchedule(serverId: string, s: ScheduleInput): Promise<Schedule>;
   updateSchedule(serverId: string, scheduleId: string, s: ScheduleInput): Promise<Schedule>;
@@ -132,6 +143,7 @@ export const api: ServerGateway = {
   changePassword: (currentPassword, newPassword) => versioned('/auth/password', {method:'PUT', body:JSON.stringify({current_password:currentPassword, new_password:newPassword})}),
   adminGetUserQuota: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`),
   adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
+  games: () => versioned('/games'),
   listSchedules: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`),
   createSchedule: (serverId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules`, {method:'POST', body:JSON.stringify(s)}),
   updateSchedule: (serverId, scheduleId, s) => versioned(`/servers/${encodeURIComponent(serverId)}/schedules/${encodeURIComponent(scheduleId)}`, {method:'PUT', body:JSON.stringify(s)}),
