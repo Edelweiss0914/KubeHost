@@ -14,6 +14,20 @@ const resourceFields = [
   { key: 'storage_gb', label: '스토리지', unit: 'GiB', min: 5, max: 100, step: 1 },
 ] as const;
 
+const RESOURCE_PLANS = [
+  { name: 'Micro',  tag: '테스트용',  cpu: 0.5, memory_mb: 1024, storage_gb: 5  },
+  { name: 'Small',  tag: '권장',      cpu: 1,   memory_mb: 2048, storage_gb: 10 },
+  { name: 'Medium', tag: '다인용',    cpu: 2,   memory_mb: 4096, storage_gb: 20 },
+  { name: 'Large',  tag: '고성능',    cpu: 4,   memory_mb: 8192, storage_gb: 50 },
+];
+
+function matchesPlan(input: ServerInput): string | null {
+  const match = RESOURCE_PLANS.find(
+    p => p.cpu === input.cpu && p.memory_mb === input.memory_mb && p.storage_gb === input.storage_gb
+  );
+  return match?.name ?? null;
+}
+
 export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerProps) {
   const workers = nodes.filter(node => node.role === 'worker' && node.schedulable);
   const defaultWorkerId = workers[0]?.id;
@@ -34,6 +48,17 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
     });
   }
 
+  function applyPlan(plan: typeof RESOURCE_PLANS[number]) {
+    setInput(previous => ({ ...previous, cpu: plan.cpu, memory_mb: plan.memory_mb, storage_gb: plan.storage_gb }));
+    setErrors(previous => {
+      const next = { ...previous };
+      delete next['cpu'];
+      delete next['memory_mb'];
+      delete next['storage_gb'];
+      return next;
+    });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const submitted = { ...input, name: input.name.trim() };
@@ -41,6 +66,8 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
     setErrors(next);
     if (!Object.keys(next).length) await onCreate(submitted);
   }
+
+  const selectedPlan = matchesPlan(input);
 
   return <section className="panel create-panel">
     <div className="section-title">
@@ -50,13 +77,32 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
     <form onSubmit={submit} noValidate>
       <div className="form-section">
         <div className="form-section-header"><span>01</span><div><h3>기본 정보</h3><p>서버 이름, 버전과 배포할 Worker를 선택하세요.</p></div></div>
+
+        {/* Game picker */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ marginBottom: '10px', display: 'block' }}>게임 선택</label>
+          <div className="game-picker-grid">
+            <div className="game-picker-card selected" role="radio" aria-checked="true" tabIndex={0}>
+              <span className="game-picker-icon" aria-hidden="true">⛏</span>
+              <div>
+                <strong>Minecraft Java</strong>
+                <small>Paper</small>
+              </div>
+            </div>
+            <div className="game-picker-card disabled" role="radio" aria-checked="false" aria-disabled="true" tabIndex={-1}>
+              <span className="game-picker-icon" aria-hidden="true">+</span>
+              <div>
+                <strong>더 많은 게임</strong>
+                <small>예정...</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="form-grid">
           <label className="full">서버 이름
             <input autoFocus value={input.name} onChange={event => set('name', event.target.value)} placeholder="예: My Survival World" maxLength={40} aria-invalid={!!errors.name} aria-describedby="name-hint"/>
             <small id="name-hint">{errors.name ?? '영문·숫자·공백·밑줄·하이픈, 3–40자'}</small>
-          </label>
-          <label>게임
-            <select value={input.game} disabled><option value="minecraft-java">Minecraft Java</option></select>
           </label>
           <label>서버 소프트웨어
             <select value={input.edition} disabled><option value="paper">Paper</option></select>
@@ -85,6 +131,33 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
       </div>
       <div className="form-section">
         <div className="form-section-header"><span>02</span><div><h3>리소스</h3><p>서버가 사용할 CPU, 메모리와 로컬 스토리지를 지정하세요.</p></div></div>
+
+        {/* Resource preset cards */}
+        <div style={{ marginBottom: '22px' }}>
+          <label style={{ marginBottom: '10px', display: 'block' }}>리소스 프리셋 <small style={{ fontWeight: 400 }}>선택 후 수동 조정 가능</small></label>
+          <div className="resource-plan-grid">
+            {RESOURCE_PLANS.map(plan => (
+              <button
+                key={plan.name}
+                type="button"
+                className={`resource-plan-card${selectedPlan === plan.name ? ' selected' : ''}`}
+                onClick={() => applyPlan(plan)}
+                aria-pressed={selectedPlan === plan.name}
+              >
+                <div className="resource-plan-card-header">
+                  <strong>{plan.name}</strong>
+                  <span className="resource-plan-tag">{plan.tag}</span>
+                </div>
+                <div className="resource-plan-card-specs">
+                  <span>{plan.cpu} vCPU</span>
+                  <span>{plan.memory_mb / 1024} GiB</span>
+                  <span>{plan.storage_gb} GiB</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="form-grid resource-grid">
           {resourceFields.map(field => <label key={field.key}>{field.label} <span className="field-unit">{field.unit}</span>
             <input type="number" value={input[field.key]} min={field.min} max={field.max} step={field.step}
