@@ -95,22 +95,42 @@ function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
+const TIME_RANGE_OPTIONS: { label: string; minutes: number }[] = [
+  { label: '15분', minutes: 15 },
+  { label: '1시간', minutes: 60 },
+  { label: '6시간', minutes: 360 },
+];
+
 function ServerMetricsPanel({ serverId }: { serverId: string }) {
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [minutes, setMinutes] = useState(60);
 
   useEffect(() => {
-    const load = () => api.serverMetrics(serverId, 60).then(setMetrics).catch(() => {});
+    setLoading(true);
+    const load = () => api.serverMetrics(serverId, minutes).then(setMetrics).catch(() => {});
     load().finally(() => setLoading(false));
     const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 15000);
     return () => window.clearInterval(timer);
-  }, [serverId]);
+  }, [serverId, minutes]);
 
   return (
     <div className="metrics-panel">
       <div className="section-title">
         <div><span className="eyebrow">METRICS</span><h2>리소스 사용량</h2></div>
-        <span className="muted" style={{fontSize:'12px'}}>최근 1시간</span>
+        <div className="metrics-time-range" role="group" aria-label="시간 범위 선택">
+          {TIME_RANGE_OPTIONS.map(opt => (
+            <button
+              key={opt.minutes}
+              type="button"
+              className={minutes === opt.minutes ? 'active' : ''}
+              onClick={() => setMinutes(opt.minutes)}
+              aria-pressed={minutes === opt.minutes}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
       {loading ? <p className="muted">불러오는 중…</p> : (
         <div className="metrics-grid">
