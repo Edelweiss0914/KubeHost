@@ -699,9 +699,17 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
    LANDING PAGE  — prefix: landing-
    ═══════════════════════════════════════════════════════════ */
 .landing-page{
+  /* Always dark — override all theme CSS vars within landing scope */
+  --page:#0b1220;
+  --surface:#111827;
+  --surface2:#1a2236;
+  --border:#1e2d45;
+  --subtle:#1e2d45;
+  --text:#e7edf5;
+  --muted:#8095b4;
+  --accent:#6c8ef5;
   min-height:100vh;
   background:#0b1220;
-  background:var(--page,#0b1220);
   color:#e7edf5;
   color:var(--text,#e7edf5);
   font-family:'DM Sans','Noto Sans KR',sans-serif;
@@ -841,7 +849,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   line-height:1.08;
   margin:0 0 24px;
   color:#eef5ff;
-  font-family:'Sora','Noto Sans KR',sans-serif;
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
 }
 .landing-accent-text{
   color:var(--accent);
@@ -922,7 +930,7 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   font-size:13px;
   font-weight:700;
   color:var(--text);
-  font-family:'JetBrains Mono',monospace;
+  font-family:'DM Sans','Noto Sans KR',sans-serif;
   letter-spacing:.5px;
 }
 .landing-hero-stat span{
