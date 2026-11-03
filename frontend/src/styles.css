@@ -1342,9 +1342,10 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
   font-weight:500;
   color:#8095b4;
   font-family:'DM Sans','Noto Sans KR',sans-serif;
-  transition:color .2s,border-color .2s;
-  cursor:default;
+  transition:color .2s,border-color .2s,background .2s;
+  cursor:pointer;
   overflow:hidden;
+  text-decoration:none;
 }
 .landing-marquee-item:hover{
   color:#c9d8f0;

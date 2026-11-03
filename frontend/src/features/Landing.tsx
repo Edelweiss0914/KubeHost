@@ -60,7 +60,14 @@ function MarqueeRow({ games, reverse }: { games: typeof GAMES_ROW1; reverse?: bo
     <div className="landing-marquee">
       <div className={`landing-marquee-track${reverse ? ' landing-marquee-reverse' : ''}`}>
         {[...games, ...games].map((g, i) => (
-          <span className="landing-marquee-item" key={i}>
+          <a
+            className="landing-marquee-item"
+            key={i}
+            href={`https://store.steampowered.com/app/${g.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${g.name} Steam 상점 페이지`}
+          >
             <img
               src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/capsule_sm_120.jpg`}
               alt={g.name}
@@ -68,7 +75,7 @@ function MarqueeRow({ games, reverse }: { games: typeof GAMES_ROW1; reverse?: bo
               loading="lazy"
             />
             {g.name}
-          </span>
+          </a>
         ))}
       </div>
     </div>
