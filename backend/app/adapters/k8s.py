@@ -140,6 +140,18 @@ class K8sAdapter:
                 if not (ignore_conflict and err.status == 409):
                     raise
 
+    def _delete_resource(self, kind: str, name: str, namespace: str) -> None:
+        try:
+            if kind == "Service":
+                self._core.delete_namespaced_service(name, namespace)
+            elif kind == "StatefulSet":
+                self._apps.delete_namespaced_stateful_set(name, namespace)
+            elif kind == "PersistentVolumeClaim":
+                self._core.delete_namespaced_persistent_volume_claim(name, namespace)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+
     def create(self, plan: ResourcePlan) -> str | None:
         for resource in plan.resources:
             kind = resource["kind"]
@@ -148,7 +160,12 @@ class K8sAdapter:
                 utils.create_from_dict(self._api_client, resource)
             except utils.FailToCreateError as exc:
                 for err in exc.api_exceptions:
-                    if not (ignore_conflict and err.status == 409):
+                    if err.status == 409 and not ignore_conflict:
+                        name = resource["metadata"]["name"]
+                        ns = resource["metadata"].get("namespace", plan.namespace)
+                        self._delete_resource(kind, name, ns)
+                        utils.create_from_dict(self._api_client, resource)
+                    elif not (ignore_conflict and err.status == 409):
                         raise
         game_svc_name = next(
             (r["metadata"]["name"] for r in plan.resources
