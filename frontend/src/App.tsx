@@ -316,7 +316,7 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(() => needsOnboarding());
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const { toasts, push: pushToast, dismiss: dismissToast } = useToast();
   const prevServersRef = useRef<Map<string, string>>(new Map());
 
@@ -381,6 +381,7 @@ export function App() {
       try { localStorage.setItem('kubehost-token', token); localStorage.setItem('kubehost-username', username); } catch { /* ignore */ }
       setAuth({ token, username });
       setShowLogin(false);
+      if (needsOnboarding()) setShowOnboarding(true);
     }
     return (
       <>

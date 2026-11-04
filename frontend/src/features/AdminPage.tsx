@@ -12,17 +12,26 @@ type Tab = 'users' | 'invites' | 'overview' | 'audit';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  function doCopy() {
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta); done();
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta); done();
+    }
+  }
   return (
-    <button
-      className="text-button"
-      style={{ fontSize: '11px' }}
-      onClick={() => {
-        void navigator.clipboard.writeText(text).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-    >
+    <button className="text-button" style={{ fontSize: '11px' }} onClick={doCopy}>
       {copied ? '복사됨' : '복사'}
     </button>
   );
