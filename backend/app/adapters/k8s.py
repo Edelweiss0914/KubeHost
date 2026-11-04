@@ -644,9 +644,11 @@ class K8sAdapter:
         safe = self._safe_path(path)
         parent = safe.rsplit("/", 1)[0] or "/data"
         b64 = base64.b64encode(content).decode("ascii")
+        # IFS= read -r reads exactly one newline-terminated line → stdin 채널이 닫히지 않아도 명령이 종료됨
         self._exec_anywhere(server_id, namespace,
-            ["sh", "-c", f"mkdir -p '{parent}' && base64 -d > '{safe}'"],
-            stdin_data=b64.encode("ascii"))
+            ["sh", "-c",
+             f"mkdir -p '{parent}' && IFS= read -r _b64 && printf '%s' \"$_b64\" | base64 -d > '{safe}'"],
+            stdin_data=(b64 + "\n").encode("ascii"))
 
     def delete_path(self, server_id: str, namespace: str, path: str) -> None:
         safe = self._safe_path(path)
