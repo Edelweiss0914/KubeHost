@@ -34,7 +34,7 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
     const server = serverById.get(pod.server_id);
     return <li className="hierarchy-pod" key={`${pod.namespace}/${pod.name}`}>
       <div className="hierarchy-row">
-        <span className="hierarchy-kind">파드</span>
+        <span className="hierarchy-kind">서버 인스턴스</span>
         <strong>{pod.name}</strong>
         <span className="hierarchy-phase">{pod.phase}{pod.simulated ? ' · 모의' : ''}</span>
       </div>
@@ -55,21 +55,21 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
 
   return <section className="panel hierarchy" aria-labelledby="hierarchy-title">
     <div className="section-title">
-      <div><span className="eyebrow">WORKLOAD TOPOLOGY</span><h2 id="hierarchy-title">클러스터 계층형 토폴로지</h2>
-        <p className="section-copy">클러스터 → 노드 → 파드 → 실행 서버</p></div>
-      <span className="tag">노드 {nodes.length} · 파드 {ownedPods.length} · 서버 {servers.length}</span>
+      <div><span className="eyebrow">WORKLOAD TOPOLOGY</span><h2 id="hierarchy-title">서버 배치 현황</h2>
+        <p className="section-copy">환경 → 호스트 → 게임 서버</p></div>
+      <span className="tag">호스트 {nodes.length} · 인스턴스 {ownedPods.length} · 서버 {servers.length}</span>
     </div>
-    <div className="hierarchy-root"><span className="hierarchy-kind">클러스터</span><strong>KubeHost</strong></div>
+    <div className="hierarchy-root"><span className="hierarchy-kind">서버 환경</span><strong>KubeHost</strong></div>
     {nodes.length === 0 ? <p className="muted hierarchy-empty">표시할 노드가 없습니다.</p> : <ul className="hierarchy-nodes">
       {nodes.map(node => {
         const nodePods = ownedPods.filter(pod => pod.node_id === node.id);
         const withoutPod = servers.filter(server => server.node_id === node.id && !podServers.has(server.id));
         return <li className="hierarchy-node" key={node.id}>
-          <div className="hierarchy-row"><span className="hierarchy-kind">{node.role === 'worker' ? 'Worker 노드' : 'Control Plane'}</span>
+          <div className="hierarchy-row"><span className="hierarchy-kind">{node.role === 'worker' ? '호스트 서버' : '관리 서버'}</span>
             <strong>{node.name}</strong><Status value={node.status}/></div>
-          <small>{nodePods.length}개 파드 · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
+          <small>{nodePods.length}개 서버 인스턴스 · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
           {nodePods.length > 0 && <ul className="hierarchy-pod-list">{nodePods.map(renderPod)}</ul>}
-          {withoutPod.length > 0 && <div className="hierarchy-unplaced"><span className="hierarchy-kind">파드 없음</span>
+          {withoutPod.length > 0 && <div className="hierarchy-unplaced"><span className="hierarchy-kind">인스턴스 없음</span>
             {withoutPod.map(server => <button key={server.id} onClick={() => onSelect(server.id)}>{server.name} · {server.status === 'stopped' ? '중지됨' : '배치 대기'} ↗</button>)}</div>}
           {nodePods.length === 0 && withoutPod.length === 0 && <p className="muted hierarchy-empty">표시할 워크로드가 없습니다.</p>}
         </li>;
@@ -86,7 +86,7 @@ export function ClusterMap({ nodes, servers, pods, onSelect }: Props) {
     return (
       <div className="cluster-page"><div className="panel empty">
         <div className="empty-icon" aria-hidden="true">▧</div>
-        <p>표시할 Worker 노드가 없습니다.</p>
+        <p>표시할 호스트 서버가 없습니다.</p>
       </div><Hierarchy nodes={nodes} servers={servers} pods={pods} onSelect={onSelect}/></div>
     );
   }
@@ -105,7 +105,7 @@ export function ClusterMap({ nodes, servers, pods, onSelect }: Props) {
                 <span className="node-icon" aria-hidden="true">▧</span>
                 <div>
                   <strong>{node.name}</strong>
-                  <small>Worker · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
+                  <small>호스트 서버 · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
                 </div>
               </div>
               <Status value={node.status} />

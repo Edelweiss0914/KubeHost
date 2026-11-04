@@ -84,7 +84,7 @@ function ServerCard({ server, onSelect }: { server: Server; onSelect: (id: strin
         </div>
       </div>
       <div className="server-card-meta">
-        <span>Worker: {server.node_id}</span>
+        <span>호스트 서버: {server.node_id}</span>
         <span>{server.cpu} vCPU · {server.memory_mb / 1024} GiB · {server.storage_gb} GiB</span>
       </div>
       <div className="server-card-connection">
@@ -131,12 +131,12 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
       {!servers.length ? <div className="empty">
         <span className="empty-icon" aria-hidden="true">▦</span>
         <h3>아직 서버가 없습니다</h3>
-        <p>Worker와 리소스를 선택해 첫 Minecraft 서버를 배포하세요.</p>
+        <p>호스트 서버와 리소스를 선택해 첫 Minecraft 서버를 배포하세요.</p>
         <button onClick={onCreate}>첫 서버 만들기</button>
       </div> : <>
         <div className="list-toolbar">
           <label className="search-field">서버 검색
-            <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름 또는 Worker 검색"/>
+            <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름 또는 호스트 서버 검색"/>
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span className="results-count">{visible.length}개 표시</span>
@@ -171,7 +171,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th scope="col">서버</th><th scope="col">상태</th><th scope="col">Worker</th><th scope="col">할당 리소스</th><th scope="col">접속 주소</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
+                <thead><tr><th scope="col">서버</th><th scope="col">상태</th><th scope="col">호스트 서버</th><th scope="col">할당 리소스</th><th scope="col">접속 주소</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
                 <tbody>{visible.map(server => <tr key={server.id}>
                   <td><strong>{server.name}</strong><small>Minecraft Java · Paper {server.version}</small></td>
                   <td><Status value={server.status}/></td>
@@ -192,14 +192,14 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th scope="col">서버</th><th scope="col">보존 날짜</th><th scope="col">스토리지</th><th scope="col">PVC</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
+          <thead><tr><th scope="col">서버</th><th scope="col">보존 날짜</th><th scope="col">스토리지</th><th scope="col">저장 공간</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
           <tbody>{retained.map(server => <tr key={server.id}>
             <td><strong>{server.name}</strong><small>Paper {server.version} · {server.node_id}</small></td>
             <td>{new Date(server.created_at).toLocaleDateString('ko-KR')}</td>
             <td>{server.storage_gb} GiB</td>
             <td>{pvcs[server.id] === undefined
-              ? <button className="text-button" onClick={() => void loadPvcs(server.id)}>PVC 확인</button>
-              : pvcs[server.id].length ? <code>{pvcs[server.id][0]}</code> : <span className="muted">확인된 PVC 없음</span>}</td>
+              ? <button className="text-button" onClick={() => void loadPvcs(server.id)}>저장 공간 확인</button>
+              : pvcs[server.id].length ? <code>{pvcs[server.id][0]}</code> : <span className="muted">저장 공간 없음</span>}</td>
             <td><button className="secondary" onClick={() => onRestore(server)}>복원</button></td>
           </tr>)}</tbody>
         </table>

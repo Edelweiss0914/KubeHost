@@ -65,7 +65,7 @@ function QuotaModal({ userId, username, onClose }: { userId: string; username: s
     <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
       <div className="settings-dialog-inner">
         <div className="section-title">
-          <div><span className="eyebrow">QUOTA</span><h2>{username} 쿼터</h2></div>
+          <div><span className="eyebrow">QUOTA</span><h2>{username} 사용 한도</h2></div>
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
         {loading ? <p className="muted">불러오는 중…</p> : (
@@ -167,7 +167,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                 {u.id.slice(0, 8)}…
               </td>
               <td style={{ padding: '8px 12px' }}>
-                <button className="secondary" onClick={() => setQuotaUser({ id: u.id, username: u.username })}>쿼터</button>
+                <button className="secondary" onClick={() => setQuotaUser({ id: u.id, username: u.username })}>사용 한도</button>
                 {u.id !== currentUserId && (
                   <button
                     className="text-button"
@@ -345,7 +345,7 @@ function ClusterSummary({ nodes, servers }: { nodes: WorkerNode[]; servers: Admi
         <div style={{ fontSize: '22px', fontWeight: 750, margin: '6px 0 2px', color: 'var(--text)' }}>
           {workers.length}<span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 400, marginLeft: '6px' }}>/ {nodes.length}개</span>
         </div>
-        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>스케줄 가능 Worker</div>
+        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>스케줄 가능 호스트 서버</div>
       </div>
       <div style={{ background: 'var(--surface-2)', borderRadius: '10px', padding: '14px 16px' }}>
         <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600, letterSpacing: '.04em' }}>CPU 할당</div>
@@ -437,10 +437,10 @@ function OverviewTab() {
       <thead>
         <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
           <th style={{ padding: '8px 12px' }}>사용자</th>
-          <th style={{ padding: '8px 12px' }}>네임스페이스</th>
+          <th style={{ padding: '8px 12px' }}>계정 공간</th>
           <th style={{ padding: '8px 12px' }}>서버 수</th>
-          <th style={{ padding: '8px 12px' }}>CPU 쿼터</th>
-          <th style={{ padding: '8px 12px' }}>메모리 쿼터</th>
+          <th style={{ padding: '8px 12px' }}>CPU 사용 한도</th>
+          <th style={{ padding: '8px 12px' }}>메모리 사용 한도</th>
         </tr>
       </thead>
       <tbody>

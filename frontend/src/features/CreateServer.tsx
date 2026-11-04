@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, type Game } from '../api/client';
 import { defaults, validate, type GameType, type ServerInput, type WorkerNode } from '../domain/server';
+import { Tooltip } from '../components/Tooltip';
 
 type CreateServerProps = {
   nodes: WorkerNode[];
@@ -107,12 +108,12 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
   return <section className="panel create-panel">
     <div className="section-title">
-      <div><span className="eyebrow">SERVER PROVISIONING</span><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
+      <div><span className="eyebrow">서버 생성</span><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
       <span className="tag">{GAME_TYPES.find(g => g.type === input.game_type)?.label ?? 'Paper'}</span>
     </div>
     <form onSubmit={submit} noValidate>
       <div className="form-section">
-        <div className="form-section-header"><span>01</span><div><h3>기본 정보</h3><p>서버 이름, 버전과 배포할 Worker를 선택하세요.</p></div></div>
+        <div className="form-section-header"><span>01</span><div><h3>기본 정보</h3><p>서버 이름, 버전과 배포할 호스트 서버를 선택하세요.</p></div></div>
 
         {/* Game picker */}
         <div style={{ marginBottom: '20px' }}>
@@ -232,12 +233,12 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             </select>
             <small>접속할 클라이언트 버전과 맞춰야 합니다.</small>
           </label>
-          <label>배포 Worker
+          <label>호스트 서버
             <select value={input.node_id} onChange={event => set('node_id', event.target.value)} aria-invalid={!!errors.node_id} aria-describedby="node-hint">
-              {!workers.length && <option value="">사용 가능한 Worker 없음</option>}
+              {!workers.length && <option value="">사용 가능한 호스트 서버 없음</option>}
               {workers.map(node => <option key={node.id} value={node.id}>{node.name}</option>)}
             </select>
-            <small id="node-hint">{errors.node_id ?? '게임 서버는 Worker 노드에 배포됩니다.'}</small>
+            <small id="node-hint">{errors.node_id ?? '게임 서버는 호스트 서버에 배포됩니다.'}</small>
           </label>
           {(() => {
             const selectedNode = workers.find(n => n.id === input.node_id);
@@ -254,7 +255,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
         </div>
       </div>
       <div className="form-section">
-        <div className="form-section-header"><span>02</span><div><h3>리소스</h3><p>서버가 사용할 CPU, 메모리와 로컬 스토리지를 지정하세요.</p></div></div>
+        <div className="form-section-header"><span>02</span><div><h3>서버 구성</h3><p>서버가 사용할 CPU, 메모리와 로컬 스토리지를 지정하세요.</p></div></div>
 
         {/* Resource preset cards */}
         <div style={{ marginBottom: '22px' }}>
@@ -292,9 +293,9 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
         </div>
       </div>
       <div className="form-section">
-        <div className="form-section-header"><span>03</span><div><h3>접속</h3><p>고정 포트를 지정하거나 Kubernetes 자동 배정을 사용하세요.</p></div></div>
+        <div className="form-section-header"><span>03</span><div><h3>접속</h3><p>고정 포트를 지정하거나 플랫폼 자동 배정을 사용하세요.</p></div></div>
         <div className="form-grid">
-          <label>NodePort <span className="field-unit">선택 사항</span>
+          <label>접속 포트 <Tooltip text="외부에서 서버에 접속할 포트 번호입니다. 비워두면 자동으로 배정됩니다." /> <span className="field-unit">선택 사항</span>
             <input type="number" value={input.node_port ?? ''} min={30000} max={32767} step={1}
               placeholder="자동 배정"
               onChange={event => set('node_port', event.target.value === '' ? null : Number(event.target.value))}
@@ -303,7 +304,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
           </label>
         </div>
       </div>
-      <div className="notice">데이터는 선택한 Worker의 로컬 SSD에 저장됩니다. Worker 장애 시 다른 노드로 자동 이동하지 않으며, PVC 크기는 실제 디스크 예약을 보장하지 않습니다.</div>
+      <div className="notice">데이터는 선택한 호스트 서버의 로컬 SSD에 저장됩니다. 호스트 서버 장애 시 다른 노드로 자동 이동하지 않으며, 저장 공간 크기는 실제 디스크 예약을 보장하지 않습니다.</div>
       <div className="actions">
         <button type="button" className="secondary" onClick={onCancel} disabled={busy}>취소</button>
         <button disabled={busy || !workers.length}>{busy ? '생성 중…' : '서버 생성 →'}</button>

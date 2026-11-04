@@ -14,6 +14,7 @@ import { Login } from './features/Login';
 import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
 import { useToast, ToastContainer } from './components/Toast';
+import { Tooltip } from './components/Tooltip';
 
 function getStoredAuth(): { token: string; username: string } | null {
   try {
@@ -66,7 +67,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
     <section className="hero">
       <div className="hero-copy">
         <span className="eyebrow">KUBEHOST / MISSION CONTROL</span>
-        <h2>클러스터의 모든 흐름을<br/>한 화면에서.</h2>
+        <h2>서버 환경의 모든 흐름을<br/>한 화면에서.</h2>
         <p>노드 상태와 워크로드를 실시간으로 살피고 다음 배포를 준비하세요.</p>
       </div>
       <div className="hero-actions"><button onClick={onCreate}>새 서버 배포 <span aria-hidden="true">↗</span></button></div>
@@ -90,16 +91,16 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
     </section>
     {tenant && <section className="panel mission-quota">
       <div className="section-title">
-        <div><span className="eyebrow">TENANT</span><h2>내 네임스페이스</h2>
+        <div><span className="eyebrow">TENANT</span><h2>계정 공간</h2>
           <p className="section-copy" style={{fontFamily:'monospace',fontSize:'12px'}}>{tenant.namespace}</p>
         </div>
-        <span className="tag">리소스 쿼터</span>
+        <span className="tag">사용 한도 <Tooltip text="이 계정에서 사용할 수 있는 최대 리소스 한도입니다." /></span>
       </div>
       <div style={{padding:'8px 0'}}>
         {tenant.quota['requests.cpu'] && <QuotaBar label="CPU" entry={tenant.quota['requests.cpu']}/>}
         {tenant.quota['requests.memory'] && <QuotaBar label="메모리" entry={tenant.quota['requests.memory']}/>}
         {tenant.quota['requests.storage'] && <QuotaBar label="스토리지" entry={tenant.quota['requests.storage']}/>}
-        {tenant.quota['pods'] && <QuotaBar label="파드" entry={tenant.quota['pods']}/>}
+        {tenant.quota['pods'] && <QuotaBar label="서버 인스턴스" entry={tenant.quota['pods']}/>}
       </div>
     </section>}
     {nsMetrics && (
@@ -360,7 +361,7 @@ export function App() {
         if (server.status === 'running')       pushToast(`${label} 서버가 실행됐습니다.`, 'success');
         else if (server.status === 'stopped')  pushToast(`${label} 서버가 중지됐습니다.`, 'info');
         else if (server.status === 'error')    pushToast(`${label} 서버에 오류가 발생했습니다.`, 'error');
-        else if (server.status === 'provisioning') pushToast(`${label} 서버를 프로비저닝 중입니다.`, 'info');
+        else if (server.status === 'provisioning') pushToast(`${label} 서버를 준비 중입니다.`, 'info');
       }
     }
     const next = new Map(servers.map(s => [s.id, s.status]));
@@ -418,7 +419,7 @@ export function App() {
     await run(async () => {
       setSelected(await api.create(input));
       setView('detail');
-      setNotice('서버와 리소스 계획을 생성했습니다.');
+      setNotice('서버를 생성했습니다.');
       await refresh();
     });
   }
@@ -472,7 +473,7 @@ export function App() {
   }
 
   const titles: Record<View, string> = {
-    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '클러스터 맵', admin: '관리자',
+    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '서버 현황 맵', admin: '관리자',
   };
 
   return <div className="shell">
@@ -490,17 +491,17 @@ export function App() {
           ▤ <span>게임 서버</span><span className="nav-count">{servers.length}</span>
         </button>
         <button className={view === 'cluster' ? 'active' : ''} aria-current={view === 'cluster' ? 'page' : undefined} onClick={() => navigate('cluster')}>
-          ▧ <span>클러스터 맵</span>
+          ▧ <span>서버 현황 맵</span>
         </button>
         {isAdmin && <button className={view === 'admin' ? 'active' : ''} aria-current={view === 'admin' ? 'page' : undefined} onClick={() => navigate('admin')}>
           ◈ <span>관리자</span>
         </button>}
       </nav>
       <div className="sidebar-footer">
-        <div className="environment-pill"><span className="demo-dot"/> KUBERNETES<small>K3s API 연결</small></div>
+        <div className="environment-pill"><span className="demo-dot"/> KUBEHOST<small>플랫폼 연결</small></div>
         <div className="profile">
           <span className="avatar">{auth ? auth.username[0].toUpperCase() : 'D'}</span>
-          <div>{auth.username}<small>로그인됨 · K3s</small></div>
+          <div>{auth.username}<small>로그인됨</small></div>
           {auth && <button className="text-button" style={{fontSize:'11px'}} onClick={() => setShowProfileSettings(true)}>프로필 설정</button>}
           {auth && <button className="text-button" style={{marginLeft:'auto',fontSize:'11px'}} onClick={() => {
             try { localStorage.removeItem('kubehost-token'); localStorage.removeItem('kubehost-username'); } catch { /* ignore */ }
@@ -513,7 +514,7 @@ export function App() {
       <header className="topbar">
         <span>워크스페이스 <span className="muted">/</span> <strong>{titles[view]}</strong></span>
         <div className="topbar-actions">
-          <span className="topbar-status"><span className="demo-dot"/>클러스터 연결</span>
+          <span className="topbar-status"><span className="demo-dot"/>서버 환경 연결</span>
           {auth && (
             <span
               className={`session-timer${sessionRemaining < 120000 ? sessionRemaining < 60000 ? ' session-timer-urgent' : ' session-timer-warn' : ''}`}
@@ -530,7 +531,7 @@ export function App() {
       </header>
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
-          <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '배포할 Worker와 리소스를 선택하세요.' : view === 'cluster' ? 'Worker 노드와 배포된 파드의 배치를 시각적으로 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
+          <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
           <button className="secondary" onClick={() => void refreshView()} disabled={loading || busy}>↻ 새로고침</button>
         </div>
         {notice && <p role="status" className="notice">{notice}</p>}
@@ -552,7 +553,7 @@ export function App() {
               onDelete={(deleteData, confirmation) => void remove(deleteData, confirmation)}
             />}
           </>}
-        <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>
+        <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>호스트 서버 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>
       </main>
     </div>
       {showProfileSettings && <ProfileSettingsModal onClose={() => setShowProfileSettings(false)}/>}

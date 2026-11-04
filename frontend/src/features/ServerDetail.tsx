@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
+import { Tooltip } from '../components/Tooltip';
 import { ServerSettingsPanel } from './ServerSettings';
 import { ServerConsole } from './ServerConsole';
 import { FileManager } from './FileManager';
@@ -39,7 +40,7 @@ function kindSummary(r: K8sResource): string {
       return `기본 CPU ${def.cpu ?? '?'} · 기본 메모리 ${def.memory ?? '?'}`
     }
     case 'NetworkPolicy':
-      return 'Ingress: 게임(25565) + RCON(25575 내부) · Egress: DNS + 외부'
+      return 'Ingress: 게임(25565) + 원격 콘솔(25575 내부) · Egress: DNS + 외부'
     case 'Service': {
       const ports = spec?.ports as Array<Record<string, unknown>> | undefined
       if (spec?.clusterIP === 'None') return 'Headless · 포트 25565'
@@ -53,7 +54,7 @@ function kindSummary(r: K8sResource): string {
       const storage = ((vcts?.[0]?.spec as Record<string, unknown> | undefined)
         ?.resources as Record<string, Record<string, string>> | undefined)
         ?.requests?.storage ?? '?'
-      return `replicas: 1 · Worker: ${node} · PVC: ${storage} local-path`
+      return `replicas: 1 · 호스트 서버: ${node} · 저장 공간: ${storage} local-path`
     }
     default:
       return ''
@@ -704,17 +705,17 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
               </div>
               <dl className="details-grid">
                 <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
-                <div><dt>배포 Worker</dt><dd>{server.node_id}</dd></div>
+                <div><dt>호스트 서버</dt><dd>{server.node_id}</dd></div>
                 <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
-                <div><dt>스토리지</dt><dd>{server.storage_gb} GiB · local-path</dd></div>
-                <div><dt>접속 주소</dt><dd style={{display:'flex',alignItems:'center',gap:'8px'}}><code>{server.connection ?? '할당 중'}</code><CopyBtn text={server.connection}/></dd></div>
+                <div><dt>저장 공간 <Tooltip text="서버의 월드 데이터와 파일이 저장되는 공간입니다." /></dt><dd>{server.storage_gb} GiB · local-path</dd></div>
+                <div><dt>접속 포트 <Tooltip text="외부에서 이 서버에 접속할 때 사용하는 포트 번호입니다." /></dt><dd style={{display:'flex',alignItems:'center',gap:'8px'}}><code>{server.connection ?? '할당 중'}</code><CopyBtn text={server.connection}/></dd></div>
                 <div><dt>데이터 정책</dt><dd>Retain · 삭제 시 기본 보존</dd></div>
               </dl>
             </section>
             <section className="panel">
-              <div className="section-title"><div><span className="eyebrow">배포된 리소스</span><h2>Kubernetes 리소스 계획</h2></div></div>
-              <p className="muted">Namespace: <code>{server.resource_plan.namespace}</code> · StatefulSet 1 replica · Worker 전용 배치</p>
-              <div className="notice">Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
+              <div className="section-title"><div><span className="eyebrow">서버 구성</span><h2>서버 구성 정보</h2></div></div>
+              <p className="muted">계정 공간: <code>{server.resource_plan.namespace}</code> · 서버 구성 1 replica · 호스트 서버 전용 배치</p>
+              <div className="notice">호스트 서버 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
               {server.resource_plan.warnings.map(w => <p className="muted" key={w}>{w}</p>)}
               <ResourcePlanViewer plan={server.resource_plan}/>
             </section>
