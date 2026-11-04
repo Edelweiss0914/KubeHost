@@ -474,3 +474,187 @@ class K8sAdapter:
         if "/" in filename or ".." in filename:
             raise ValueError("잘못된 파일명입니다.")
         self._exec_in_pod(server_id, namespace, ["rm", f"/data/plugins/{filename}"])
+
+    # ── File Manager ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _safe_path(path: str) -> str:
+        import os as _os
+        path = (path or "/data").strip()
+        if not path.startswith("/"):
+            path = "/data/" + path
+        normalized = _os.path.normpath(path)
+        if normalized != "/data" and not normalized.startswith("/data/"):
+            raise ValueError("경로는 /data/ 이내여야 합니다.")
+        if "'" in normalized:
+            raise ValueError("경로에 사용할 수 없는 문자가 포함돼 있습니다.")
+        return normalized
+
+    def _pvc_name(self, server_id: str) -> str:
+        return f"data-{self._sts_name(server_id)}-0"
+
+    def _get_server_node(self, server_id: str, namespace: str) -> str:
+        name = self._sts_name(server_id)
+        try:
+            sts = self._apps.read_namespaced_stateful_set(name, namespace)
+            ns_map = sts.spec.template.spec.node_selector or {}
+            return ns_map.get("kubernetes.io/hostname", "")
+        except ApiException:
+            return ""
+
+    def _exec_in_temp_pod(
+        self, namespace: str, pvc_name: str, node_name: str,
+        command: list[str], stdin_data: bytes | None = None,
+    ) -> str:
+        import time
+        from uuid import uuid4
+        from kubernetes.stream import stream  # type: ignore[import-untyped]
+
+        pod_name = f"kubehost-fs-{uuid4().hex[:8]}"
+        pod_body = {
+            "apiVersion": "v1", "kind": "Pod",
+            "metadata": {
+                "name": pod_name, "namespace": namespace,
+                "labels": {"app.kubernetes.io/managed-by": "kubehost",
+                           "kubehost.io/role": "filemanager"},
+            },
+            "spec": {
+                "restartPolicy": "Never",
+                "automountServiceAccountToken": False,
+                "securityContext": {
+                    "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,
+                    "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"},
+                },
+                **({"nodeSelector": {"kubernetes.io/hostname": node_name}} if node_name else {}),
+                "containers": [{
+                    "name": "fs",
+                    "image": "itzg/minecraft-server:latest",
+                    "command": ["/bin/sh", "-c", "sleep 300"],
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "capabilities": {"drop": ["ALL"]},
+                    },
+                    "resources": {
+                        "requests": {"cpu": "50m", "memory": "64Mi"},
+                        "limits": {"cpu": "100m", "memory": "128Mi"},
+                    },
+                    "volumeMounts": [{"name": "data", "mountPath": "/data"}],
+                }],
+                "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": pvc_name}}],
+            },
+        }
+        try:
+            self._core.create_namespaced_pod(namespace, pod_body)
+            for _ in range(30):
+                pod = self._core.read_namespaced_pod(pod_name, namespace)
+                phase = (pod.status.phase if pod.status else None)
+                cs = (pod.status.container_statuses or []) if pod.status else []
+                if phase == "Running" and cs and cs[0].ready:
+                    break
+                time.sleep(1)
+            else:
+                raise RuntimeError("임시 파드 준비 타임아웃 (30초)")
+
+            resp = stream(
+                self._core.connect_get_namespaced_pod_exec,
+                pod_name, namespace,
+                command=command,
+                stdin=stdin_data is not None,
+                stdout=True, stderr=True, tty=False,
+                _preload_content=False,
+            )
+            if stdin_data is not None:
+                resp.write_stdin(stdin_data.decode("utf-8", errors="replace"))
+            out = ""
+            while resp.is_open():
+                resp.update(timeout=15)
+                if resp.peek_stdout():
+                    out += resp.read_stdout()
+            resp.close()
+            return out
+        finally:
+            try:
+                self._core.delete_namespaced_pod(pod_name, namespace)
+            except Exception:
+                pass
+
+    def _exec_anywhere(
+        self, server_id: str, namespace: str,
+        command: list[str], stdin_data: bytes | None = None,
+    ) -> str:
+        """실행 중인 파드 우선, 없으면 임시 파드로 폴백."""
+        try:
+            return self._exec_in_pod(server_id, namespace, command, stdin_data)
+        except ValueError:
+            pvc = self._pvc_name(server_id)
+            node = self._get_server_node(server_id, namespace)
+            return self._exec_in_temp_pod(namespace, pvc, node, command, stdin_data)
+
+    _MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MiB
+
+    def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
+        safe = self._safe_path(path)
+        cmd = [
+            "sh", "-c",
+            f"ls -1Ap '{safe}' 2>/dev/null | while IFS= read -r name; do "
+            f"  stripped=\"${{name%/}}\"; "
+            f"  fp=\"{safe}/$stripped\"; "
+            f"  if [ -d \"$fp\" ]; then t=d; else t=f; fi; "
+            f"  sz=$(stat -c %s \"$fp\" 2>/dev/null || echo 0); "
+            f"  mt=$(stat -c %Y \"$fp\" 2>/dev/null || echo 0); "
+            f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$stripped\"; "
+            f"done",
+        ]
+        try:
+            out = self._exec_anywhere(server_id, namespace, cmd)
+        except Exception:
+            return []
+        entries = []
+        for line in out.strip().splitlines():
+            parts = line.split("\t", 3)
+            if len(parts) != 4:
+                continue
+            ftype, size_s, mtime_s, name = parts
+            name = name.strip()
+            if not name or name in (".", ".."):
+                continue
+            entries.append({
+                "name": name,
+                "type": "dir" if ftype.strip() == "d" else "file",
+                "size": int(size_s) if size_s.strip().isdigit() else 0,
+                "modified": int(mtime_s) if mtime_s.strip().isdigit() else 0,
+            })
+        return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
+
+    def read_file(self, server_id: str, namespace: str, path: str) -> bytes:
+        import base64
+        safe = self._safe_path(path)
+        size_out = self._exec_anywhere(server_id, namespace,
+            ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"])
+        size = int(size_out.strip()) if size_out.strip().isdigit() else 0
+        if size > self._MAX_FILE_BYTES:
+            raise ValueError(f"파일이 너무 큽니다 ({size // (1024 * 1024)} MiB, 최대 50 MiB).")
+        out = self._exec_anywhere(server_id, namespace,
+            ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"])
+        return base64.b64decode(out.strip())
+
+    def write_file(self, server_id: str, namespace: str, path: str, content: bytes) -> None:
+        import base64
+        if len(content) > self._MAX_FILE_BYTES:
+            raise ValueError(f"파일이 너무 큽니다 ({len(content) // (1024 * 1024)} MiB, 최대 50 MiB).")
+        safe = self._safe_path(path)
+        parent = safe.rsplit("/", 1)[0] or "/data"
+        b64 = base64.b64encode(content).decode("ascii")
+        self._exec_anywhere(server_id, namespace,
+            ["sh", "-c", f"mkdir -p '{parent}' && base64 -d > '{safe}'"],
+            stdin_data=b64.encode("ascii"))
+
+    def delete_path(self, server_id: str, namespace: str, path: str) -> None:
+        safe = self._safe_path(path)
+        if safe in ("/data", "/data/"):
+            raise ValueError("/data 루트는 삭제할 수 없습니다.")
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"rm -rf '{safe}'"])
+
+    def mkdir(self, server_id: str, namespace: str, path: str) -> None:
+        safe = self._safe_path(path)
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"])

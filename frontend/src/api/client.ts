@@ -26,6 +26,13 @@ export type Schedule = {
 
 export type ScheduleInput = Omit<Schedule, 'id' | 'server_id'>;
 
+export type FileEntry = {
+  name: string;
+  type: 'file' | 'dir';
+  size: number;
+  modified: number; // unix timestamp
+};
+
 export type MetricPoint = { t: number; v: number };
 export type ServerMetrics = { cpu: MetricPoint[]; memory_bytes: MetricPoint[] };
 export type NamespaceMetrics = { namespace: string; cpu: MetricPoint[]; memory_bytes: MetricPoint[] };
@@ -107,10 +114,12 @@ export interface ServerGateway {
   createBackup(id: string): Promise<{ filename: string }>;
   restoreBackup(id: string, filename: string): Promise<void>;
   deleteBackup(id: string, filename: string): Promise<void>;
-  listPlugins(id: string): Promise<{ plugins: string[] }>;
-  uploadPlugin(id: string, file: File): Promise<{ filename: string }>;
-  deletePlugin(id: string, filename: string): Promise<void>;
   setVersion(id: string, version: string): Promise<void>;
+  listFiles(serverId: string, path: string): Promise<FileEntry[]>;
+  downloadFile(serverId: string, path: string): Promise<void>;
+  uploadFile(serverId: string, path: string, file: File): Promise<{ path: string; name: string; size: number }>;
+  deletePath(serverId: string, path: string): Promise<void>;
+  mkdirFs(serverId: string, path: string): Promise<{ path: string }>;
   serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
   namespaceMetrics(minutes?: number): Promise<NamespaceMetrics>;
   clusterMetrics(): Promise<ClusterMetrics>;
@@ -182,22 +191,38 @@ export const api: ServerGateway = {
   createBackup: (id) => versioned(`/servers/${encodeURIComponent(id)}/backups`, { method: 'POST' }),
   restoreBackup: (id, filename) => versioned(`/servers/${encodeURIComponent(id)}/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST' }),
   deleteBackup: (id, filename) => versioned(`/servers/${encodeURIComponent(id)}/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
-  listPlugins: (id) => versioned(`/servers/${encodeURIComponent(id)}/plugins`),
-  uploadPlugin: (id, file) => {
-    const token = localStorage.getItem('kubehost-token') ?? '';
+  setVersion: (id, version) => versioned(`/servers/${encodeURIComponent(id)}/version`, { method: 'PUT', body: JSON.stringify({ version }) }),
+  listFiles: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs?path=${encodeURIComponent(path)}`),
+  downloadFile: async (id, path) => {
+    const token = getToken();
+    const url = apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/fs/download?path=${encodeURIComponent(path)}`);
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!resp.ok) throw new ApiError(resp.status, '다운로드 실패');
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = path.split('/').pop() ?? 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  },
+  uploadFile: (id, path, file) => {
+    const token = getToken();
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/plugins`), {
-      method: 'POST',
-      headers,
-      body: (() => { const f = new FormData(); f.append('file', file); return f; })(),
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/fs/upload?path=${encodeURIComponent(path)}`), {
+      method: 'POST', headers, body: form,
     }).then(async r => {
       if (!r.ok) { const b = await r.json().catch(() => ({})); throw new ApiError(r.status, b.detail ?? '업로드 실패'); }
       return r.json();
     });
   },
-  deletePlugin: (id, filename) => versioned(`/servers/${encodeURIComponent(id)}/plugins/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
-  setVersion: (id, version) => versioned(`/servers/${encodeURIComponent(id)}/version`, { method: 'PUT', body: JSON.stringify({ version }) }),
+  deletePath: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
+  mkdirFs: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs/mkdir`, { method: 'POST', body: JSON.stringify({ path }) }),
   serverMetrics: (serverId, minutes = 60) => versioned(`/metrics/server/${encodeURIComponent(serverId)}?minutes=${minutes}`),
   namespaceMetrics: (minutes = 60) => versioned(`/metrics/namespace?minutes=${minutes}`),
   clusterMetrics: () => versioned('/metrics/cluster'),

@@ -3,6 +3,7 @@ import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { ServerSettingsPanel } from './ServerSettings';
 import { ServerConsole } from './ServerConsole';
+import { FileManager } from './FileManager';
 import { api } from '../api/client';
 import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
 import { MetricsChart } from '../components/MetricsChart';
@@ -192,11 +193,6 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backupBusy, setBackupBusy] = useState(false);
 
-  // Plugins
-  const [plugins, setPlugins] = useState<string[]>([]);
-  const [pluginsLoading, setPluginsLoading] = useState(true);
-  const [pluginBusy, setPluginBusy] = useState(false);
-
   const showFlash = (msg: string) => { setFlash(msg); setTimeout(() => setFlash(''), 3000); };
 
   useEffect(() => {
@@ -204,7 +200,6 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
     api.getJvm(serverId).then(r => setJvmMb(r.memory_mb)).catch(() => {}).finally(() => setJvmLoading(false));
     api.getProperties(serverId).then(r => setProps(r.content)).catch(() => {}).finally(() => setPropsLoading(false));
     api.listBackups(serverId).then(r => setBackups(r.backups)).catch(() => {}).finally(() => setBackupsLoading(false));
-    api.listPlugins(serverId).then(r => setPlugins(r.plugins)).catch(() => {}).finally(() => setPluginsLoading(false));
     if (!active) { setWlLoading(false); return; }
     api.whitelist(serverId).then(r => setWhitelist(r.names)).catch(() => {}).finally(() => setWlLoading(false));
   }, [serverId, active]);
@@ -254,26 +249,6 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
       showFlash(`${filename} 삭제됨`);
     } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
     finally { setBackupBusy(false); }
-  }
-
-  async function doUploadPlugin(file: File) {
-    setPluginBusy(true);
-    try {
-      const r = await api.uploadPlugin(serverId, file);
-      setPlugins(p => p.includes(r.filename) ? p : [...p, r.filename]);
-      showFlash(`${r.filename} 업로드됨`);
-    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
-    finally { setPluginBusy(false); }
-  }
-
-  async function doDeletePlugin(filename: string) {
-    setPluginBusy(true);
-    try {
-      await api.deletePlugin(serverId, filename);
-      setPlugins(p => p.filter(f => f !== filename));
-      showFlash(`${filename} 삭제됨`);
-    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
-    finally { setPluginBusy(false); }
   }
 
   async function addWl() {
@@ -374,26 +349,6 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
                     <button className="secondary small" disabled={backupBusy} onClick={() => void doRestoreBackup(f)}>복원</button>
                     <button className="secondary small" disabled={backupBusy} onClick={() => void doDeleteBackup(f)}>삭제</button>
                   </div>
-                </div>
-              ))}
-            </div>}
-      </div>
-
-      {/* Plugins */}
-      <div className="manage-section">
-        <h3>플러그인</h3>
-        <p className="section-copy">.jar 플러그인 파일을 업로드하거나 삭제합니다.</p>
-        <div style={{ marginBottom: '10px' }}>
-          <input type="file" accept=".jar" disabled={pluginBusy}
-            onChange={e => { const f = e.target.files?.[0]; if (f) void doUploadPlugin(f); e.target.value = ''; }}/>
-        </div>
-        {pluginsLoading ? <p className="muted">불러오는 중…</p>
-          : plugins.length === 0 ? <p className="muted">설치된 플러그인이 없습니다.</p>
-          : <div className="plugin-list">
-              {plugins.map(f => (
-                <div key={f} className="plugin-item">
-                  <span className="plugin-name">{f}</span>
-                  <button className="secondary small" disabled={pluginBusy} onClick={() => void doDeletePlugin(f)}>삭제</button>
                 </div>
               ))}
             </div>}
@@ -623,7 +578,7 @@ function ScheduleForm({ initial, onSave, onCancel }: {
   );
 }
 
-type ServerSubView = 'console' | 'players' | 'manage' | 'overview' | 'metrics' | 'schedule' | 'settings';
+type ServerSubView = 'console' | 'players' | 'manage' | 'overview' | 'metrics' | 'schedule' | 'settings' | 'files';
 
 type ServerDetailProps = {
   server: Server;
@@ -645,8 +600,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
   const NAV_ITEMS: [ServerSubView, string, string][] = [
     ['console', '▶', '콘솔'],
     ['players', '◉', '플레이어'],
+    ['files', '◫', '파일'],
     ['manage', '⚒', '관리'],
-    ['overview', '◫', '서버 정보'],
+    ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
     ['settings', '⚙', '설정'],
@@ -761,6 +717,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
           <section className="panel">
             <SchedulePanel serverId={server.id}/>
           </section>
+        )}
+        {subView === 'files' && (
+          <FileManager serverId={server.id} />
         )}
         {subView === 'settings' && (
           <ServerSettingsPanel

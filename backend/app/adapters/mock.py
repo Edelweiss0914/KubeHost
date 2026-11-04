@@ -65,7 +65,7 @@ class MockKubernetesAdapter:
         self._jvm: dict[str, int] = {}
         self._properties: dict[str, str] = {}
         self._backups: dict[str, list[str]] = {}
-        self._plugins: dict[str, list[str]] = {}
+        self._fs: dict[str, dict[str, dict]] = {}
 
     _MOCK_PROPERTIES = (
         "difficulty=easy\ngamemode=survival\nmax-players=20\n"
@@ -182,19 +182,76 @@ class MockKubernetesAdapter:
         if server_id in self._backups:
             self._backups[server_id] = [f for f in self._backups[server_id] if f != filename]
 
-    def list_plugins(self, server_id: str, namespace: str) -> list[str]:
-        return list(self._plugins.get(server_id, ["EssentialsX-2.20.1.jar", "LuckPerms-Bukkit-5.4.jar"]))
-
-    def upload_plugin(self, server_id: str, namespace: str, filename: str, content: bytes) -> None:
-        self._plugins.setdefault(server_id, [])
-        if filename not in self._plugins[server_id]:
-            self._plugins[server_id].append(filename)
-
-    def delete_plugin(self, server_id: str, namespace: str, filename: str) -> None:
-        if server_id in self._plugins:
-            self._plugins[server_id] = [f for f in self._plugins[server_id] if f != filename]
-
     def set_version(self, server_id: str, namespace: str, version: str) -> None:
         pass  # DB update handled by route layer
+
+    # ── File Manager ─────────────────────────────────────────────────────────
+
+    _DEFAULT_FS: list[tuple[str, str, int]] = [
+        # (path, type, size)
+        ("/data/plugins", "dir", 0),
+        ("/data/plugins/EssentialsX-2.20.1.jar", "file", 1_258_291),
+        ("/data/plugins/LuckPerms-Bukkit-5.4.jar", "file", 987_654),
+        ("/data/mods", "dir", 0),
+        ("/data/config", "dir", 0),
+        ("/data/world", "dir", 0),
+        ("/data/server.properties", "file", 1_024),
+        ("/data/ops.json", "file", 128),
+        ("/data/whitelist.json", "file", 64),
+    ]
+    _EPOCH = 1_700_000_000
+
+    def _fs_for(self, server_id: str) -> dict[str, dict]:
+        if server_id not in self._fs:
+            self._fs[server_id] = {
+                path: {"name": path.rsplit("/", 1)[-1], "type": ftype,
+                       "size": size, "modified": self._EPOCH, "content": b""}
+                for path, ftype, size in self._DEFAULT_FS
+            }
+        return self._fs[server_id]
+
+    def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
+        path = path.rstrip("/")
+        fs = self._fs_for(server_id)
+        entries = []
+        for fpath, entry in fs.items():
+            parent = fpath.rsplit("/", 1)[0]
+            if parent == path:
+                entries.append({"name": entry["name"], "type": entry["type"],
+                                 "size": entry["size"], "modified": entry["modified"]})
+        return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
+
+    def read_file(self, server_id: str, namespace: str, path: str) -> bytes:
+        fs = self._fs_for(server_id)
+        entry = fs.get(path)
+        if entry is None:
+            raise ValueError("파일을 찾을 수 없습니다.")
+        return entry.get("content", b"")
+
+    def write_file(self, server_id: str, namespace: str, path: str, content: bytes) -> None:
+        import time
+        fs = self._fs_for(server_id)
+        name = path.rsplit("/", 1)[-1]
+        # Ensure parent dir entry exists
+        parent = path.rsplit("/", 1)[0]
+        if parent not in fs and parent != "/data":
+            pname = parent.rsplit("/", 1)[-1]
+            fs[parent] = {"name": pname, "type": "dir", "size": 0,
+                          "modified": int(time.time()), "content": b""}
+        fs[path] = {"name": name, "type": "file", "size": len(content),
+                    "modified": int(time.time()), "content": content}
+
+    def delete_path(self, server_id: str, namespace: str, path: str) -> None:
+        fs = self._fs_for(server_id)
+        to_del = [k for k in fs if k == path or k.startswith(path + "/")]
+        for k in to_del:
+            del fs[k]
+
+    def mkdir(self, server_id: str, namespace: str, path: str) -> None:
+        import time
+        fs = self._fs_for(server_id)
+        name = path.rsplit("/", 1)[-1]
+        fs[path] = {"name": name, "type": "dir", "size": 0,
+                    "modified": int(time.time()), "content": b""}
 
 

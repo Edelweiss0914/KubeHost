@@ -527,39 +527,72 @@ def delete_backup(server_id: str, filename: str, owner: Owner, svc: Service) -> 
 # ── Plugin management ──────────────────────────────────────────────────────────
 
 from fastapi import UploadFile, File as _File
+from fastapi.responses import Response as _Response
 
 
-@router.get("/api/v1/servers/{server_id}/plugins")
-def list_plugins(server_id: str, owner: Owner, svc: Service) -> dict:
+# ── File Manager ──────────────────────────────────────────────────────────────
+
+@router.get("/api/v1/servers/{server_id}/fs")
+def list_files(server_id: str, owner: Owner, svc: Service, path: str = "/data") -> list[dict]:
     server = svc.get(owner, server_id)
-    plugins = svc.adapter.list_plugins(server_id, server.resource_plan.namespace)
-    return {"plugins": plugins}
+    return svc.adapter.list_files(server_id, server.resource_plan.namespace, path)
 
 
-@router.post("/api/v1/servers/{server_id}/plugins", status_code=201)
-async def upload_plugin(
+@router.get("/api/v1/servers/{server_id}/fs/download")
+def download_file(server_id: str, owner: Owner, svc: Service, path: str) -> _Response:
+    server = svc.get(owner, server_id)
+    try:
+        content = svc.adapter.read_file(server_id, server.resource_plan.namespace, path)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    filename = path.rsplit("/", 1)[-1]
+    return _Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/api/v1/servers/{server_id}/fs/upload", status_code=201)
+async def upload_file(
     server_id: str, owner: Owner, svc: Service,
+    path: str = "/data",
     file: UploadFile = _File(...),
 ) -> dict:
-    filename = (file.filename or "plugin.jar").strip()
-    if not filename.endswith(".jar"):
-        raise HTTPException(status_code=422, detail=".jar 파일만 업로드할 수 있습니다.")
+    filename = (file.filename or "").strip()
+    if not filename:
+        raise HTTPException(status_code=422, detail="파일명이 없습니다.")
+    dest = path.rstrip("/") + "/" + filename
     content = await file.read()
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.upload_plugin(server_id, server.resource_plan.namespace, filename, content)
+        svc.adapter.write_file(server_id, server.resource_plan.namespace, dest, content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {"filename": filename}
+    return {"path": dest, "name": filename, "size": len(content)}
 
 
-@router.delete("/api/v1/servers/{server_id}/plugins/{filename}", status_code=204)
-def delete_plugin(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
+@router.delete("/api/v1/servers/{server_id}/fs", status_code=204)
+def delete_path(server_id: str, owner: Owner, svc: Service, path: str) -> None:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.delete_plugin(server_id, server.resource_plan.namespace, filename)
+        svc.adapter.delete_path(server_id, server.resource_plan.namespace, path)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+class _MkdirBody(_BaseModel):
+    path: str
+
+
+@router.post("/api/v1/servers/{server_id}/fs/mkdir", status_code=201)
+def make_dir(server_id: str, body: _MkdirBody, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    try:
+        svc.adapter.mkdir(server_id, server.resource_plan.namespace, body.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"path": body.path}
 
 
 # ── Version upgrade ───────────────────────────────────────────────────────────
