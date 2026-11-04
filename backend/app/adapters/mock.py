@@ -10,6 +10,7 @@ class InMemoryServerRepository:
         self._servers: dict[str, Server] = {}
         self.retained: dict[str, Server] = {}
         self._ops: dict[str, list[str]] = {}
+        self._bans: dict[str, list[str]] = {}
 
     def list_by_owner(self, owner_id: str) -> list[Server]:
         return [s.model_copy(deep=True) for s in self._servers.values() if s.owner_id == owner_id]
@@ -59,6 +60,18 @@ class InMemoryServerRepository:
         if server_id in self._ops:
             self._ops[server_id] = [n for n in self._ops[server_id] if n != player_name]
 
+    def list_bans(self, server_id: str) -> list[str]:
+        return list(self._bans.get(server_id, []))
+
+    def add_ban(self, server_id: str, player_name: str) -> None:
+        self._bans.setdefault(server_id, [])
+        if player_name not in self._bans[server_id]:
+            self._bans[server_id].append(player_name)
+
+    def remove_ban(self, server_id: str, player_name: str) -> None:
+        if server_id in self._bans:
+            self._bans[server_id] = [n for n in self._bans[server_id] if n != player_name]
+
 
 class MockKubernetesAdapter:
     def __init__(self) -> None:
@@ -66,6 +79,7 @@ class MockKubernetesAdapter:
         self._properties: dict[str, str] = {}
         self._backups: dict[str, list[str]] = {}
         self._fs: dict[str, dict[str, dict]] = {}
+        self._auto_restart: dict[str, bool] = {}
 
     _MOCK_PROPERTIES = (
         "difficulty=easy\ngamemode=survival\nmax-players=20\n"
@@ -140,6 +154,14 @@ class MockKubernetesAdapter:
         if cmd.startswith("deop "):
             name = command.strip().split()[-1]
             return f"Made {name} no longer a server operator"
+        if cmd.startswith("ban "):
+            name = command.strip().split()[-1]
+            return f"Banned player {name}"
+        if cmd.startswith("pardon "):
+            name = command.strip().split()[-1]
+            return f"Unbanned player {name}"
+        if cmd == "banlist":
+            return "There are 0 IP bans"
         return "[MOCK] 명령어가 실행됐습니다."
 
     def get_tenant_quota(self, namespace: str) -> dict[str, dict[str, str]]:
@@ -158,6 +180,12 @@ class MockKubernetesAdapter:
 
     def set_jvm(self, server_id: str, namespace: str, memory_mb: int) -> None:
         self._jvm[server_id] = memory_mb
+
+    def get_auto_restart(self, server_id: str, namespace: str) -> bool:
+        return self._auto_restart.get(server_id, False)
+
+    def set_auto_restart(self, server_id: str, namespace: str, enabled: bool) -> None:
+        self._auto_restart[server_id] = enabled
 
     def get_raw_properties(self, server_id: str, namespace: str) -> str:
         return self._properties.get(server_id, self._MOCK_PROPERTIES)

@@ -411,6 +411,25 @@ class K8sAdapter:
             "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
         })
 
+    def get_auto_restart(self, server_id: str, namespace: str) -> bool:
+        name = self._sts_name(server_id)
+        try:
+            sts = self._apps.read_namespaced_stateful_set(name, namespace)
+            env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
+            return env.get("RESTART_ON_CRASH", "false").lower() == "true"
+        except Exception:
+            return False
+
+    def set_auto_restart(self, server_id: str, namespace: str, enabled: bool) -> None:
+        name = self._sts_name(server_id)
+        sts = self._apps.read_namespaced_stateful_set(name, namespace)
+        current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
+        current["RESTART_ON_CRASH"] = "true" if enabled else "false"
+        new_env = [{"name": k, "value": v} for k, v in current.items()]
+        self._apps.patch_namespaced_stateful_set(name, namespace, {
+            "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
+        })
+
     # ── server.properties ────────────────────────────────────────────────────
     def get_raw_properties(self, server_id: str, namespace: str) -> str:
         try:

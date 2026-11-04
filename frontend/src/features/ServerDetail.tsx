@@ -189,12 +189,19 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
   const [ops, setOps] = useState<string[]>([]);
   const [opInput, setOpInput] = useState('');
   const [opBusy, setOpBusy] = useState(false);
+  const [bans, setBans] = useState<string[]>([]);
+  const [banInput, setBanInput] = useState('');
+  const [banBusy, setBanBusy] = useState(false);
   const [flash, setFlash] = useState('');
 
   // JVM
   const [jvmMb, setJvmMb] = useState(1536);
   const [jvmLoading, setJvmLoading] = useState(true);
   const [jvmBusy, setJvmBusy] = useState(false);
+
+  // Auto-restart
+  const [autoRestart, setAutoRestart] = useState(false);
+  const [autoRestartBusy, setAutoRestartBusy] = useState(false);
 
   // server.properties
   const [props, setProps] = useState('');
@@ -210,7 +217,9 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
 
   useEffect(() => {
     api.listOps(serverId).then(r => setOps(r.names)).catch(() => {});
+    api.listBans(serverId).then(r => setBans(r.names)).catch(() => {});
     api.getJvm(serverId).then(r => setJvmMb(r.memory_mb)).catch(() => {}).finally(() => setJvmLoading(false));
+    api.getAutoRestart(serverId).then(r => setAutoRestart(r.enabled)).catch(() => {});
     api.getProperties(serverId).then(r => setProps(r.content)).catch(() => {}).finally(() => setPropsLoading(false));
     api.listBackups(serverId).then(r => setBackups(r.backups)).catch(() => {}).finally(() => setBackupsLoading(false));
     if (!active) { setWlLoading(false); return; }
@@ -224,6 +233,16 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
       showFlash(`JVM 메모리 ${jvmMb} MiB로 설정됨 (재시작 필요)`);
     } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
     finally { setJvmBusy(false); }
+  }
+
+  async function toggleAutoRestart(val: boolean) {
+    setAutoRestartBusy(true);
+    try {
+      await api.setAutoRestart(serverId, val);
+      setAutoRestart(val);
+      showFlash(val ? '자동 재시작 활성화됨' : '자동 재시작 비활성화됨');
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setAutoRestartBusy(false); }
   }
 
   async function saveProps() {
@@ -298,6 +317,28 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
     finally { setOpBusy(false); }
   }
 
+  async function doBan() {
+    const name = banInput.trim(); if (!name) return;
+    setBanBusy(true);
+    try {
+      const r = await api.banPlayer(serverId, name);
+      setBans(p => p.includes(name) ? p : [...p, name]);
+      setBanInput('');
+      showFlash(r.output || `${name} 차단됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setBanBusy(false); }
+  }
+
+  async function doUnban(name: string) {
+    setBanBusy(true);
+    try {
+      const r = await api.unbanPlayer(serverId, name);
+      setBans(p => p.filter(n => n !== name));
+      showFlash(r.output || `${name} 차단 해제됨`);
+    } catch (e) { showFlash(e instanceof Error ? e.message : '오류 발생'); }
+    finally { setBanBusy(false); }
+  }
+
   function PlayerRow({ name, onRemove, busy }: { name: string; onRemove: () => void; busy: boolean }) {
     return (
       <div className="manage-item">
@@ -321,13 +362,32 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
         <h3>JVM 메모리</h3>
         <p className="section-copy">서버에 할당할 JVM 힙 메모리를 설정합니다. 변경 후 서버 재시작이 필요합니다.</p>
         {jvmLoading ? <p className="muted">불러오는 중…</p> : (
-          <div className="manage-add-row">
-            <input type="number" min={512} max={8192} step={256} value={jvmMb}
-              onChange={e => setJvmMb(Number(e.target.value))} disabled={jvmBusy}/>
-            <span className="muted">MiB</span>
-            <button onClick={() => void saveJvm()} disabled={jvmBusy}>저장</button>
-          </div>
+          <>
+            <div className="jvm-presets">
+              {([{ label: '1GB', mb: 1024 }, { label: '2GB', mb: 2048 }, { label: '4GB', mb: 4096 }, { label: '6GB', mb: 6144 }] as const).map(p => (
+                <button key={p.mb} type="button" className={`jvm-preset-btn${jvmMb === p.mb ? ' selected' : ''}`}
+                  onClick={() => setJvmMb(p.mb)} disabled={jvmBusy}>{p.label}</button>
+              ))}
+            </div>
+            <div className="manage-add-row">
+              <input type="number" min={512} max={8192} step={256} value={jvmMb}
+                onChange={e => setJvmMb(Number(e.target.value))} disabled={jvmBusy}/>
+              <span className="muted">MiB</span>
+              <button onClick={() => void saveJvm()} disabled={jvmBusy}>저장</button>
+            </div>
+          </>
         )}
+      </div>
+
+      {/* Auto-restart */}
+      <div className="manage-section">
+        <h3>자동 재시작</h3>
+        <p className="section-copy">서버 프로세스가 비정상 종료될 때 자동으로 재시작합니다.</p>
+        <label className="toggle-row">
+          <input type="checkbox" checked={autoRestart} disabled={autoRestartBusy}
+            onChange={e => void toggleAutoRestart(e.target.checked)}/>
+          <span>자동 재시작 {autoRestart ? '활성화됨' : '비활성화됨'}</span>
+        </label>
       </div>
 
       {/* server.properties */}
@@ -413,6 +473,25 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
           </div>
         )}
         {ops.length === 0 && <p className="muted">등록된 OP가 없습니다.</p>}
+      </div>
+
+      {/* Ban Management */}
+      <div className="manage-section">
+        <h3>차단 관리</h3>
+        <p className="section-copy">차단된 플레이어는 서버에 접속할 수 없습니다.</p>
+        <div className="manage-add-row">
+          <input value={banInput} onChange={e => setBanInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && void doBan()}
+            placeholder="플레이어 이름" disabled={!active || banBusy}/>
+          <button onClick={() => void doBan()} disabled={!active || banBusy || !banInput.trim()}>차단</button>
+        </div>
+        {bans.length > 0 ? (
+          <div className="manage-list">
+            {bans.map(name => (
+              <PlayerRow key={name} name={name} busy={!active || banBusy} onRemove={() => void doUnban(name)}/>
+            ))}
+          </div>
+        ) : <p className="muted">차단된 플레이어가 없습니다.</p>}
       </div>
     </section>
   );

@@ -15,6 +15,7 @@ import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
 import { useToast, ToastContainer } from './components/Toast';
 import { Tooltip } from './components/Tooltip';
+import { OnboardingModal, needsOnboarding } from './features/Onboarding';
 
 function getStoredAuth(): { token: string; username: string } | null {
   try {
@@ -315,6 +316,7 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => needsOnboarding());
   const { toasts, push: pushToast, dismiss: dismissToast } = useToast();
   const prevServersRef = useRef<Map<string, string>>(new Map());
 
@@ -560,6 +562,7 @@ export function App() {
       {showSessionExpired && (
         <SessionExpiredModal onRelogin={() => { setShowSessionExpired(false); setShowLogin(true); }}/>
       )}
+      {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
   </div>;
 }

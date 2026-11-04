@@ -381,6 +381,32 @@ def remove_op(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
     return {"output": out}
 
 
+@router.get("/api/v1/servers/{server_id}/bans")
+def list_bans(server_id: str, owner: Owner, svc: Service) -> dict:
+    svc.get(owner, server_id)  # ownership check
+    names = svc.repository.list_bans(server_id)  # type: ignore[attr-defined]
+    return {"names": names}
+
+
+@router.post("/api/v1/servers/{server_id}/bans")
+def ban_player(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"ban {name}")
+    svc.repository.add_ban(server_id, name)  # type: ignore[attr-defined]
+    return {"output": out}
+
+
+@router.delete("/api/v1/servers/{server_id}/bans/{name}")
+def unban_player(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"pardon {name}")
+    svc.repository.remove_ban(server_id, name)  # type: ignore[attr-defined]
+    return {"output": out}
+
+
 # ── Game catalog ──────────────────────────────────────────────────────────────
 
 @router.get("/api/v1/games")
@@ -475,6 +501,25 @@ def set_jvm(server_id: str, body: _JvmBody, owner: Owner, svc: Service) -> None:
         raise HTTPException(status_code=422, detail="메모리는 512–8192 MiB 범위입니다.")
     server = svc.get(owner, server_id)
     svc.adapter.set_jvm(server_id, server.resource_plan.namespace, body.memory_mb)
+
+
+# ── Auto-restart ──────────────────────────────────────────────────────────────
+
+class _AutoRestartBody(_BaseModel):
+    enabled: bool
+
+
+@router.get("/api/v1/servers/{server_id}/auto-restart")
+def get_auto_restart(server_id: str, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    enabled = svc.adapter.get_auto_restart(server_id, server.resource_plan.namespace)
+    return {"enabled": enabled}
+
+
+@router.put("/api/v1/servers/{server_id}/auto-restart", status_code=204)
+def set_auto_restart(server_id: str, body: _AutoRestartBody, owner: Owner, svc: Service) -> None:
+    server = svc.get(owner, server_id)
+    svc.adapter.set_auto_restart(server_id, server.resource_plan.namespace, body.enabled)
 
 
 # ── server.properties ─────────────────────────────────────────────────────────
