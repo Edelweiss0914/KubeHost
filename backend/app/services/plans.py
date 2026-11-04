@@ -25,7 +25,7 @@ def namespace_resources(namespace: str) -> list[dict]:
     return [
         {"apiVersion": "v1", "kind": "Namespace",
          "metadata": {"name": namespace, "labels": {
-             "pod-security.kubernetes.io/enforce": "restricted"}}},
+             "pod-security.kubernetes.io/enforce": "baseline"}}},
         {"apiVersion": "v1", "kind": "ResourceQuota",
          "metadata": {"name": "tenant-quota", "namespace": namespace},
          "spec": {"hard": {
@@ -100,7 +100,7 @@ def build_resource_plan(
 
     resources.append({"apiVersion": "v1", "kind": "Namespace",
                       "metadata": {"name": namespace, "labels": {
-                          "pod-security.kubernetes.io/enforce": "restricted"}}})
+                          "pod-security.kubernetes.io/enforce": "baseline"}}})
     resource("ResourceQuota", "tenant-quota", {"hard": {
         "requests.cpu": "4", "limits.cpu": "4", "requests.memory": "8Gi",
         "limits.memory": "8Gi", "requests.storage": "100Gi",
@@ -298,18 +298,15 @@ def build_garrysmod_plan(
             "template": {"metadata": {"labels": labels}, "spec": {
                 "automountServiceAccountToken": False,
                 "nodeSelector": {"kubernetes.io/hostname": request.node_id},
-                "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000,
-                                    "runAsNonRoot": True,
-                                    "seccompProfile": {"type": "RuntimeDefault"}},
+                "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000},
                 "containers": [{"name": "garrysmod", "image": "ceifa/garrysmod:latest",
                     "env": env,
                     "ports": [{"containerPort": 27015, "protocol": "UDP", "name": "gmod"},
                               {"containerPort": 27015, "protocol": "TCP", "name": "gmod-rcon"}],
                     "resources": {"requests": {"cpu": cpu, "memory": memory},
                                   "limits": {"cpu": cpu, "memory": memory}},
-                    "securityContext": {"allowPrivilegeEscalation": False,
-                                        "capabilities": {"drop": ["ALL"]}},
-                    "volumeMounts": [{"name": "data", "mountPath": "/home/steam/garrysmod"}]}]},
+                    "securityContext": {"allowPrivilegeEscalation": False},
+                    "volumeMounts": [{"name": "data", "mountPath": "/home/gmod/server"}]}]},
             },
             "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
                 "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
