@@ -5,18 +5,18 @@ from uuid import UUID
 from app.models.server import ALLOWED_WORKERS, ResourcePlan, ServerCreate
 
 _REAL_WARNINGS = [
-    "Local PVC data cannot automatically move to another Worker after failure.",
-    "local-path size is not a guaranteed disk quota or reservation.",
-    "StatefulSet PVC retention does not protect data from explicit PVC or namespace deletion.",
-    "Namespace and Pod security alone do not provide complete tenant isolation.",
-    "Minecraft version is pinned; Paper build and image digest require verification before deployment.",
+    "호스트 서버 장애 시 저장 데이터가 자동으로 다른 서버로 이동하지 않습니다.",
+    "저장 공간 크기는 실제 디스크 예약을 보장하지 않습니다.",
+    "서버 삭제 시 저장 공간을 직접 삭제하면 데이터가 복구 불가능하게 손실될 수 있습니다.",
+    "중요한 월드 데이터는 정기적으로 백업하는 것을 권장합니다.",
+    "Minecraft 버전은 고정됩니다. 버전 변경은 서버 재생성이 필요할 수 있습니다.",
 ]
 
 _MOCK_WARNINGS = [
-    "Mock plan only: no Kubernetes resources are applied.",
+    "테스트 모드: 실제 서버가 생성되지 않습니다.",
     *_REAL_WARNINGS,
-    "NodePort is unassigned; a real cluster adapter must allocate it. No connection is available.",
-    "Tenant Namespace, ResourceQuota and LimitRange are shared; a real adapter must upsert them idempotently.",
+    "접속 포트가 미배정 상태입니다. 실제 클러스터 환경에서 자동으로 배정됩니다.",
+    "계정 공간 및 리소스 한도는 실제 환경에서 자동으로 설정됩니다.",
 ]
 
 
