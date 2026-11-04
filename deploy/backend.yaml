@@ -47,6 +47,11 @@ spec:
           value: "kubehost"
         - name: KUBEHOST_CORS_ORIGINS
           value: "http://100.84.38.5"
+        - name: KUBEHOST_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kubehost-backend-secrets
+              key: jwt-secret
         volumeMounts:
         - name: db
           mountPath: /data
