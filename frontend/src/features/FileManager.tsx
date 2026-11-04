@@ -205,11 +205,11 @@ export function FileManager({ serverId }: Props) {
       {uploadPct !== null && (
         <div style={{ marginTop: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-            <span className="muted">업로드 중…</span>
-            <span className="muted">{uploadPct}%</span>
+            <span className="muted">{uploadPct < 100 ? '업로드 중…' : '서버에 저장 중…'}</span>
+            <span className="muted">{uploadPct < 100 ? `${uploadPct}%` : '처리 중'}</span>
           </div>
           <div className="fm-progress-track">
-            <div className="fm-progress-bar" style={{ width: `${uploadPct}%` }} />
+            <div className="fm-progress-bar" style={{ width: `${uploadPct}%`, opacity: uploadPct === 100 ? 0.6 : 1 }} />
           </div>
         </div>
       )}

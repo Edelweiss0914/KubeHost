@@ -565,8 +565,13 @@ async def upload_file(
     dest = path.rstrip("/") + "/" + filename
     content = await file.read()
     server = svc.get(owner, server_id)
+    import asyncio
+    loop = asyncio.get_event_loop()
     try:
-        svc.adapter.write_file(server_id, server.resource_plan.namespace, dest, content)
+        await loop.run_in_executor(
+            None, svc.adapter.write_file,
+            server_id, server.resource_plan.namespace, dest, content,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"path": dest, "name": filename, "size": len(content)}
