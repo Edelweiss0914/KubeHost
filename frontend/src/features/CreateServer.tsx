@@ -59,9 +59,6 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [games, setGames] = useState<Game[]>([]);
   const [hasCfKey, setHasCfKey] = useState<boolean | null>(null);
-  const [cfKeyInput, setCfKeyInput] = useState('');
-  const [cfKeySaving, setCfKeySaving] = useState(false);
-  const [cfKeyMsg, setCfKeyMsg] = useState('');
 
   useEffect(() => {
     api.games().then(setGames).catch(() => {});
@@ -72,21 +69,6 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
       api.getCfKey().then(r => setHasCfKey(r.has_key)).catch(() => setHasCfKey(false));
     }
   }, [input.game_type, hasCfKey]);
-
-  async function saveCfKey() {
-    if (!cfKeyInput.trim()) return;
-    setCfKeySaving(true);
-    try {
-      await api.setCfKey(cfKeyInput.trim());
-      setHasCfKey(true);
-      setCfKeyMsg('API 키가 저장됐습니다.');
-      setCfKeyInput('');
-    } catch {
-      setCfKeyMsg('저장 실패. 다시 시도해주세요.');
-    } finally {
-      setCfKeySaving(false);
-    }
-  }
 
   useEffect(() => {
     if (defaultWorkerId) setInput(previous => previous.node_id ? previous : { ...previous, node_id: defaultWorkerId });
@@ -207,30 +189,13 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
           {input.game_type === 'AUTO_CURSEFORGE' && (
             <div className="full">
-              {!hasCfKey ? (
-                <div className="cf-key-register">
-                  <p className="muted" style={{ marginBottom: '8px', fontSize: '13px' }}>
-                    CurseForge 모드팩을 사용하려면 API 키가 필요합니다.{' '}
-                    <a href="https://console.curseforge.com/#/api-keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-                      키 발급 →
-                    </a>
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      value={cfKeyInput}
-                      onChange={e => setCfKeyInput(e.target.value)}
-                      placeholder="CurseForge API 키 입력"
-                      type="password"
-                      style={{ flex: 1 }}
-                      disabled={cfKeySaving}
-                    />
-                    <button type="button" onClick={saveCfKey} disabled={cfKeySaving || !cfKeyInput.trim()}>
-                      {cfKeySaving ? '저장 중…' : '저장'}
-                    </button>
-                  </div>
-                  {cfKeyMsg && <small style={{ color: 'var(--accent)', marginTop: '4px', display: 'block' }}>{cfKeyMsg}</small>}
+              {hasCfKey === false && (
+                <div className="cf-key-notice" role="alert">
+                  <span>⚠ CurseForge API 키가 등록되지 않았습니다.</span>
+                  <span className="muted" style={{ fontSize: '12px' }}>사이드바 하단 <strong>프로필 설정</strong>에서 먼저 등록해주세요.</span>
                 </div>
-              ) : (
+              )}
+              {hasCfKey && (
                 <>
                   <label>CurseForge 모드팩 Slug
                     <input value={input.cf_slug ?? ''} placeholder="예: all-the-mods-9"
@@ -246,12 +211,8 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                       </button>
                     ))}
                   </div>
-                  <small style={{ marginTop: '6px', display: 'block' }}>
-                    <span className="muted">API 키 등록됨 · </span>
-                    <button type="button" className="text-button" style={{ fontSize: '12px' }}
-                      onClick={() => { api.setCfKey(null); setHasCfKey(false); }}>
-                      키 삭제
-                    </button>
+                  <small style={{ marginTop: '6px', display: 'block', color: 'var(--muted)' }}>
+                    API 키 등록됨 · 프로필 설정에서 변경 또는 삭제할 수 있습니다.
                   </small>
                 </>
               )}

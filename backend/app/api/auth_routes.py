@@ -115,11 +115,7 @@ def get_cf_key(request: Request) -> dict[str, object]:
     svc = _svc(request)
     try:
         payload = svc.verify_token(token)
-        user = svc.repository.get_user_by_id(str(payload["sub"]))
-        if not user:
-            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-        has_key = bool(user.cf_api_key)
-        return {"has_key": has_key}
+        return {"has_key": svc.get_cf_key_status(str(payload["sub"]))}
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 
@@ -137,11 +133,7 @@ def set_cf_key(payload: CfApiKeyRequest, request: Request) -> None:
     svc = _svc(request)
     try:
         token_payload = svc.verify_token(token)
-        user = svc.repository.get_user_by_id(str(token_payload["sub"]))
-        if not user:
-            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-        user.cf_api_key = payload.cf_api_key or None
-        svc.repository.save_user(user)
+        svc.set_cf_key(str(token_payload["sub"]), payload.cf_api_key)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 

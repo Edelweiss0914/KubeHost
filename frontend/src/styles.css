@@ -364,12 +364,12 @@ pre{font-family:Consolas,monospace;
 .res-bar-warn{background:#c98a3a}
 .cluster-pods-label{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .cluster-pods{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.cluster-pod{background:#0e1825;border:1px solid #2a3a4f;border-radius:7px;padding:14px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;width:100%}
-.cluster-pod:hover{border-color:#4db888;background:#111f2e}
+.cluster-pod{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:14px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;width:100%}
+.cluster-pod:hover{border-color:var(--accent-border);background:var(--hover)}
 .cluster-pod-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
-.cluster-pod-name{font-size:13px;font-weight:600;color:#dce9f7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cluster-pod-meta{display:flex;justify-content:space-between;font-size:10px;color:#7a8fa5;margin-bottom:6px}
-.cluster-pod-conn{font-size:10px;color:#5abf96;font-family:monospace}
+.cluster-pod-name{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cluster-pod-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:6px}
+.cluster-pod-conn{font-size:10px;color:var(--accent-text);font-family:monospace}
 summary{cursor:pointer;
   padding:15px 0;
   color:#a8c9df;
@@ -2384,14 +2384,34 @@ footer{font-size:12px;color:var(--subtle);border-top:1px solid var(--border);pad
 }
 
 /* --- Primary button — gradient + glow --- */
-button:not(.secondary):not(.danger):not(.text-button):not(.filter-chip):not(nav button):not(.theme-switch button):not(.login-tabs button):not(.hierarchy button) {
+button:not(.secondary):not(.danger):not(.text-button):not(.filter-chip):not(nav button):not(.theme-switch button):not(.login-tabs button):not(.hierarchy button):not(.day-btn):not(.game-type-card):not(.modpack-preset-btn):not(.resource-plan-card):not(.profile-settings-tabs button):not(.fm-quick-card):not(.copy-btn):not(.cluster-pod) {
   background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 72%, #a8ccff) 100%);
   border-color: transparent;
   box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 32%, transparent);
 }
-button:not(.secondary):not(.danger):not(.text-button):not(.filter-chip):not(nav button):not(.theme-switch button):not(.login-tabs button):not(.hierarchy button):hover {
+button:not(.secondary):not(.danger):not(.text-button):not(.filter-chip):not(nav button):not(.theme-switch button):not(.login-tabs button):not(.hierarchy button):not(.day-btn):not(.game-type-card):not(.modpack-preset-btn):not(.resource-plan-card):not(.profile-settings-tabs button):not(.fm-quick-card):not(.copy-btn):not(.cluster-pod):hover {
   background: linear-gradient(135deg, var(--accent-hover) 0%, color-mix(in srgb, var(--accent-hover) 72%, #bbdaff) 100%);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 44%, transparent);
+}
+
+/* --- Widget buttons: reset gradient for grouped button containers --- */
+.view-toggle button,
+.metrics-time-range button {
+  background: var(--surface-2) !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  transform: none !important;
+}
+.view-toggle button:hover,
+.metrics-time-range button:hover {
+  background: var(--hover) !important;
+  color: var(--text) !important;
+}
+.view-toggle button.active,
+.metrics-time-range button.active {
+  background: var(--accent-bg) !important;
+  color: var(--accent-text) !important;
 }
 
 /* --- Input / select focus — animated glow ring --- */
@@ -3338,17 +3358,17 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   gap: 2px;
   margin-bottom: 12px;
   font-size: 13px;
-  color: #a0b4cc;
+  color: var(--muted);
   flex-wrap: wrap;
 }
-.file-breadcrumb-sep { color: #3a4a5c; }
-.file-breadcrumb-current { color: #e2eaf4; font-weight: 500; }
+.file-breadcrumb-sep { color: var(--border); }
+.file-breadcrumb-current { color: var(--text); font-weight: 500; }
 
 .file-list {
   display: flex;
   flex-direction: column;
   margin-top: 8px;
-  border: 1px solid #1e2d40;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -3360,24 +3380,24 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   font-weight: 600;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #4a6080;
-  background: #0a1520;
-  border-bottom: 1px solid #1e2d40;
+  color: var(--subtle);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
 .file-row {
   display: grid;
   grid-template-columns: 1fr 90px 140px 72px;
   align-items: center;
   padding: 7px 12px;
-  border-bottom: 1px solid #131f2d;
+  border-bottom: 1px solid var(--border);
   transition: background .12s;
 }
 .file-row:last-child { border-bottom: none; }
-.file-row:hover { background: #0f1e2d; }
+.file-row:hover { background: var(--hover); }
 .file-name { display: flex; align-items: center; min-width: 0; }
 .file-entry-btn {
   font-size: 13px;
-  color: #58c9ff;
+  color: var(--accent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3386,7 +3406,7 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .file-entry-btn:hover { text-decoration: underline; }
 .file-entry-label {
   font-size: 13px;
-  color: #c8d8e8;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3406,9 +3426,9 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   font-weight: 600;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #3a5070;
-  background: #0a1520;
-  border-bottom: 1px solid #1e2d40;
+  color: var(--subtle);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
 
 /* ── 빠른 접근 그리드 ─────────────────────────────────────────── */
@@ -3425,25 +3445,25 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   gap: 4px;
   padding: 12px 14px;
   border-radius: 8px;
-  border: 1px solid #1e2d40;
-  background: #0d1a28;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   cursor: pointer;
   text-align: left;
   transition: border-color .15s, background .15s;
 }
 .fm-quick-card--exists {
-  border-color: #1e3a52;
+  border-color: var(--border);
 }
 .fm-quick-card--exists:hover {
-  border-color: #2a5a7a;
-  background: #0f2035;
+  border-color: var(--accent-border);
+  background: var(--hover);
 }
 .fm-quick-card--missing {
   opacity: .5;
 }
 .fm-quick-card--missing:hover {
   opacity: .75;
-  border-color: #2a3a4a;
+  border-color: var(--border);
 }
 .fm-quick-icon {
   font-size: 20px;
@@ -3453,11 +3473,11 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .fm-quick-label {
   font-size: 13px;
   font-weight: 600;
-  color: #c8d8e8;
+  color: var(--text);
 }
 .fm-quick-desc {
   font-size: 11px;
-  color: #4a6080;
+  color: var(--muted);
   line-height: 1.3;
 }
 .fm-quick-badge {
@@ -3493,11 +3513,13 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   transition: border-color .15s, background .15s;
   text-align: center;
 }
-.game-type-card:hover { border-color: var(--accent, #38bdf8); background: #0d2440; }
-.game-type-card.selected { border-color: var(--accent, #38bdf8); background: #0a2a45; }
+.game-type-card:hover { border-color: var(--accent); background: var(--hover); }
+.game-type-card.selected { border-color: var(--accent); background: var(--accent-bg); }
+.game-type-card.selected .game-type-label { color: var(--accent-text); }
+.game-type-card.selected .game-type-desc { color: var(--accent-text); opacity: .8; }
 .game-type-icon { font-size: 20px; }
-.game-type-label { font-size: 13px; font-weight: 600; color: var(--text, #e2e8f0); }
-.game-type-desc { font-size: 11px; color: var(--muted, #64748b); }
+.game-type-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.game-type-desc { font-size: 11px; color: var(--muted); }
 
 /* ── Modpack Presets ──────────────────────────────────────────────────────── */
 .modpack-presets {
@@ -3518,9 +3540,9 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   text-align: left;
   transition: border-color .15s;
 }
-.modpack-preset-btn:hover { border-color: var(--accent, #38bdf8); }
-.modpack-preset-btn strong { color: var(--text, #e2e8f0); font-size: 12px; }
-.modpack-preset-btn span { color: var(--muted, #64748b); font-size: 11px; }
+.modpack-preset-btn:hover { border-color: var(--accent); background: var(--hover); }
+.modpack-preset-btn strong { color: var(--text); font-size: 12px; }
+.modpack-preset-btn span { color: var(--muted); font-size: 11px; }
 
 .cf-key-register {
   padding: 14px;
@@ -3528,6 +3550,59 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   border: 1px dashed var(--border, #1e3a5f);
   background: var(--surface-2, #0d1f33);
   margin-top: 4px;
+}
+
+.cf-key-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(251,191,36,.35);
+  background: rgba(146,64,14,.12);
+  color: #fbbf24;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.profile-settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border, #1e3a5f);
+  margin-bottom: 0;
+}
+.profile-settings-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  box-shadow: none;
+  transition: color .15s, border-color .15s;
+}
+.profile-settings-tabs button:hover { color: var(--text, #e2e8f0); background: none; filter: none; }
+.profile-settings-tabs button.active { color: var(--accent, #38bdf8); border-bottom-color: var(--accent, #38bdf8); }
+
+.cf-key-status { display: flex; align-items: center; gap: 8px; }
+.cf-key-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  background: var(--surface-2, #0d1f33);
+  color: var(--muted, #64748b);
+  border: 1px solid var(--border, #1e3a5f);
+}
+.cf-key-badge.registered {
+  background: rgba(34,197,94,.12);
+  color: #4ade80;
+  border-color: rgba(34,197,94,.3);
 }
 
 .fm-progress-track {

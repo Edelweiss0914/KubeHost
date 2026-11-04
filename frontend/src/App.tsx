@@ -132,33 +132,73 @@ function SessionExpiredModal({ onRelogin }: { onRelogin: () => void }) {
   );
 }
 
-function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [tab, setTab] = useState<'account' | 'cfkey'>('account');
+
+  // Account tab
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwDone, setPwDone] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // CF API key tab
+  const [hasCfKey, setHasCfKey] = useState<boolean | null>(null);
+  const [cfKeyInput, setCfKeyInput] = useState('');
+  const [cfSaving, setCfSaving] = useState(false);
+  const [cfMsg, setCfMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null);
 
   useEffect(() => { dialogRef.current?.showModal(); }, []);
+  useEffect(() => {
+    api.getCfKey().then(r => setHasCfKey(r.has_key)).catch(() => setHasCfKey(false));
+  }, []);
 
   function handleClick(e: React.MouseEvent<HTMLDialogElement>) {
     if (e.target === dialogRef.current) onClose();
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submitPw(e: React.FormEvent) {
     e.preventDefault();
-    if (next !== confirm) { setError('새 비밀번호가 일치하지 않습니다.'); return; }
-    if (next.length < 8) { setError('새 비밀번호는 8자 이상이어야 합니다.'); return; }
-    setSaving(true); setError('');
+    if (next !== confirm) { setPwError('새 비밀번호가 일치하지 않습니다.'); return; }
+    if (next.length < 8) { setPwError('새 비밀번호는 8자 이상이어야 합니다.'); return; }
+    setPwSaving(true); setPwError('');
     try {
       await api.changePassword(current, next);
-      setDone(true);
+      setPwDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '변경 실패');
+      setPwError(err instanceof Error ? err.message : '변경 실패');
     } finally {
-      setSaving(false);
+      setPwSaving(false);
+    }
+  }
+
+  async function saveCfKey() {
+    if (!cfKeyInput.trim()) return;
+    setCfSaving(true); setCfMsg(null);
+    try {
+      await api.setCfKey(cfKeyInput.trim());
+      setHasCfKey(true);
+      setCfKeyInput('');
+      setCfMsg({ text: 'API 키가 저장됐습니다.', type: 'ok' });
+    } catch {
+      setCfMsg({ text: '저장 실패. 다시 시도해주세요.', type: 'err' });
+    } finally {
+      setCfSaving(false);
+    }
+  }
+
+  async function deleteCfKey() {
+    setCfSaving(true); setCfMsg(null);
+    try {
+      await api.setCfKey(null);
+      setHasCfKey(false);
+      setCfMsg({ text: 'API 키가 삭제됐습니다.', type: 'ok' });
+    } catch {
+      setCfMsg({ text: '삭제 실패. 다시 시도해주세요.', type: 'err' });
+    } finally {
+      setCfSaving(false);
     }
   }
 
@@ -166,32 +206,83 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
       <div className="settings-dialog-inner">
         <div className="section-title">
-          <div><span className="eyebrow">ACCOUNT</span><h2>비밀번호 변경</h2></div>
+          <div><span className="eyebrow">PROFILE</span><h2>프로필 설정</h2></div>
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
-        {done ? (
-          <>
-            <p role="status" className="notice">비밀번호가 변경됐습니다.</p>
-            <div className="actions"><button onClick={onClose}>닫기</button></div>
-          </>
-        ) : (
-          <form onSubmit={e => void submit(e)}>
-            <div className="form-grid">
-              <label className="full">현재 비밀번호
-                <input type="password" value={current} onChange={e => setCurrent(e.target.value)} required autoFocus/>
-              </label>
-              <label className="full">새 비밀번호
-                <input type="password" value={next} onChange={e => setNext(e.target.value)} required minLength={8}/>
-              </label>
-              <label className="full">새 비밀번호 확인
-                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required/>
+        <div className="profile-settings-tabs">
+          <button className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>계정</button>
+          <button className={tab === 'cfkey' ? 'active' : ''} onClick={() => setTab('cfkey')}>CurseForge API 키</button>
+        </div>
+
+        {tab === 'account' && (
+          pwDone ? (
+            <>
+              <p role="status" className="notice">비밀번호가 변경됐습니다.</p>
+              <div className="actions"><button onClick={onClose}>닫기</button></div>
+            </>
+          ) : (
+            <form onSubmit={e => void submitPw(e)}>
+              <div className="form-grid" style={{ marginTop: '16px' }}>
+                <label className="full">현재 비밀번호
+                  <input type="password" value={current} onChange={e => setCurrent(e.target.value)} required autoFocus/>
+                </label>
+                <label className="full">새 비밀번호
+                  <input type="password" value={next} onChange={e => setNext(e.target.value)} required minLength={8}/>
+                </label>
+                <label className="full">새 비밀번호 확인
+                  <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required/>
+                </label>
+              </div>
+              {pwError && <div role="alert" className="error">{pwError}</div>}
+              <div className="actions">
+                <button type="submit" disabled={pwSaving}>{pwSaving ? '변경 중…' : '비밀번호 변경'}</button>
+              </div>
+            </form>
+          )
+        )}
+
+        {tab === 'cfkey' && (
+          <div style={{ marginTop: '16px' }}>
+            <p className="muted" style={{ marginBottom: '12px', fontSize: '13px' }}>
+              CurseForge 모드팩 서버 생성 시 필요한 API 키입니다.{' '}
+              <a href="https://console.curseforge.com/#/api-keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                키 발급 →
+              </a>
+            </p>
+            <div className="cf-key-status">
+              <span className={`cf-key-badge${hasCfKey ? ' registered' : ''}`}>
+                {hasCfKey === null ? '확인 중…' : hasCfKey ? '등록됨' : '미등록'}
+              </span>
+            </div>
+            <div className="form-grid" style={{ marginTop: '12px' }}>
+              <label className="full">{hasCfKey ? 'API 키 변경' : 'API 키 등록'}
+                <input
+                  type="password"
+                  value={cfKeyInput}
+                  onChange={e => setCfKeyInput(e.target.value)}
+                  placeholder="CurseForge API 키 입력"
+                  disabled={cfSaving}
+                />
               </label>
             </div>
-            {error && <div role="alert" className="error">{error}</div>}
-            <div className="actions">
-              <button type="submit" disabled={saving}>{saving ? '변경 중…' : '변경'}</button>
+            {cfMsg && (
+              <div role={cfMsg.type === 'err' ? 'alert' : 'status'}
+                className={cfMsg.type === 'err' ? 'error' : 'notice'}
+                style={{ marginTop: '8px' }}>
+                {cfMsg.text}
+              </div>
+            )}
+            <div className="actions" style={{ marginTop: '12px' }}>
+              {hasCfKey && (
+                <button type="button" className="secondary danger" onClick={() => void deleteCfKey()} disabled={cfSaving}>
+                  {cfSaving ? '처리 중…' : '키 삭제'}
+                </button>
+              )}
+              <button type="button" onClick={() => void saveCfKey()} disabled={cfSaving || !cfKeyInput.trim()}>
+                {cfSaving ? '저장 중…' : hasCfKey ? '키 변경' : '키 저장'}
+              </button>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </dialog>
@@ -221,7 +312,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
-  const [showChangePw, setShowChangePw] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const { toasts, push: pushToast, dismiss: dismissToast } = useToast();
   const prevServersRef = useRef<Map<string, string>>(new Map());
@@ -410,7 +501,7 @@ export function App() {
         <div className="profile">
           <span className="avatar">{auth ? auth.username[0].toUpperCase() : 'D'}</span>
           <div>{auth.username}<small>로그인됨 · K3s</small></div>
-          {auth && <button className="text-button" style={{fontSize:'11px'}} onClick={() => setShowChangePw(true)}>비밀번호 변경</button>}
+          {auth && <button className="text-button" style={{fontSize:'11px'}} onClick={() => setShowProfileSettings(true)}>프로필 설정</button>}
           {auth && <button className="text-button" style={{marginLeft:'auto',fontSize:'11px'}} onClick={() => {
             try { localStorage.removeItem('kubehost-token'); localStorage.removeItem('kubehost-username'); } catch { /* ignore */ }
             setAuth(null);
@@ -464,7 +555,7 @@ export function App() {
         <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>Worker 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>
       </main>
     </div>
-      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)}/>}
+      {showProfileSettings && <ProfileSettingsModal onClose={() => setShowProfileSettings(false)}/>}
       {showSessionExpired && (
         <SessionExpiredModal onRelogin={() => { setShowSessionExpired(false); setShowLogin(true); }}/>
       )}
