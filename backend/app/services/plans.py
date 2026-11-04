@@ -82,6 +82,10 @@ def build_resource_plan(
 ) -> ResourcePlan:
     if request.node_id not in ALLOWED_WORKERS:
         raise ValueError("Worker is not allowed")
+    if request.game == "valheim":
+        return build_valheim_plan(request, tenant_id, server_id, mock)
+    if request.game == "garrysmod":
+        return build_garrysmod_plan(request, tenant_id, server_id, mock)
     namespace = f"tenant-{tenant_id.hex}"
     name = f"mc-{server_id.hex}"
     labels = {"app.kubernetes.io/name": name}
@@ -166,6 +170,149 @@ def build_resource_plan(
             "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
             "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
     }, "apps/v1")
+    return ResourcePlan(
+        namespace=namespace,
+        target_node=request.node_id,
+        resources=resources,
+        warnings=_MOCK_WARNINGS if mock else _REAL_WARNINGS,
+    )
+
+
+def build_valheim_plan(
+    request: ServerCreate, tenant_id: UUID, server_id: UUID, mock: bool = True,
+) -> ResourcePlan:
+    if request.node_id not in ALLOWED_WORKERS:
+        raise ValueError("Worker is not allowed")
+    namespace = f"tenant-{tenant_id.hex}"
+    name = f"vh-{server_id.hex}"
+    labels = {"app.kubernetes.io/name": name}
+    memory = f"{request.memory_mb}Mi"
+    cpu = str(request.cpu)
+    resources: list[dict[str, Any]] = []
+
+    resources.extend(namespace_resources(namespace))
+
+    # Headless service
+    resources.append({"apiVersion": "v1", "kind": "Service",
+        "metadata": {"name": f"{name}-headless", "namespace": namespace},
+        "spec": {"clusterIP": "None", "selector": labels,
+            "ports": [{"name": "valheim", "port": 2456, "targetPort": 2456, "protocol": "UDP"}]}})
+
+    # NodePort service
+    game_port: dict = {"name": "valheim", "port": 2456, "targetPort": 2456, "protocol": "UDP"}
+    if request.node_port is not None:
+        game_port["nodePort"] = request.node_port
+    resources.append({"apiVersion": "v1", "kind": "Service",
+        "metadata": {"name": f"{name}-game", "namespace": namespace},
+        "spec": {"type": "NodePort", "selector": labels, "ports": [game_port]}})
+
+    # StatefulSet
+    env = [
+        {"name": "SERVER_NAME", "value": request.name},
+        {"name": "WORLD_NAME", "value": request.world_name or "KubeHostWorld"},
+        {"name": "SERVER_PASS", "value": request.server_password or "changeme"},
+        {"name": "SERVER_PUBLIC", "value": "1" if request.server_public else "0"},
+        {"name": "PUID", "value": "1000"},
+        {"name": "PGID", "value": "1000"},
+    ]
+    resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": {
+            "replicas": 1, "serviceName": f"{name}-headless",
+            "selector": {"matchLabels": labels},
+            "persistentVolumeClaimRetentionPolicy": {"whenDeleted": "Retain", "whenScaled": "Retain"},
+            "template": {"metadata": {"labels": labels}, "spec": {
+                "automountServiceAccountToken": False,
+                "nodeSelector": {"kubernetes.io/hostname": request.node_id},
+                "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000,
+                                    "seccompProfile": {"type": "RuntimeDefault"}},
+                "containers": [{"name": "valheim", "image": "lloesche/valheim-server:latest",
+                    "env": env,
+                    "ports": [{"containerPort": 2456, "protocol": "UDP", "name": "valheim"},
+                              {"containerPort": 2457, "protocol": "UDP", "name": "valheim-query"}],
+                    "resources": {"requests": {"cpu": cpu, "memory": memory},
+                                  "limits": {"cpu": cpu, "memory": memory}},
+                    "securityContext": {"allowPrivilegeEscalation": False,
+                                        "capabilities": {"drop": ["ALL"]}},
+                    "volumeMounts": [{"name": "data", "mountPath": "/config"}]}]},
+            },
+            "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
+                "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
+        }})
+
+    return ResourcePlan(
+        namespace=namespace,
+        target_node=request.node_id,
+        resources=resources,
+        warnings=_MOCK_WARNINGS if mock else _REAL_WARNINGS,
+    )
+
+
+def build_garrysmod_plan(
+    request: ServerCreate, tenant_id: UUID, server_id: UUID, mock: bool = True,
+) -> ResourcePlan:
+    if request.node_id not in ALLOWED_WORKERS:
+        raise ValueError("Worker is not allowed")
+    namespace = f"tenant-{tenant_id.hex}"
+    name = f"gmod-{server_id.hex}"
+    labels = {"app.kubernetes.io/name": name}
+    memory = f"{request.memory_mb}Mi"
+    cpu = str(request.cpu)
+    resources: list[dict[str, Any]] = []
+
+    resources.extend(namespace_resources(namespace))
+
+    # Headless service
+    resources.append({"apiVersion": "v1", "kind": "Service",
+        "metadata": {"name": f"{name}-headless", "namespace": namespace},
+        "spec": {"clusterIP": "None", "selector": labels,
+            "ports": [{"name": "gmod", "port": 27015, "targetPort": 27015, "protocol": "UDP"}]}})
+
+    # NodePort service
+    game_port: dict = {"name": "gmod", "port": 27015, "targetPort": 27015, "protocol": "UDP"}
+    if request.node_port is not None:
+        game_port["nodePort"] = request.node_port
+    resources.append({"apiVersion": "v1", "kind": "Service",
+        "metadata": {"name": f"{name}-game", "namespace": namespace},
+        "spec": {"type": "NodePort", "selector": labels, "ports": [game_port]}})
+
+    map_name = request.map_name or "gm_flatgrass"
+    gamemode = request.gamemode_name or "sandbox"
+    max_players = 16
+    env = [
+        {"name": "GAME_ID", "value": "4020"},
+        {"name": "GAME_PARAMS", "value": f"+map {map_name} +gamemode {gamemode} +maxplayers {max_players}"},
+        {"name": "VALIDATE", "value": "false"},
+        {"name": "PUID", "value": "1000"},
+        {"name": "PGID", "value": "1000"},
+    ]
+    resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": {
+            "replicas": 1, "serviceName": f"{name}-headless",
+            "selector": {"matchLabels": labels},
+            "persistentVolumeClaimRetentionPolicy": {"whenDeleted": "Retain", "whenScaled": "Retain"},
+            "template": {"metadata": {"labels": labels}, "spec": {
+                "automountServiceAccountToken": False,
+                "nodeSelector": {"kubernetes.io/hostname": request.node_id},
+                "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000,
+                                    "seccompProfile": {"type": "RuntimeDefault"}},
+                "containers": [{"name": "garrysmod", "image": "ich777/garrysmod:latest",
+                    "env": env,
+                    "ports": [{"containerPort": 27015, "protocol": "UDP", "name": "gmod"},
+                              {"containerPort": 27015, "protocol": "TCP", "name": "gmod-rcon"}],
+                    "resources": {"requests": {"cpu": cpu, "memory": memory},
+                                  "limits": {"cpu": cpu, "memory": memory}},
+                    "securityContext": {"allowPrivilegeEscalation": False,
+                                        "capabilities": {"drop": ["ALL"]}},
+                    "volumeMounts": [{"name": "data", "mountPath": "/serverdata"}]}]},
+            },
+            "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
+                "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
+        }})
+
     return ResourcePlan(
         namespace=namespace,
         target_node=request.node_id,

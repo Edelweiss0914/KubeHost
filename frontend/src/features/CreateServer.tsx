@@ -105,6 +105,10 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   }
 
   const selectedPlan = matchesPlan(input);
+  const visiblePlans = RESOURCE_PLANS.filter(p => {
+    if (input.game === 'valheim') return p.memory_mb >= 2048;
+    return true;
+  });
 
   return <section className="panel create-panel">
     <div className="section-title">
@@ -132,8 +136,32 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                     aria-checked={input.game === game.slug}
                     aria-disabled={!game.supported}
                     tabIndex={game.supported ? 0 : -1}
-                    onClick={() => { if (game.supported && game.slug === 'minecraft-java') set('game', 'minecraft-java'); }}
-                    onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && game.supported && game.slug === 'minecraft-java') set('game', 'minecraft-java'); }}
+                    onClick={() => {
+                      if (!game.supported) return;
+                      const slug = game.slug as ServerInput['game'];
+                      if (slug !== 'minecraft-java' && slug !== 'valheim' && slug !== 'garrysmod') return;
+                      const gameDefaults = slug === 'valheim'
+                        ? { cpu: 2, memory_mb: 4096, storage_gb: 20 }
+                        : slug === 'garrysmod'
+                        ? { cpu: 1, memory_mb: 2048, storage_gb: 15 }
+                        : { cpu: 1, memory_mb: 2048, storage_gb: 10 };
+                      setInput(prev => ({
+                        ...prev,
+                        game: slug,
+                        game_type: 'PAPER' as GameType,
+                        modrinth_project: null, cf_slug: null,
+                        server_password: null, world_name: null, server_public: false,
+                        map_name: null, gamemode_name: null,
+                        ...gameDefaults,
+                      }));
+                    }}
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                      if (!game.supported) return;
+                      const slug = game.slug as ServerInput['game'];
+                      if (slug !== 'minecraft-java' && slug !== 'valheim' && slug !== 'garrysmod') return;
+                      set('game', slug);
+                    }}
                   >
                     {game.image_url
                       ? <img src={game.image_url} alt={game.name} className="game-picker-img" />
@@ -153,6 +181,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             <input autoFocus value={input.name} onChange={event => set('name', event.target.value)} placeholder="예: My Survival World" maxLength={40} aria-invalid={!!errors.name} aria-describedby="name-hint"/>
             <small id="name-hint">{errors.name ?? '영문·숫자·공백·밑줄·하이픈, 3–40자'}</small>
           </label>
+          {input.game === 'minecraft-java' && (<>
           <div className="full">
             <label style={{ marginBottom: '8px', display: 'block' }}>서버 타입</label>
             <div className="game-type-grid">
@@ -233,6 +262,42 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             </select>
             <small>접속할 클라이언트 버전과 맞춰야 합니다.</small>
           </label>
+          </>)}
+
+          {input.game === 'valheim' && (
+            <div className="full">
+              <h4 style={{ margin: '0 0 12px' }}>Valheim 서버 설정</h4>
+              <label>월드 이름
+                <input value={input.world_name ?? ''} onChange={e => set('world_name', e.target.value || null)} placeholder="KubeHostWorld" maxLength={64}/>
+              </label>
+              <label>서버 비밀번호 <small>(최소 5자, 없으면 공개 서버)</small>
+                <input type="password" value={input.server_password ?? ''} onChange={e => set('server_password', e.target.value || null)} placeholder="5자 이상" maxLength={64}/>
+                {errors.server_password && <small style={{ color: 'var(--danger)' }}>{errors.server_password}</small>}
+              </label>
+              <label className="checkbox" style={{ marginTop: '8px' }}>
+                <input type="checkbox" checked={input.server_public ?? false} onChange={e => set('server_public', e.target.checked)}/>
+                Steam 공개 서버 목록에 표시
+              </label>
+            </div>
+          )}
+
+          {input.game === 'garrysmod' && (
+            <div className="full">
+              <h4 style={{ margin: '0 0 12px' }}>Garry's Mod 서버 설정</h4>
+              <label>시작 맵
+                <input value={input.map_name ?? ''} onChange={e => set('map_name', e.target.value || null)} placeholder="gm_flatgrass" maxLength={64}/>
+              </label>
+              <label>게임모드
+                <select value={input.gamemode_name ?? 'sandbox'} onChange={e => set('gamemode_name', e.target.value)}>
+                  <option value="sandbox">Sandbox</option>
+                  <option value="terrortown">TTT (역할극)</option>
+                  <option value="prop_hunt">Prop Hunt</option>
+                  <option value="murder">Murder</option>
+                  <option value="deathrun">Deathrun</option>
+                </select>
+              </label>
+            </div>
+          )}
           <label>호스트 서버
             <select value={input.node_id} onChange={event => set('node_id', event.target.value)} aria-invalid={!!errors.node_id} aria-describedby="node-hint">
               {!workers.length && <option value="">사용 가능한 호스트 서버 없음</option>}
@@ -261,7 +326,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
         <div style={{ marginBottom: '22px' }}>
           <label style={{ marginBottom: '10px', display: 'block' }}>리소스 프리셋 <small style={{ fontWeight: 400 }}>선택 후 수동 조정 가능</small></label>
           <div className="resource-plan-grid">
-            {RESOURCE_PLANS.map(plan => (
+            {visiblePlans.map(plan => (
               <button
                 key={plan.name}
                 type="button"

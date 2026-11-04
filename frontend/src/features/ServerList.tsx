@@ -54,12 +54,20 @@ function CopyBtn({ text }: { text: string | null }) {
 
 function gameIcon(game: string): string {
   if (game === 'minecraft-java') return '⛏';
+  if (game === 'valheim') return '⚔';
+  if (game === 'garrysmod') return '🔧';
   return '▦';
 }
 
 function gameBadgeStyle(game: string): React.CSSProperties {
   if (game === 'minecraft-java') {
     return { background: '#4ade80', color: '#0a2215', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
+  }
+  if (game === 'valheim') {
+    return { background: '#93c5fd', color: '#0c1a3a', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
+  }
+  if (game === 'garrysmod') {
+    return { background: '#fbbf24', color: '#1a0f00', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
   }
   return { background: 'var(--surface-2)', color: 'var(--muted)', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
 }
@@ -173,7 +181,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
               <table>
                 <thead><tr><th scope="col">서버</th><th scope="col">상태</th><th scope="col">호스트 서버</th><th scope="col">할당 리소스</th><th scope="col">접속 주소</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
                 <tbody>{visible.map(server => <tr key={server.id}>
-                  <td><strong>{server.name}</strong><small>Minecraft Java · Paper {server.version}</small></td>
+                  <td><strong>{server.name}</strong><small>{server.game === 'minecraft-java' ? `Minecraft Java · Paper ${server.version}` : server.game === 'valheim' ? 'Valheim' : server.game === 'garrysmod' ? "Garry's Mod" : server.game}</small></td>
                   <td><Status value={server.status}/></td>
                   <td>{server.node_id}</td>
                   <td>{server.cpu} vCPU · {server.memory_mb / 1024} GiB RAM<small>{server.storage_gb} GiB 스토리지</small></td>

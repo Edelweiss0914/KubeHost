@@ -181,7 +181,7 @@ function PlayerPanel({ serverId, active }: { serverId: string; active: boolean }
   );
 }
 
-function ManagePanel({ serverId, active }: { serverId: string; active: boolean }) {
+function ManagePanel({ serverId, active, game }: { serverId: string; active: boolean; game: string }) {
   const [whitelist, setWhitelist] = useState<string[]>([]);
   const [wlLoading, setWlLoading] = useState(true);
   const [wlInput, setWlInput] = useState('');
@@ -357,7 +357,8 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
       </div>
       {flash && <div className="manage-flash">{flash}</div>}
 
-      {/* JVM Memory */}
+      {/* JVM Memory - Minecraft only */}
+      {game === 'minecraft-java' && (
       <div className="manage-section">
         <h3>JVM 메모리</h3>
         <p className="section-copy">서버에 할당할 JVM 힙 메모리를 설정합니다. 변경 후 서버 재시작이 필요합니다.</p>
@@ -378,6 +379,7 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
           </>
         )}
       </div>
+      )}
 
       {/* Auto-restart */}
       <div className="manage-section">
@@ -390,7 +392,8 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
         </label>
       </div>
 
-      {/* server.properties */}
+      {/* server.properties - Minecraft only */}
+      {game === 'minecraft-java' && (
       <div className="manage-section">
         <h3>server.properties</h3>
         <p className="section-copy">서버 설정 파일을 직접 편집합니다. 저장 후 서버 재시작이 필요합니다.</p>
@@ -404,6 +407,7 @@ function ManagePanel({ serverId, active }: { serverId: string; active: boolean }
           </>
         )}
       </div>
+      )}
 
       {/* Backups */}
       <div className="manage-section">
@@ -707,7 +711,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
         <div className="server-sidebar-header">
           <button className="text-button server-sidebar-back" onClick={onBack}>← 목록</button>
           <div className="server-sidebar-identity">
-            <span className="server-sidebar-icon" aria-hidden="true">⬡</span>
+            <span className="server-sidebar-icon" aria-hidden="true">{server.game === 'minecraft-java' ? '⛏' : server.game === 'valheim' ? '⚔' : server.game === 'garrysmod' ? '🔧' : '⬡'}</span>
             <div>
               <strong className="server-sidebar-name">{server.name}</strong>
               <div style={{marginTop:'5px'}}><Status value={server.status}/></div>
@@ -774,7 +778,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
           <PlayerPanel serverId={server.id} active={active} />
         )}
         {subView === 'manage' && (
-          <ManagePanel serverId={server.id} active={active} />
+          <ManagePanel serverId={server.id} active={active} game={server.game} />
         )}
         {subView === 'overview' && (
           <>

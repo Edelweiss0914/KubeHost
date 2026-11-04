@@ -11,13 +11,20 @@ DEMO_OWNER = "demo-user"
 class ServerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     name: str = Field(min_length=3, max_length=40, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9 _-]*$")
-    game: Literal["minecraft-java"] = "minecraft-java"
+    game: Literal["minecraft-java", "valheim", "garrysmod"] = "minecraft-java"
     edition: Literal["paper"] = "paper"
     game_type: Literal["VANILLA", "PAPER", "FORGE", "FABRIC", "MODRINTH", "AUTO_CURSEFORGE"] = "PAPER"
     version: Literal["LATEST", "1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.16.5", "1.14.4", "1.12.2"] = "LATEST"
     modrinth_project: str | None = Field(default=None, max_length=128)
     cf_slug: str | None = Field(default=None, max_length=128)
     cf_api_key: str | None = Field(default=None, exclude=True)  # 런타임 주입, API 노출 안 함
+    # Valheim
+    server_password: str | None = Field(default=None, max_length=64)
+    world_name: str | None = Field(default=None, max_length=64)
+    server_public: bool = False
+    # Garry's Mod
+    map_name: str | None = Field(default=None, max_length=64)
+    gamemode_name: str | None = Field(default=None, max_length=32)
     cpu: float = Field(default=1, ge=0.5, le=4, allow_inf_nan=False)
     memory_mb: int = Field(default=2048, ge=1024, le=8192, strict=True)
     storage_gb: int = Field(default=10, ge=5, le=100, strict=True)
