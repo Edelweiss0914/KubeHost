@@ -284,11 +284,10 @@ def build_garrysmod_plan(
     gamemode = request.gamemode_name or "sandbox"
     max_players = 16
     env = [
-        {"name": "GAME_ID", "value": "4020"},
-        {"name": "GAME_PARAMS", "value": f"+map {map_name} +gamemode {gamemode} +maxplayers {max_players}"},
-        {"name": "VALIDATE", "value": "false"},
-        {"name": "PUID", "value": "1000"},
-        {"name": "PGID", "value": "1000"},
+        {"name": "GAMEMODE", "value": gamemode},
+        {"name": "MAP", "value": map_name},
+        {"name": "MAXPLAYERS", "value": str(max_players)},
+        {"name": "SERVERNAME", "value": request.name},
     ]
     resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
         "metadata": {"name": name, "namespace": namespace},
@@ -302,7 +301,7 @@ def build_garrysmod_plan(
                 "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000,
                                     "runAsNonRoot": True,
                                     "seccompProfile": {"type": "RuntimeDefault"}},
-                "containers": [{"name": "garrysmod", "image": "ich777/garrysmod:latest",
+                "containers": [{"name": "garrysmod", "image": "cm2network/garrysmod:latest",
                     "env": env,
                     "ports": [{"containerPort": 27015, "protocol": "UDP", "name": "gmod"},
                               {"containerPort": 27015, "protocol": "TCP", "name": "gmod-rcon"}],
@@ -310,7 +309,7 @@ def build_garrysmod_plan(
                                   "limits": {"cpu": cpu, "memory": memory}},
                     "securityContext": {"allowPrivilegeEscalation": False,
                                         "capabilities": {"drop": ["ALL"]}},
-                    "volumeMounts": [{"name": "data", "mountPath": "/serverdata"}]}]},
+                    "volumeMounts": [{"name": "data", "mountPath": "/home/steam/gmod-dedicated"}]}]},
             },
             "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
                 "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
