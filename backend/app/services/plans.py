@@ -287,7 +287,7 @@ def build_garrysmod_plan(
         {"name": "GAMEMODE", "value": gamemode},
         {"name": "MAP", "value": map_name},
         {"name": "MAXPLAYERS", "value": str(max_players)},
-        {"name": "SERVERNAME", "value": request.name},
+        {"name": "SERVER_NAME", "value": request.name},
     ]
     resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
         "metadata": {"name": name, "namespace": namespace},
@@ -301,7 +301,7 @@ def build_garrysmod_plan(
                 "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000,
                                     "runAsNonRoot": True,
                                     "seccompProfile": {"type": "RuntimeDefault"}},
-                "containers": [{"name": "garrysmod", "image": "cm2network/garrysmod:latest",
+                "containers": [{"name": "garrysmod", "image": "ceifa/garrysmod:latest",
                     "env": env,
                     "ports": [{"containerPort": 27015, "protocol": "UDP", "name": "gmod"},
                               {"containerPort": 27015, "protocol": "TCP", "name": "gmod-rcon"}],
@@ -309,7 +309,7 @@ def build_garrysmod_plan(
                                   "limits": {"cpu": cpu, "memory": memory}},
                     "securityContext": {"allowPrivilegeEscalation": False,
                                         "capabilities": {"drop": ["ALL"]}},
-                    "volumeMounts": [{"name": "data", "mountPath": "/home/steam/gmod-dedicated"}]}]},
+                    "volumeMounts": [{"name": "data", "mountPath": "/home/steam/garrysmod"}]}]},
             },
             "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
                 "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
