@@ -373,10 +373,12 @@ class K8sAdapter:
             _preload_content=False,
         )
         if stdin_data is not None:
-            resp.write_stdin(stdin_data)
+            _CHUNK = 256 * 1024  # 256 KB — WebSocket 내부 버퍼 폭발 방지
+            for _off in range(0, len(stdin_data), _CHUNK):
+                resp.write_stdin(stdin_data[_off:_off + _CHUNK])
         out = ""
         while resp.is_open():
-            resp.update(timeout=10)
+            resp.update(timeout=60)
             if resp.peek_stdout():
                 out += resp.read_stdout()
         resp.close()
@@ -564,7 +566,9 @@ class K8sAdapter:
                 _preload_content=False,
             )
             if stdin_data is not None:
-                resp.write_stdin(stdin_data)
+                _CHUNK = 256 * 1024
+                for _off in range(0, len(stdin_data), _CHUNK):
+                    resp.write_stdin(stdin_data[_off:_off + _CHUNK])
             out = ""
             while resp.is_open():
                 resp.update(timeout=15)
