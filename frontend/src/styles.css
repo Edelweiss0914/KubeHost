@@ -3472,3 +3472,16 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   font-weight: 600;
   letter-spacing: .04em;
 }
+
+.fm-progress-track {
+  height: 6px;
+  background: var(--surface-2, #1e2d40);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.fm-progress-bar {
+  height: 100%;
+  background: var(--accent, #38bdf8);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}

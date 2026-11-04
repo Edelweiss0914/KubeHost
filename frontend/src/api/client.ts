@@ -117,7 +117,7 @@ export interface ServerGateway {
   setVersion(id: string, version: string): Promise<void>;
   listFiles(serverId: string, path: string): Promise<FileEntry[]>;
   downloadFile(serverId: string, path: string): Promise<void>;
-  uploadFile(serverId: string, path: string, file: File): Promise<{ path: string; name: string; size: number }>;
+  uploadFile(serverId: string, path: string, file: File, onProgress?: (pct: number) => void): Promise<{ path: string; name: string; size: number }>;
   deletePath(serverId: string, path: string): Promise<void>;
   mkdirFs(serverId: string, path: string): Promise<{ path: string }>;
   serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
@@ -208,17 +208,27 @@ export const api: ServerGateway = {
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
   },
-  uploadFile: (id, path, file) => {
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const form = new FormData();
-    form.append('file', file);
-    return fetch(apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/fs/upload?path=${encodeURIComponent(path)}`), {
-      method: 'POST', headers, body: form,
-    }).then(async r => {
-      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new ApiError(r.status, b.detail ?? '업로드 실패'); }
-      return r.json();
+  uploadFile: (id, path, file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const token = getToken();
+      const form = new FormData();
+      form.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/fs/upload?path=${encodeURIComponent(path)}`));
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(JSON.parse(xhr.responseText));
+        } else {
+          const detail = (() => { try { return JSON.parse(xhr.responseText).detail; } catch { return null; } })();
+          reject(new ApiError(xhr.status, detail ?? '업로드 실패'));
+        }
+      };
+      xhr.onerror = () => reject(new ApiError(0, '네트워크 오류'));
+      xhr.send(form);
     });
   },
   deletePath: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),

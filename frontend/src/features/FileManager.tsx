@@ -47,6 +47,7 @@ export function FileManager({ serverId }: Props) {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [flash, setFlash] = useState('');
   const [flashError, setFlashError] = useState(false);
   const [newDirName, setNewDirName] = useState('');
@@ -85,14 +86,16 @@ export function FileManager({ serverId }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     setBusy(true);
+    setUploadPct(0);
     try {
-      await api.uploadFile(serverId, path, file);
+      await api.uploadFile(serverId, path, file, setUploadPct);
       showMsg(`${file.name} 업로드됨`);
       loadDir(path);
     } catch (err) {
       showMsg(err instanceof Error ? err.message : '업로드 실패', true);
     } finally {
       setBusy(false);
+      setUploadPct(null);
       if (fileRef.current) fileRef.current.value = '';
     }
   }
@@ -196,6 +199,18 @@ export function FileManager({ serverId }: Props) {
             placeholder="폴더 이름" disabled={busy} autoFocus />
           <button onClick={() => void handleMkdir()} disabled={busy || !newDirName.trim()}>생성</button>
           <button className="secondary" onClick={() => { setShowMkdir(false); setNewDirName(''); }}>취소</button>
+        </div>
+      )}
+
+      {uploadPct !== null && (
+        <div style={{ marginTop: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
+            <span className="muted">업로드 중…</span>
+            <span className="muted">{uploadPct}%</span>
+          </div>
+          <div className="fm-progress-track">
+            <div className="fm-progress-bar" style={{ width: `${uploadPct}%` }} />
+          </div>
         </div>
       )}
 
