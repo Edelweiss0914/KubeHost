@@ -3522,6 +3522,14 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 .modpack-preset-btn strong { color: var(--text, #e2e8f0); font-size: 12px; }
 .modpack-preset-btn span { color: var(--muted, #64748b); font-size: 11px; }
 
+.cf-key-register {
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px dashed var(--border, #1e3a5f);
+  background: var(--surface-2, #0d1f33);
+  margin-top: 4px;
+}
+
 .fm-progress-track {
   height: 6px;
   background: var(--surface-2, #1e2d40);

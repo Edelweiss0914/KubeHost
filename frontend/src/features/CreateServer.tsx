@@ -58,10 +58,35 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   const [input, setInput] = useState<ServerInput>({ ...defaults, node_id: defaultWorkerId ?? '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [games, setGames] = useState<Game[]>([]);
+  const [hasCfKey, setHasCfKey] = useState<boolean | null>(null);
+  const [cfKeyInput, setCfKeyInput] = useState('');
+  const [cfKeySaving, setCfKeySaving] = useState(false);
+  const [cfKeyMsg, setCfKeyMsg] = useState('');
 
   useEffect(() => {
     api.games().then(setGames).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (input.game_type === 'AUTO_CURSEFORGE' && hasCfKey === null) {
+      api.getCfKey().then(r => setHasCfKey(r.has_key)).catch(() => setHasCfKey(false));
+    }
+  }, [input.game_type, hasCfKey]);
+
+  async function saveCfKey() {
+    if (!cfKeyInput.trim()) return;
+    setCfKeySaving(true);
+    try {
+      await api.setCfKey(cfKeyInput.trim());
+      setHasCfKey(true);
+      setCfKeyMsg('API 키가 저장됐습니다.');
+      setCfKeyInput('');
+    } catch {
+      setCfKeyMsg('저장 실패. 다시 시도해주세요.');
+    } finally {
+      setCfKeySaving(false);
+    }
+  }
 
   useEffect(() => {
     if (defaultWorkerId) setInput(previous => previous.node_id ? previous : { ...previous, node_id: defaultWorkerId });
@@ -182,20 +207,54 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
           {input.game_type === 'AUTO_CURSEFORGE' && (
             <div className="full">
-              <label>CurseForge 모드팩 Slug
-                <input value={input.cf_slug ?? ''} placeholder="예: all-the-mods-9"
-                  onChange={e => set('cf_slug', e.target.value || null)}
-                  aria-invalid={!!errors.cf_slug} />
-                {errors.cf_slug && <small style={{ color: 'var(--danger)' }}>{errors.cf_slug}</small>}
-              </label>
-              <div className="modpack-presets">
-                {CF_PRESETS.map(p => (
-                  <button key={p.slug} type="button" className="modpack-preset-btn"
-                    onClick={() => set('cf_slug', p.slug)}>
-                    <strong>{p.name}</strong>
-                  </button>
-                ))}
-              </div>
+              {!hasCfKey ? (
+                <div className="cf-key-register">
+                  <p className="muted" style={{ marginBottom: '8px', fontSize: '13px' }}>
+                    CurseForge 모드팩을 사용하려면 API 키가 필요합니다.{' '}
+                    <a href="https://console.curseforge.com/#/api-keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                      키 발급 →
+                    </a>
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      value={cfKeyInput}
+                      onChange={e => setCfKeyInput(e.target.value)}
+                      placeholder="CurseForge API 키 입력"
+                      type="password"
+                      style={{ flex: 1 }}
+                      disabled={cfKeySaving}
+                    />
+                    <button type="button" onClick={saveCfKey} disabled={cfKeySaving || !cfKeyInput.trim()}>
+                      {cfKeySaving ? '저장 중…' : '저장'}
+                    </button>
+                  </div>
+                  {cfKeyMsg && <small style={{ color: 'var(--accent)', marginTop: '4px', display: 'block' }}>{cfKeyMsg}</small>}
+                </div>
+              ) : (
+                <>
+                  <label>CurseForge 모드팩 Slug
+                    <input value={input.cf_slug ?? ''} placeholder="예: all-the-mods-9"
+                      onChange={e => set('cf_slug', e.target.value || null)}
+                      aria-invalid={!!errors.cf_slug} />
+                    {errors.cf_slug && <small style={{ color: 'var(--danger)' }}>{errors.cf_slug}</small>}
+                  </label>
+                  <div className="modpack-presets">
+                    {CF_PRESETS.map(p => (
+                      <button key={p.slug} type="button" className="modpack-preset-btn"
+                        onClick={() => set('cf_slug', p.slug)}>
+                        <strong>{p.name}</strong>
+                      </button>
+                    ))}
+                  </div>
+                  <small style={{ marginTop: '6px', display: 'block' }}>
+                    <span className="muted">API 키 등록됨 · </span>
+                    <button type="button" className="text-button" style={{ fontSize: '12px' }}
+                      onClick={() => { api.setCfKey(null); setHasCfKey(false); }}>
+                      키 삭제
+                    </button>
+                  </small>
+                </>
+              )}
             </div>
           )}
 
