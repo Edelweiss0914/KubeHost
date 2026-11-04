@@ -594,21 +594,20 @@ class K8sAdapter:
 
     def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
         safe = self._safe_path(path)
+        # glob for loop — 파이프 없이 안정적으로 각 항목을 출력
         cmd = [
             "sh", "-c",
-            f"ls -1Ap '{safe}' 2>/dev/null | while IFS= read -r name; do "
-            f"  stripped=\"${{name%/}}\"; "
-            f"  fp=\"{safe}/$stripped\"; "
+            f"for fp in '{safe}'/* '{safe}'/.*; do "
+            f"  [ -e \"$fp\" ] || continue; "
+            f"  name=$(basename \"$fp\"); "
+            f"  [ \"$name\" = '.' ] || [ \"$name\" = '..' ] && continue; "
             f"  if [ -d \"$fp\" ]; then t=d; else t=f; fi; "
             f"  sz=$(stat -c %s \"$fp\" 2>/dev/null || echo 0); "
             f"  mt=$(stat -c %Y \"$fp\" 2>/dev/null || echo 0); "
-            f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$stripped\"; "
+            f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$name\"; "
             f"done",
         ]
-        try:
-            out = self._exec_anywhere(server_id, namespace, cmd)
-        except Exception:
-            return []
+        out = self._exec_anywhere(server_id, namespace, cmd)
         entries = []
         for line in out.strip().splitlines():
             parts = line.split("\t", 3)
