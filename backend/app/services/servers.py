@@ -185,6 +185,7 @@ class ServerService:
             server = next((s for s in retained if s.id == server_id), None)
             if server is None:
                 raise ServerNotFound("Retained server not found")
+            self.adapter.delete(server_id, server.namespace, delete_data=False)
             connection = self.adapter.create(server.resource_plan)
             server = server.model_copy(update={
                 "status": "provisioning",
