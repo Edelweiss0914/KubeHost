@@ -42,7 +42,7 @@ class ServerService:
     def _sync_status(self, server: Server) -> Server:
         """K8s 실제 상태와 DB 상태를 동기화. 실패 시 기존 상태 유지."""
         try:
-            real_status = self.adapter.get_status(server.id, server.resource_plan.namespace)
+            real_status = self.adapter.get_status(server.id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
             if real_status is not None and real_status != server.status:
                 server.status = real_status  # type: ignore[assignment]
                 self.repository.save(server)
@@ -115,7 +115,7 @@ class ServerService:
             server = self.get(owner_id, server_id)
             if server.status == state:
                 raise InvalidOperation(f"Server is already {state}")
-            self.adapter.set_state(server.id, server.resource_plan.namespace, state)
+            self.adapter.set_state(server.id, server.resource_plan.namespace, state, sts_name=server.resource_plan.sts_name)
             server.status = state
             server.logs.append(
                 f"[MOCK] Server {state}. No real process was changed."
@@ -136,7 +136,7 @@ class ServerService:
             server = self.get(owner_id, server_id)
             if delete_data and confirmation != server.name:
                 raise InvalidOperation("Type the exact server name to confirm permanent data deletion")
-            self.adapter.delete(server.id, server.resource_plan.namespace, delete_data)
+            self.adapter.delete(server.id, server.resource_plan.namespace, delete_data, sts_name=server.resource_plan.sts_name)
             if not delete_data:
                 self.repository.retain(server)
             self.repository.delete(server.id)
@@ -152,7 +152,7 @@ class ServerService:
         if server.status != "running":
             raise InvalidOperation("서버가 실행 중일 때만 명령어를 사용할 수 있습니다.")
         try:
-            return self.adapter.rcon(server_id, server.resource_plan.namespace, command)
+            return self.adapter.rcon(server_id, server.resource_plan.namespace, command, sts_name=server.resource_plan.sts_name)
         except Exception as exc:
             raise InvalidOperation(str(exc))
 
@@ -160,7 +160,7 @@ class ServerService:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
-        return self.adapter.get_settings(server_id, server.resource_plan.namespace)
+        return self.adapter.get_settings(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
 
     def update_settings(self, owner_id: str, server_id: str, settings: ServerSettings) -> None:
         server = self.repository.get(server_id)
@@ -177,7 +177,7 @@ class ServerService:
             "VIEW_DISTANCE": str(settings.view_distance),
             "OPS": settings.ops,
             "FORCE_GAMEMODE": "TRUE" if settings.force_gamemode else "FALSE",
-        })
+        }, sts_name=server.resource_plan.sts_name)
 
     def restore(self, owner_id: str, server_id: str) -> Server:
         with self._lock:

@@ -37,6 +37,7 @@ class ResourcePlan(BaseModel):
     target_node: str
     resources: list[dict[str, Any]]
     warnings: list[str]
+    sts_name: str = ""
 
 
 class Server(ServerCreate):

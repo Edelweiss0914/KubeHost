@@ -92,7 +92,7 @@ class K8sAdapter:
         return result
 
     def list_server_pods(self, server: Server) -> list[ServerPod]:
-        name = self._sts_name(server.id)
+        name = server.resource_plan.sts_name or self._sts_name(server.id)
         pods = self._core.list_namespaced_pod(
             server.resource_plan.namespace,
             label_selector=f"app.kubernetes.io/name={name}",
@@ -193,8 +193,8 @@ class K8sAdapter:
         except Exception:
             return None
 
-    def get_status(self, server_id: str, namespace: str) -> str | None:
-        name = self._sts_name(server_id)
+    def get_status(self, server_id: str, namespace: str, sts_name: str | None = None) -> str | None:
+        name = sts_name or self._sts_name(server_id)
         try:
             sts = self._apps.read_namespaced_stateful_set(name, namespace)
         except ApiException as exc:
@@ -216,13 +216,13 @@ class K8sAdapter:
             return "error"
         return "provisioning"
 
-    def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"]) -> None:
-        name = self._sts_name(server_id)
+    def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"], sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         replicas = 1 if state == "running" else 0
         self._apps.patch_namespaced_stateful_set(name, namespace, {"spec": {"replicas": replicas}})
 
-    def logs(self, server_id: str, namespace: str, tail: int = 300) -> list[str]:
-        name = self._sts_name(server_id)
+    def logs(self, server_id: str, namespace: str, tail: int = 300, sts_name: str | None = None) -> list[str]:
+        name = sts_name or self._sts_name(server_id)
         try:
             pods = self._core.list_namespaced_pod(
                 namespace, label_selector=f"app.kubernetes.io/name={name}"
@@ -239,8 +239,8 @@ class K8sAdapter:
     _SETTINGS_KEYS = {"DIFFICULTY", "GAMEMODE", "MAX_PLAYERS", "MOTD", "PVP",
                       "ONLINE_MODE", "SPAWN_PROTECTION", "VIEW_DISTANCE", "OPS", "FORCE_GAMEMODE"}
 
-    def get_settings(self, server_id: str, namespace: str) -> dict[str, str]:
-        name = self._sts_name(server_id)
+    def get_settings(self, server_id: str, namespace: str, sts_name: str | None = None) -> dict[str, str]:
+        name = sts_name or self._sts_name(server_id)
         try:
             sts = self._apps.read_namespaced_stateful_set(name, namespace)
             env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
@@ -248,8 +248,8 @@ class K8sAdapter:
         except ApiException:
             return {}
 
-    def patch_settings(self, server_id: str, namespace: str, updates: dict[str, str]) -> None:
-        name = self._sts_name(server_id)
+    def patch_settings(self, server_id: str, namespace: str, updates: dict[str, str], sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         current.update(updates)
@@ -258,9 +258,9 @@ class K8sAdapter:
             "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
         })
 
-    def rcon(self, server_id: str, namespace: str, command: str) -> str:
+    def rcon(self, server_id: str, namespace: str, command: str, sts_name: str | None = None) -> str:
         import socket, struct  # noqa: E401
-        name = self._sts_name(server_id)
+        name = sts_name or self._sts_name(server_id)
         pods = self._core.list_namespaced_pod(
             namespace, label_selector=f"app.kubernetes.io/name={name}"
         ).items
@@ -339,8 +339,8 @@ class K8sAdapter:
             else:
                 raise
 
-    def delete(self, server_id: str, namespace: str, delete_data: bool) -> None:
-        name = self._sts_name(server_id)
+    def delete(self, server_id: str, namespace: str, delete_data: bool, sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         for svc_name in (f"{name}-headless", f"{name}-game"):
             try:
                 self._core.delete_namespaced_service(svc_name, namespace)
@@ -365,8 +365,8 @@ class K8sAdapter:
                             raise
 
     # ── Version upgrade ───────────────────────────────────────────────────────
-    def set_version(self, server_id: str, namespace: str, version: str) -> None:
-        name = self._sts_name(server_id)
+    def set_version(self, server_id: str, namespace: str, version: str, sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         current["VERSION"] = version
@@ -377,10 +377,10 @@ class K8sAdapter:
 
     # ── Pod exec helper ──────────────────────────────────────────────────────
     def _exec_in_pod(self, server_id: str, namespace: str, command: list[str],
-                     stdin_data: bytes | None = None) -> str:
+                     stdin_data: bytes | None = None, sts_name: str | None = None) -> str:
         from kubernetes.stream import stream  # type: ignore[import-untyped]
         core = self._fresh_core()
-        name = self._sts_name(server_id)
+        name = sts_name or self._sts_name(server_id)
         pods = core.list_namespaced_pod(
             namespace, label_selector=f"app.kubernetes.io/name={name}"
         ).items
@@ -408,8 +408,8 @@ class K8sAdapter:
         return out
 
     # ── JVM memory ───────────────────────────────────────────────────────────
-    def get_jvm(self, server_id: str, namespace: str) -> int:
-        name = self._sts_name(server_id)
+    def get_jvm(self, server_id: str, namespace: str, sts_name: str | None = None) -> int:
+        name = sts_name or self._sts_name(server_id)
         try:
             sts = self._apps.read_namespaced_stateful_set(name, namespace)
             env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
@@ -418,8 +418,8 @@ class K8sAdapter:
         except ApiException:
             return 0
 
-    def set_jvm(self, server_id: str, namespace: str, memory_mb: int) -> None:
-        name = self._sts_name(server_id)
+    def set_jvm(self, server_id: str, namespace: str, memory_mb: int, sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         current["MEMORY"] = f"{memory_mb}M"
@@ -428,8 +428,8 @@ class K8sAdapter:
             "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
         })
 
-    def get_auto_restart(self, server_id: str, namespace: str) -> bool:
-        name = self._sts_name(server_id)
+    def get_auto_restart(self, server_id: str, namespace: str, sts_name: str | None = None) -> bool:
+        name = sts_name or self._sts_name(server_id)
         try:
             sts = self._apps.read_namespaced_stateful_set(name, namespace)
             env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
@@ -437,8 +437,8 @@ class K8sAdapter:
         except Exception:
             return False
 
-    def set_auto_restart(self, server_id: str, namespace: str, enabled: bool) -> None:
-        name = self._sts_name(server_id)
+    def set_auto_restart(self, server_id: str, namespace: str, enabled: bool, sts_name: str | None = None) -> None:
+        name = sts_name or self._sts_name(server_id)
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         current["RESTART_ON_CRASH"] = "true" if enabled else "false"
@@ -448,28 +448,29 @@ class K8sAdapter:
         })
 
     # ── server.properties ────────────────────────────────────────────────────
-    def get_raw_properties(self, server_id: str, namespace: str) -> str:
+    def get_raw_properties(self, server_id: str, namespace: str, sts_name: str | None = None) -> str:
         try:
             return self._exec_in_pod(server_id, namespace,
-                                     ["cat", "/data/server.properties"])
+                                     ["cat", "/data/server.properties"], sts_name=sts_name)
         except Exception:
             return ""
 
-    def set_raw_properties(self, server_id: str, namespace: str, content: str) -> None:
+    def set_raw_properties(self, server_id: str, namespace: str, content: str, sts_name: str | None = None) -> None:
         self._exec_in_pod(server_id, namespace,
                           ["sh", "-c", "cat > /data/server.properties"],
-                          stdin_data=content.encode("utf-8"))
+                          stdin_data=content.encode("utf-8"), sts_name=sts_name)
 
     # ── World backups ─────────────────────────────────────────────────────────
-    def list_backups(self, server_id: str, namespace: str) -> list[str]:
+    def list_backups(self, server_id: str, namespace: str, sts_name: str | None = None) -> list[str]:
         try:
             out = self._exec_in_pod(server_id, namespace,
-                ["sh", "-c", "ls /data/backups/*.tar.gz 2>/dev/null | xargs -I{} basename {} || true"])
+                ["sh", "-c", "ls /data/backups/*.tar.gz 2>/dev/null | xargs -I{} basename {} || true"],
+                sts_name=sts_name)
             return [f.strip() for f in out.strip().splitlines() if f.strip().endswith(".tar.gz")]
         except Exception:
             return []
 
-    def create_backup(self, server_id: str, namespace: str) -> str:
+    def create_backup(self, server_id: str, namespace: str, sts_name: str | None = None) -> str:
         from datetime import datetime, timezone
         ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         filename = f"world-{ts}.tar.gz"
@@ -479,32 +480,33 @@ class K8sAdapter:
             f"tar -czf /data/backups/{filename} -C /data "
             f"$(ls -d /data/world /data/world_nether /data/world_the_end 2>/dev/null | xargs -I{{}} basename {{}})"
             f" 2>/dev/null || true"
-        ])
+        ], sts_name=sts_name)
         return filename
 
-    def restore_backup(self, server_id: str, namespace: str, filename: str) -> None:
+    def restore_backup(self, server_id: str, namespace: str, filename: str, sts_name: str | None = None) -> None:
         if "/" in filename or ".." in filename:
             raise ValueError("잘못된 파일명입니다.")
         self._exec_in_pod(server_id, namespace, [
             "sh", "-c",
             f"tar -xzf /data/backups/{filename} -C /data"
-        ])
+        ], sts_name=sts_name)
 
-    def delete_backup(self, server_id: str, namespace: str, filename: str) -> None:
+    def delete_backup(self, server_id: str, namespace: str, filename: str, sts_name: str | None = None) -> None:
         if "/" in filename or ".." in filename:
             raise ValueError("잘못된 파일명입니다.")
-        self._exec_in_pod(server_id, namespace, ["rm", f"/data/backups/{filename}"])
+        self._exec_in_pod(server_id, namespace, ["rm", f"/data/backups/{filename}"], sts_name=sts_name)
 
     # ── Plugin management ─────────────────────────────────────────────────────
-    def list_plugins(self, server_id: str, namespace: str) -> list[str]:
+    def list_plugins(self, server_id: str, namespace: str, sts_name: str | None = None) -> list[str]:
         try:
             out = self._exec_in_pod(server_id, namespace,
-                ["sh", "-c", "ls /data/plugins/*.jar 2>/dev/null | xargs -I{} basename {} || true"])
+                ["sh", "-c", "ls /data/plugins/*.jar 2>/dev/null | xargs -I{} basename {} || true"],
+                sts_name=sts_name)
             return [f.strip() for f in out.strip().splitlines() if f.strip().endswith(".jar")]
         except Exception:
             return []
 
-    def upload_plugin(self, server_id: str, namespace: str, filename: str, content: bytes) -> None:
+    def upload_plugin(self, server_id: str, namespace: str, filename: str, content: bytes, sts_name: str | None = None) -> None:
         if "/" in filename or ".." in filename:
             raise ValueError("잘못된 파일명입니다.")
         import base64
@@ -512,12 +514,12 @@ class K8sAdapter:
         self._exec_in_pod(server_id, namespace, [
             "sh", "-c",
             f"mkdir -p /data/plugins && echo '{b64}' | base64 -d > /data/plugins/{filename}"
-        ])
+        ], sts_name=sts_name)
 
-    def delete_plugin(self, server_id: str, namespace: str, filename: str) -> None:
+    def delete_plugin(self, server_id: str, namespace: str, filename: str, sts_name: str | None = None) -> None:
         if "/" in filename or ".." in filename:
             raise ValueError("잘못된 파일명입니다.")
-        self._exec_in_pod(server_id, namespace, ["rm", f"/data/plugins/{filename}"])
+        self._exec_in_pod(server_id, namespace, ["rm", f"/data/plugins/{filename}"], sts_name=sts_name)
 
     # ── File Manager ─────────────────────────────────────────────────────────
 
@@ -534,11 +536,11 @@ class K8sAdapter:
             raise ValueError("경로에 사용할 수 없는 문자가 포함돼 있습니다.")
         return normalized
 
-    def _pvc_name(self, server_id: str) -> str:
-        return f"data-{self._sts_name(server_id)}-0"
+    def _pvc_name(self, server_id: str, sts_name: str | None = None) -> str:
+        return f"data-{sts_name or self._sts_name(server_id)}-0"
 
-    def _get_server_node(self, server_id: str, namespace: str) -> str:
-        name = self._sts_name(server_id)
+    def _get_server_node(self, server_id: str, namespace: str, sts_name: str | None = None) -> str:
+        name = sts_name or self._sts_name(server_id)
         try:
             sts = self._apps.read_namespaced_stateful_set(name, namespace)
             ns_map = sts.spec.template.spec.node_selector or {}
@@ -628,18 +630,19 @@ class K8sAdapter:
     def _exec_anywhere(
         self, server_id: str, namespace: str,
         command: list[str], stdin_data: bytes | None = None,
+        sts_name: str | None = None,
     ) -> str:
         """실행 중인 파드 우선, 없으면 임시 파드로 폴백."""
         try:
-            return self._exec_in_pod(server_id, namespace, command, stdin_data)
+            return self._exec_in_pod(server_id, namespace, command, stdin_data, sts_name)
         except ValueError:
-            pvc = self._pvc_name(server_id)
-            node = self._get_server_node(server_id, namespace)
+            pvc = self._pvc_name(server_id, sts_name)
+            node = self._get_server_node(server_id, namespace, sts_name)
             return self._exec_in_temp_pod(namespace, pvc, node, command, stdin_data)
 
     _MAX_FILE_BYTES = 1024 * 1024 * 1024  # 1 GiB
 
-    def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
+    def list_files(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> list[dict]:
         safe = self._safe_path(path)
         # glob for loop — 파이프 없이 안정적으로 각 항목을 출력
         cmd = [
@@ -654,7 +657,7 @@ class K8sAdapter:
             f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$name\"; "
             f"done",
         ]
-        out = self._exec_anywhere(server_id, namespace, cmd)
+        out = self._exec_anywhere(server_id, namespace, cmd, sts_name=sts_name)
         entries = []
         for line in out.strip().splitlines():
             parts = line.split("\t", 3)
@@ -672,19 +675,19 @@ class K8sAdapter:
             })
         return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
 
-    def read_file(self, server_id: str, namespace: str, path: str) -> bytes:
+    def read_file(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> bytes:
         import base64
         safe = self._safe_path(path)
         size_out = self._exec_anywhere(server_id, namespace,
-            ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"])
+            ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"], sts_name=sts_name)
         size = int(size_out.strip()) if size_out.strip().isdigit() else 0
         if size > self._MAX_FILE_BYTES:
             raise ValueError(f"파일이 너무 큽니다 ({size // (1024 * 1024)} MiB, 최대 1 GiB).")
         out = self._exec_anywhere(server_id, namespace,
-            ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"])
+            ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"], sts_name=sts_name)
         return base64.b64decode(out.strip())
 
-    def write_file(self, server_id: str, namespace: str, path: str, content: bytes) -> None:
+    def write_file(self, server_id: str, namespace: str, path: str, content: bytes, sts_name: str | None = None) -> None:
         if len(content) > self._MAX_FILE_BYTES:
             raise ValueError(f"파일이 너무 큽니다 ({len(content) // (1024 * 1024)} MiB, 최대 1 GiB).")
         safe = self._safe_path(path)
@@ -692,14 +695,14 @@ class K8sAdapter:
         # head -c N reads exactly N bytes from stdin then exits → EOF 대기 없음, base64 오버헤드 없음
         self._exec_anywhere(server_id, namespace,
             ["sh", "-c", f"mkdir -p '{parent}' && head -c {len(content)} > '{safe}'"],
-            stdin_data=content)
+            stdin_data=content, sts_name=sts_name)
 
-    def delete_path(self, server_id: str, namespace: str, path: str) -> None:
+    def delete_path(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> None:
         safe = self._safe_path(path)
         if safe in ("/data", "/data/"):
             raise ValueError("/data 루트는 삭제할 수 없습니다.")
-        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"rm -rf '{safe}'"])
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"rm -rf '{safe}'"], sts_name=sts_name)
 
-    def mkdir(self, server_id: str, namespace: str, path: str) -> None:
+    def mkdir(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> None:
         safe = self._safe_path(path)
-        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"])
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"], sts_name=sts_name)

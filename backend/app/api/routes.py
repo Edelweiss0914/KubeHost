@@ -167,7 +167,7 @@ def update_settings(server_id: str, payload: ServerSettings, owner: Owner, svc: 
 @router.get("/api/v1/servers/{server_id}/logs")
 def server_logs(server_id: str, owner: Owner, svc: Service, tail: int = 100) -> dict[str, list[str]]:
     server = svc.get(owner, server_id)
-    lines = svc.adapter.logs(server_id, server.resource_plan.namespace, tail)
+    lines = svc.adapter.logs(server_id, server.resource_plan.namespace, tail, sts_name=server.resource_plan.sts_name)
     return {"lines": lines}
 
 
@@ -304,7 +304,7 @@ def server_players(server_id: str, owner: Owner, svc: Service) -> dict:
     if server.status != "running":
         return {"count": 0, "max": 0, "names": []}
     try:
-        output = svc.adapter.rcon(server_id, server.resource_plan.namespace, "list")
+        output = svc.adapter.rcon(server_id, server.resource_plan.namespace, "list", sts_name=server.resource_plan.sts_name)
         return _parse_player_list(output)
     except Exception:
         return {"count": 0, "max": 0, "names": []}
@@ -328,7 +328,7 @@ def get_whitelist(server_id: str, owner: Owner, svc: Service) -> dict:
     if server.status != "running":
         return {"enabled": False, "names": []}
     try:
-        out = svc.adapter.rcon(server_id, server.resource_plan.namespace, "whitelist list")
+        out = svc.adapter.rcon(server_id, server.resource_plan.namespace, "whitelist list", sts_name=server.resource_plan.sts_name)
         return {"enabled": True, "names": _parse_name_list(out)}
     except Exception:
         return {"enabled": False, "names": []}
@@ -344,14 +344,14 @@ def add_whitelist(server_id: str, body: _NameBody, owner: Owner, svc: Service) -
     if not name:
         raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist add {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist add {name}", sts_name=server.resource_plan.sts_name)
     return {"output": out}
 
 
 @router.delete("/api/v1/servers/{server_id}/whitelist/{name}")
 def remove_whitelist(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist remove {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"whitelist remove {name}", sts_name=server.resource_plan.sts_name)
     return {"output": out}
 
 
@@ -368,7 +368,7 @@ def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
     if not name:
         raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"op {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"op {name}", sts_name=server.resource_plan.sts_name)
     svc.repository.add_op(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
@@ -376,7 +376,7 @@ def add_op(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> dict:
 @router.delete("/api/v1/servers/{server_id}/ops/{name}")
 def remove_op(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"deop {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"deop {name}", sts_name=server.resource_plan.sts_name)
     svc.repository.remove_op(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
@@ -394,7 +394,7 @@ def ban_player(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> d
     if not name:
         raise HTTPException(status_code=422, detail="플레이어 이름이 필요합니다.")
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"ban {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"ban {name}", sts_name=server.resource_plan.sts_name)
     svc.repository.add_ban(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
@@ -402,7 +402,7 @@ def ban_player(server_id: str, body: _NameBody, owner: Owner, svc: Service) -> d
 @router.delete("/api/v1/servers/{server_id}/bans/{name}")
 def unban_player(server_id: str, name: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"pardon {name}")
+    out = svc.adapter.rcon(server_id, server.resource_plan.namespace, f"pardon {name}", sts_name=server.resource_plan.sts_name)
     svc.repository.remove_ban(server_id, name)  # type: ignore[attr-defined]
     return {"output": out}
 
@@ -460,7 +460,8 @@ async def stream_logs(
                 return
 
             lines: list[str] = await asyncio.to_thread(
-                svc.adapter.logs, server_id, server.resource_plan.namespace, 300
+                svc.adapter.logs, server_id, server.resource_plan.namespace, 300,
+                server.resource_plan.sts_name,
             )
 
             if not prev_lines:
@@ -491,7 +492,7 @@ class _JvmBody(_BaseModel):
 @router.get("/api/v1/servers/{server_id}/jvm")
 def get_jvm(server_id: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    mb = svc.adapter.get_jvm(server_id, server.resource_plan.namespace)
+    mb = svc.adapter.get_jvm(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
     return {"memory_mb": mb}
 
 
@@ -500,7 +501,7 @@ def set_jvm(server_id: str, body: _JvmBody, owner: Owner, svc: Service) -> None:
     if body.memory_mb < 512 or body.memory_mb > 8192:
         raise HTTPException(status_code=422, detail="메모리는 512–8192 MiB 범위입니다.")
     server = svc.get(owner, server_id)
-    svc.adapter.set_jvm(server_id, server.resource_plan.namespace, body.memory_mb)
+    svc.adapter.set_jvm(server_id, server.resource_plan.namespace, body.memory_mb, sts_name=server.resource_plan.sts_name)
 
 
 # ── Auto-restart ──────────────────────────────────────────────────────────────
@@ -512,14 +513,14 @@ class _AutoRestartBody(_BaseModel):
 @router.get("/api/v1/servers/{server_id}/auto-restart")
 def get_auto_restart(server_id: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    enabled = svc.adapter.get_auto_restart(server_id, server.resource_plan.namespace)
+    enabled = svc.adapter.get_auto_restart(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
     return {"enabled": enabled}
 
 
 @router.put("/api/v1/servers/{server_id}/auto-restart", status_code=204)
 def set_auto_restart(server_id: str, body: _AutoRestartBody, owner: Owner, svc: Service) -> None:
     server = svc.get(owner, server_id)
-    svc.adapter.set_auto_restart(server_id, server.resource_plan.namespace, body.enabled)
+    svc.adapter.set_auto_restart(server_id, server.resource_plan.namespace, body.enabled, sts_name=server.resource_plan.sts_name)
 
 
 # ── server.properties ─────────────────────────────────────────────────────────
@@ -531,14 +532,14 @@ class _PropertiesBody(_BaseModel):
 @router.get("/api/v1/servers/{server_id}/properties")
 def get_properties(server_id: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    content = svc.adapter.get_raw_properties(server_id, server.resource_plan.namespace)
+    content = svc.adapter.get_raw_properties(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
     return {"content": content}
 
 
 @router.put("/api/v1/servers/{server_id}/properties", status_code=204)
 def set_properties(server_id: str, body: _PropertiesBody, owner: Owner, svc: Service) -> None:
     server = svc.get(owner, server_id)
-    svc.adapter.set_raw_properties(server_id, server.resource_plan.namespace, body.content)
+    svc.adapter.set_raw_properties(server_id, server.resource_plan.namespace, body.content, sts_name=server.resource_plan.sts_name)
 
 
 # ── World backups ──────────────────────────────────────────────────────────────
@@ -546,14 +547,14 @@ def set_properties(server_id: str, body: _PropertiesBody, owner: Owner, svc: Ser
 @router.get("/api/v1/servers/{server_id}/backups")
 def list_backups(server_id: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    backups = svc.adapter.list_backups(server_id, server.resource_plan.namespace)
+    backups = svc.adapter.list_backups(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
     return {"backups": backups}
 
 
 @router.post("/api/v1/servers/{server_id}/backups", status_code=201)
 def create_backup(server_id: str, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
-    filename = svc.adapter.create_backup(server_id, server.resource_plan.namespace)
+    filename = svc.adapter.create_backup(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
     return {"filename": filename}
 
 
@@ -561,7 +562,7 @@ def create_backup(server_id: str, owner: Owner, svc: Service) -> dict:
 def restore_backup(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.restore_backup(server_id, server.resource_plan.namespace, filename)
+        svc.adapter.restore_backup(server_id, server.resource_plan.namespace, filename, sts_name=server.resource_plan.sts_name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -570,7 +571,7 @@ def restore_backup(server_id: str, filename: str, owner: Owner, svc: Service) ->
 def delete_backup(server_id: str, filename: str, owner: Owner, svc: Service) -> None:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.delete_backup(server_id, server.resource_plan.namespace, filename)
+        svc.adapter.delete_backup(server_id, server.resource_plan.namespace, filename, sts_name=server.resource_plan.sts_name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -586,14 +587,14 @@ from fastapi.responses import Response as _Response
 @router.get("/api/v1/servers/{server_id}/fs")
 def list_files(server_id: str, owner: Owner, svc: Service, path: str = "/data") -> list[dict]:
     server = svc.get(owner, server_id)
-    return svc.adapter.list_files(server_id, server.resource_plan.namespace, path)
+    return svc.adapter.list_files(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
 
 
 @router.get("/api/v1/servers/{server_id}/fs/download")
 def download_file(server_id: str, owner: Owner, svc: Service, path: str) -> _Response:
     server = svc.get(owner, server_id)
     try:
-        content = svc.adapter.read_file(server_id, server.resource_plan.namespace, path)
+        content = svc.adapter.read_file(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     filename = path.rsplit("/", 1)[-1]
@@ -619,9 +620,13 @@ async def upload_file(
     import asyncio
     loop = asyncio.get_event_loop()
     try:
+        import functools as _functools
         await loop.run_in_executor(
-            None, svc.adapter.write_file,
-            server_id, server.resource_plan.namespace, dest, content,
+            None, _functools.partial(
+                svc.adapter.write_file,
+                server_id, server.resource_plan.namespace, dest, content,
+                sts_name=server.resource_plan.sts_name,
+            ),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -632,7 +637,7 @@ async def upload_file(
 def delete_path(server_id: str, owner: Owner, svc: Service, path: str) -> None:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.delete_path(server_id, server.resource_plan.namespace, path)
+        svc.adapter.delete_path(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -645,7 +650,7 @@ class _MkdirBody(_BaseModel):
 def make_dir(server_id: str, body: _MkdirBody, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.mkdir(server_id, server.resource_plan.namespace, body.path)
+        svc.adapter.mkdir(server_id, server.resource_plan.namespace, body.path, sts_name=server.resource_plan.sts_name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"path": body.path}
@@ -665,7 +670,7 @@ def set_version(server_id: str, body: _VersionBody, owner: Owner, svc: Service, 
     if body.version not in _ALLOWED_VERSIONS:
         raise HTTPException(status_code=422, detail="지원하지 않는 버전입니다.")
     server = svc.get(owner, server_id)
-    svc.adapter.set_version(server_id, server.resource_plan.namespace, body.version)
+    svc.adapter.set_version(server_id, server.resource_plan.namespace, body.version, sts_name=server.resource_plan.sts_name)
     updated = server.model_copy(update={"version": body.version})
     svc.repository.save(updated)
     actor_id, actor_name = _actor(request)

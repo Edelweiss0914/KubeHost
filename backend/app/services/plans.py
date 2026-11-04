@@ -175,6 +175,7 @@ def build_resource_plan(
         target_node=request.node_id,
         resources=resources,
         warnings=_MOCK_WARNINGS if mock else _REAL_WARNINGS,
+        sts_name=name,
     )
 
 
@@ -246,6 +247,7 @@ def build_valheim_plan(
         target_node=request.node_id,
         resources=resources,
         warnings=_MOCK_WARNINGS if mock else _REAL_WARNINGS,
+        sts_name=name,
     )
 
 
@@ -318,4 +320,5 @@ def build_garrysmod_plan(
         target_node=request.node_id,
         resources=resources,
         warnings=_MOCK_WARNINGS if mock else _REAL_WARNINGS,
+        sts_name=name,
     )
