@@ -44,6 +44,10 @@ class SQLiteServerRepository:
                     conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (row[0],))
             except sqlite3.OperationalError:
                 pass  # column already exists
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN cf_api_key TEXT")
+            except sqlite3.OperationalError:
+                pass  # column already exists
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS invite_codes (
                     id TEXT PRIMARY KEY,
@@ -178,14 +182,17 @@ class SQLiteServerRepository:
 
     # ── User methods ──────────────────────────────────────────────────────────
 
+    _USER_COLS = "id, username, password_hash, is_admin, created_at, cf_api_key"
+
     def _row_to_user(self, row: tuple) -> User:
         return User(id=row[0], username=row[1], password_hash=row[2],
-                    is_admin=bool(row[3]), created_at=row[4])
+                    is_admin=bool(row[3]), created_at=row[4],
+                    cf_api_key=row[5] if len(row) > 5 else None)
 
     def get_by_username(self, username: str) -> User | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, is_admin, created_at FROM users WHERE username = ?",
+                f"SELECT {self._USER_COLS} FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
         return self._row_to_user(row) if row else None
@@ -193,7 +200,7 @@ class SQLiteServerRepository:
     def get_user_by_id(self, user_id: str) -> User | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, is_admin, created_at FROM users WHERE id = ?",
+                f"SELECT {self._USER_COLS} FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
         return self._row_to_user(row) if row else None
@@ -201,14 +208,14 @@ class SQLiteServerRepository:
     def save_user(self, user: User) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO users (id, username, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?, ?)",
-                (user.id, user.username, user.password_hash, int(user.is_admin), user.created_at.isoformat()),
+                "INSERT OR REPLACE INTO users (id, username, password_hash, is_admin, created_at, cf_api_key) VALUES (?, ?, ?, ?, ?, ?)",
+                (user.id, user.username, user.password_hash, int(user.is_admin), user.created_at.isoformat(), user.cf_api_key),
             )
 
     def list_users(self) -> list[User]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, username, password_hash, is_admin, created_at FROM users ORDER BY created_at"
+                f"SELECT {self._USER_COLS} FROM users ORDER BY created_at"
             ).fetchall()
         return [self._row_to_user(r) for r in rows]
 

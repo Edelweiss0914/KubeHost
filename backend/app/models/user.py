@@ -8,3 +8,4 @@ class User(BaseModel):
     password_hash: str
     is_admin: bool = False
     created_at: datetime
+    cf_api_key: str | None = None

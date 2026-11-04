@@ -79,6 +79,8 @@ export interface ServerGateway {
   register(username: string, password: string, inviteCode?: string): Promise<{id: string; username: string}>;
   login(username: string, password: string): Promise<{token: string; username: string}>;
   me(): Promise<{id: string; username: string; is_admin: boolean}>;
+  getCfKey(): Promise<{has_key: boolean}>;
+  setCfKey(key: string | null): Promise<void>;
   tenant(): Promise<{namespace: string; quota: Record<string, {used: string; hard: string}>}>;
   // Admin
   adminListUsers(): Promise<{id: string; username: string; is_admin: boolean; created_at: string}[]>;
@@ -150,6 +152,8 @@ export const api: ServerGateway = {
   }),
   login: (username, password) => versioned('/auth/login', {method:'POST', body:JSON.stringify({username, password})}),
   me: () => versioned('/auth/me'),
+  getCfKey: () => versioned('/auth/me/cf-key'),
+  setCfKey: (key: string | null) => versioned('/auth/me/cf-key', { method: 'PUT', body: JSON.stringify({ cf_api_key: key }) }).then(() => {}),
   tenant: () => versioned('/tenant'),
   adminListUsers: () => versioned('/admin/users'),
   adminDeleteUser: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}`, {method:'DELETE'}),

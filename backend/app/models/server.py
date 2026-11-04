@@ -13,7 +13,11 @@ class ServerCreate(BaseModel):
     name: str = Field(min_length=3, max_length=40, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9 _-]*$")
     game: Literal["minecraft-java"] = "minecraft-java"
     edition: Literal["paper"] = "paper"
+    game_type: Literal["VANILLA", "PAPER", "FORGE", "FABRIC", "MODRINTH", "AUTO_CURSEFORGE"] = "PAPER"
     version: Literal["LATEST", "1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.16.5", "1.14.4", "1.12.2"] = "LATEST"
+    modrinth_project: str | None = Field(default=None, max_length=128)
+    cf_slug: str | None = Field(default=None, max_length=128)
+    cf_api_key: str | None = Field(default=None, exclude=True)  # 런타임 주입, API 노출 안 함
     cpu: float = Field(default=1, ge=0.5, le=4, allow_inf_nan=False)
     memory_mb: int = Field(default=2048, ge=1024, le=8192, strict=True)
     storage_gb: int = Field(default=10, ge=5, le=100, strict=True)

@@ -102,6 +102,12 @@ def servers(owner: Owner, svc: Service) -> list[Server]:
 @router.post("/api/v1/servers", response_model=Server, status_code=201)
 def create(payload: ServerCreate, owner: Owner, svc: Service, request: Request) -> Server:
     try:
+        if payload.game_type == "AUTO_CURSEFORGE":
+            auth_svc = request.app.state.auth_service
+            user = auth_svc.repository.get_user_by_id(owner)
+            if not user or not user.cf_api_key:
+                raise InvalidOperation("CurseForge 모드팩을 사용하려면 설정에서 CurseForge API 키를 먼저 등록하세요.")
+            payload = payload.model_copy(update={"cf_api_key": user.cf_api_key})
         server = svc.create(owner, payload)
         actor_id, actor_name = _actor(request)
         _audit(request, actor_id, actor_name, "server.create", server.id, server.name)

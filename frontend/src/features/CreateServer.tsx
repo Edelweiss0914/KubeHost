@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, type Game } from '../api/client';
-import { defaults, validate, type ServerInput, type WorkerNode } from '../domain/server';
+import { defaults, validate, type GameType, type ServerInput, type WorkerNode } from '../domain/server';
 
 type CreateServerProps = {
   nodes: WorkerNode[];
@@ -8,6 +8,29 @@ type CreateServerProps = {
   onCreate: (input: ServerInput) => Promise<void>;
   onCancel: () => void;
 };
+
+const GAME_TYPES: { type: GameType; label: string; desc: string; icon: string }[] = [
+  { type: 'PAPER',           label: 'Paper',       desc: '플러그인 서버 (추천)',  icon: '📄' },
+  { type: 'VANILLA',         label: 'Vanilla',     desc: '순정 Minecraft',       icon: '⛏' },
+  { type: 'FORGE',           label: 'Forge',       desc: '모드 서버',             icon: '🔨' },
+  { type: 'FABRIC',          label: 'Fabric',      desc: '경량 모드 서버',        icon: '🧵' },
+  { type: 'MODRINTH',        label: 'Modrinth',    desc: '모드팩 (ID 입력)',      icon: '📦' },
+  { type: 'AUTO_CURSEFORGE', label: 'CurseForge',  desc: '모드팩 (slug 입력)',   icon: '🔥' },
+];
+
+const MODRINTH_PRESETS = [
+  { id: 'adrenaline',         name: 'Adrenaline',              desc: '고성능 최적화' },
+  { id: 'fabulously-optimized', name: 'Fabulously Optimized',  desc: 'Fabric 최적화팩' },
+  { id: 'all-the-mods-9',    name: 'All the Mods 9',           desc: '대형 모드팩' },
+  { id: 'create-new-age',    name: 'Create: New Age',           desc: 'Create 모드팩' },
+];
+
+const CF_PRESETS = [
+  { slug: 'all-the-mods-9',          name: 'All the Mods 9' },
+  { slug: 'ftb-infinity-evolved',    name: 'FTB Infinity Evolved' },
+  { slug: 'rlcraft',                 name: 'RLCraft' },
+  { slug: 'stoneblock-3',            name: 'SkyFactory 4' },
+];
 
 const resourceFields = [
   { key: 'cpu', label: 'CPU', unit: 'vCPU', min: 0.5, max: 4, step: 0.5 },
@@ -78,7 +101,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   return <section className="panel create-panel">
     <div className="section-title">
       <div><span className="eyebrow">SERVER PROVISIONING</span><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
-      <span className="tag">Paper</span>
+      <span className="tag">{GAME_TYPES.find(g => g.type === input.game_type)?.label ?? 'Paper'}</span>
     </div>
     <form onSubmit={submit} noValidate>
       <div className="form-section">
@@ -122,9 +145,60 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             <input autoFocus value={input.name} onChange={event => set('name', event.target.value)} placeholder="예: My Survival World" maxLength={40} aria-invalid={!!errors.name} aria-describedby="name-hint"/>
             <small id="name-hint">{errors.name ?? '영문·숫자·공백·밑줄·하이픈, 3–40자'}</small>
           </label>
-          <label>서버 소프트웨어
-            <select value={input.edition} disabled><option value="paper">Paper</option></select>
-          </label>
+          <div className="full">
+            <label style={{ marginBottom: '8px', display: 'block' }}>서버 타입</label>
+            <div className="game-type-grid">
+              {GAME_TYPES.map(({ type, label, desc, icon }) => (
+                <button key={type} type="button"
+                  className={`game-type-card${input.game_type === type ? ' selected' : ''}`}
+                  onClick={() => set('game_type', type)}
+                >
+                  <span className="game-type-icon">{icon}</span>
+                  <span className="game-type-label">{label}</span>
+                  <span className="game-type-desc">{desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {input.game_type === 'MODRINTH' && (
+            <div className="full">
+              <label>Modrinth 프로젝트 ID
+                <input value={input.modrinth_project ?? ''} placeholder="예: adrenaline"
+                  onChange={e => set('modrinth_project', e.target.value || null)}
+                  aria-invalid={!!errors.modrinth_project} />
+                {errors.modrinth_project && <small style={{ color: 'var(--danger)' }}>{errors.modrinth_project}</small>}
+              </label>
+              <div className="modpack-presets">
+                {MODRINTH_PRESETS.map(p => (
+                  <button key={p.id} type="button" className="modpack-preset-btn"
+                    onClick={() => set('modrinth_project', p.id)}>
+                    <strong>{p.name}</strong><span>{p.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {input.game_type === 'AUTO_CURSEFORGE' && (
+            <div className="full">
+              <label>CurseForge 모드팩 Slug
+                <input value={input.cf_slug ?? ''} placeholder="예: all-the-mods-9"
+                  onChange={e => set('cf_slug', e.target.value || null)}
+                  aria-invalid={!!errors.cf_slug} />
+                {errors.cf_slug && <small style={{ color: 'var(--danger)' }}>{errors.cf_slug}</small>}
+              </label>
+              <div className="modpack-presets">
+                {CF_PRESETS.map(p => (
+                  <button key={p.slug} type="button" className="modpack-preset-btn"
+                    onClick={() => set('cf_slug', p.slug)}>
+                    <strong>{p.name}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <label>버전
             <select value={input.version} onChange={event => set('version', event.target.value)}>
               <option value="LATEST">LATEST (최신)</option>

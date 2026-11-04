@@ -106,6 +106,46 @@ def me(request: Request) -> dict[str, object]:
         raise HTTPException(status_code=401, detail=str(exc))
 
 
+@auth_router.get("/me/cf-key")
+def get_cf_key(request: Request) -> dict[str, object]:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    token = authorization.removeprefix("Bearer ")
+    svc = _svc(request)
+    try:
+        payload = svc.verify_token(token)
+        user = svc.repository.get_user_by_id(str(payload["sub"]))
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        has_key = bool(user.cf_api_key)
+        return {"has_key": has_key}
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
+class CfApiKeyRequest(BaseModel):
+    cf_api_key: str | None = None
+
+
+@auth_router.put("/me/cf-key", status_code=204)
+def set_cf_key(payload: CfApiKeyRequest, request: Request) -> None:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    token = authorization.removeprefix("Bearer ")
+    svc = _svc(request)
+    try:
+        token_payload = svc.verify_token(token)
+        user = svc.repository.get_user_by_id(str(token_payload["sub"]))
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        user.cf_api_key = payload.cf_api_key or None
+        svc.repository.save_user(user)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
 @auth_router.put("/password", status_code=204)
 def change_password(payload: ChangePasswordRequest, request: Request) -> None:
     authorization = request.headers.get("Authorization", "")

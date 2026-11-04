@@ -62,8 +62,23 @@ def rcon_password(server_id: UUID) -> str:
     return server_id.hex[:16]
 
 
+def _game_type_env(request: ServerCreate, cf_api_key: str | None = None) -> list[dict]:
+    """게임 타입에 따른 itzg 환경변수 목록을 반환."""
+    envs: list[dict] = [{"name": "TYPE", "value": request.game_type}]
+    if request.game_type == "MODRINTH":
+        project = request.modrinth_project or ""
+        envs.append({"name": "MODRINTH_PROJECT", "value": project})
+        envs.append({"name": "MODRINTH_VERSION", "value": "latest"})
+    elif request.game_type == "AUTO_CURSEFORGE":
+        envs.append({"name": "CF_API_KEY", "value": cf_api_key or ""})
+        envs.append({"name": "CF_SLUG", "value": request.cf_slug or ""})
+        envs.append({"name": "CF_VERSION_TYPE", "value": "release"})
+    return envs
+
+
 def build_resource_plan(
-    request: ServerCreate, tenant_id: UUID, server_id: UUID, mock: bool = True
+    request: ServerCreate, tenant_id: UUID, server_id: UUID, mock: bool = True,
+    cf_api_key: str | None = None,
 ) -> ResourcePlan:
     if request.node_id not in ALLOWED_WORKERS:
         raise ValueError("Worker is not allowed")
@@ -125,7 +140,8 @@ def build_resource_plan(
                                 "runAsGroup": 1000, "fsGroup": 1000,
                                 "seccompProfile": {"type": "RuntimeDefault"}},
             "containers": [{"name": "minecraft", "image": "itzg/minecraft-server:latest",
-                "env": [{"name": "EULA", "value": "TRUE"}, {"name": "TYPE", "value": "PAPER"},
+                "env": [{"name": "EULA", "value": "TRUE"},
+                        *_game_type_env(request, cf_api_key),
                         {"name": "VERSION", "value": request.version},
                         {"name": "MEMORY", "value": f"{int(request.memory_mb * 0.75)}M"},
                         {"name": "DIFFICULTY", "value": "easy"},

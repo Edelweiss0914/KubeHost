@@ -3473,6 +3473,55 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   letter-spacing: .04em;
 }
 
+/* ── Game Type Selector ───────────────────────────────────────────────────── */
+.game-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.game-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #1e3a5f);
+  background: var(--surface-2, #0d1f33);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  text-align: center;
+}
+.game-type-card:hover { border-color: var(--accent, #38bdf8); background: #0d2440; }
+.game-type-card.selected { border-color: var(--accent, #38bdf8); background: #0a2a45; }
+.game-type-icon { font-size: 20px; }
+.game-type-label { font-size: 13px; font-weight: 600; color: var(--text, #e2e8f0); }
+.game-type-desc { font-size: 11px; color: var(--muted, #64748b); }
+
+/* ── Modpack Presets ──────────────────────────────────────────────────────── */
+.modpack-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.modpack-preset-btn {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #1e3a5f);
+  background: var(--surface-2, #0d1f33);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition: border-color .15s;
+}
+.modpack-preset-btn:hover { border-color: var(--accent, #38bdf8); }
+.modpack-preset-btn strong { color: var(--text, #e2e8f0); font-size: 12px; }
+.modpack-preset-btn span { color: var(--muted, #64748b); font-size: 11px; }
+
 .fm-progress-track {
   height: 6px;
   background: var(--surface-2, #1e2d40);

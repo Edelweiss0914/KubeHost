@@ -78,7 +78,8 @@ class ServerService:
                 )
             server_id = uuid4()
             plan = build_resource_plan(
-                request, uuid5(NAMESPACE_URL, owner_id), server_id, mock=mock
+                request, uuid5(NAMESPACE_URL, owner_id), server_id, mock=mock,
+                cf_api_key=request.cf_api_key,
             )
             try:
                 connection = self.adapter.create(plan)
