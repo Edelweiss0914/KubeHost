@@ -590,7 +590,7 @@ class K8sAdapter:
             node = self._get_server_node(server_id, namespace)
             return self._exec_in_temp_pod(namespace, pvc, node, command, stdin_data)
 
-    _MAX_FILE_BYTES = 500 * 1024 * 1024  # 500 MiB
+    _MAX_FILE_BYTES = 1024 * 1024 * 1024  # 1 GiB
 
     def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
         safe = self._safe_path(path)
@@ -632,14 +632,14 @@ class K8sAdapter:
             ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"])
         size = int(size_out.strip()) if size_out.strip().isdigit() else 0
         if size > self._MAX_FILE_BYTES:
-            raise ValueError(f"파일이 너무 큽니다 ({size // (1024 * 1024)} MiB, 최대 500 MiB).")
+            raise ValueError(f"파일이 너무 큽니다 ({size // (1024 * 1024)} MiB, 최대 1 GiB).")
         out = self._exec_anywhere(server_id, namespace,
             ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"])
         return base64.b64decode(out.strip())
 
     def write_file(self, server_id: str, namespace: str, path: str, content: bytes) -> None:
         if len(content) > self._MAX_FILE_BYTES:
-            raise ValueError(f"파일이 너무 큽니다 ({len(content) // (1024 * 1024)} MiB, 최대 500 MiB).")
+            raise ValueError(f"파일이 너무 큽니다 ({len(content) // (1024 * 1024)} MiB, 최대 1 GiB).")
         safe = self._safe_path(path)
         parent = safe.rsplit("/", 1)[0] or "/data"
         # head -c N reads exactly N bytes from stdin then exits → EOF 대기 없음, base64 오버헤드 없음
