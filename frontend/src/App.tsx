@@ -307,6 +307,7 @@ export function App() {
   const [auth, setAuth] = useState<{ token: string; username: string } | null>(getStoredAuth);
   const [showLogin, setShowLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [meLoaded, setMeLoaded] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [view, setView] = useState<View>('dashboard');
@@ -316,7 +317,7 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => !!getStoredAuth() && needsOnboarding());
   const { toasts, push: pushToast, dismiss: dismissToast } = useToast();
   const prevServersRef = useRef<Map<string, string>>(new Map());
 
@@ -338,10 +339,11 @@ export function App() {
   useEffect(() => {
     if (auth) {
       void refresh();
-      api.me().then(u => { setIsAdmin(u.is_admin); setCurrentUserId(u.id); }).catch(() => setIsAdmin(false));
+      api.me().then(u => { setIsAdmin(u.is_admin); setCurrentUserId(u.id); }).catch(() => setIsAdmin(false)).finally(() => setMeLoaded(true));
     } else {
       setIsAdmin(false);
       setCurrentUserId('');
+      setMeLoaded(false);
     }
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -546,7 +548,7 @@ export function App() {
             {(view === 'dashboard' || view === 'servers') && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
             {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}
-            {view === 'admin' && isAdmin && <AdminPage currentUserId={currentUserId}/>}
+            {view === 'admin' && (meLoaded ? (isAdmin ? <AdminPage currentUserId={currentUserId}/> : <div className="panel muted">관리자 권한이 없습니다.</div>) : <div className="panel loading" role="status">사용자 정보를 확인하는 중…</div>)}
             {view === 'detail' && selected && <ServerDetail
               key={selected.id}
               server={selected}
