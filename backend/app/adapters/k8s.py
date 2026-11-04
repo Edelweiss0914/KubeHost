@@ -30,6 +30,9 @@ class K8sAdapter:
         self._api_client = client.ApiClient()
         self._core = client.CoreV1Api(self._api_client)
         self._apps = client.AppsV1Api(self._api_client)
+        # exec(WebSocket) 전용 — 공유 커넥션 풀 오염 방지
+        self._exec_api_client = client.ApiClient()
+        self._exec_core = client.CoreV1Api(self._exec_api_client)
 
     def _sts_name(self, server_id: str) -> str:
         return f"mc-{server_id.replace('-', '')}"
@@ -358,14 +361,14 @@ class K8sAdapter:
                      stdin_data: bytes | None = None) -> str:
         from kubernetes.stream import stream  # type: ignore[import-untyped]
         name = self._sts_name(server_id)
-        pods = self._core.list_namespaced_pod(
+        pods = self._exec_core.list_namespaced_pod(
             namespace, label_selector=f"app.kubernetes.io/name={name}"
         ).items
         if not pods:
             raise ValueError("파드가 실행 중이지 않습니다.")
         pod_name = pods[0].metadata.name
         resp = stream(
-            self._core.connect_get_namespaced_pod_exec,
+            self._exec_core.connect_get_namespaced_pod_exec,
             pod_name, namespace,
             command=command,
             stdin=stdin_data is not None,
@@ -546,9 +549,9 @@ class K8sAdapter:
             },
         }
         try:
-            self._core.create_namespaced_pod(namespace, pod_body)
+            self._exec_core.create_namespaced_pod(namespace, pod_body)
             for _ in range(30):
-                pod = self._core.read_namespaced_pod(pod_name, namespace)
+                pod = self._exec_core.read_namespaced_pod(pod_name, namespace)
                 phase = (pod.status.phase if pod.status else None)
                 cs = (pod.status.container_statuses or []) if pod.status else []
                 if phase == "Running" and cs and cs[0].ready:
@@ -558,7 +561,7 @@ class K8sAdapter:
                 raise RuntimeError("임시 파드 준비 타임아웃 (30초)")
 
             resp = stream(
-                self._core.connect_get_namespaced_pod_exec,
+                self._exec_core.connect_get_namespaced_pod_exec,
                 pod_name, namespace,
                 command=command,
                 stdin=stdin_data is not None,
@@ -578,7 +581,7 @@ class K8sAdapter:
             return out
         finally:
             try:
-                self._core.delete_namespaced_pod(pod_name, namespace)
+                self._exec_core.delete_namespaced_pod(pod_name, namespace)
             except Exception:
                 pass
 
