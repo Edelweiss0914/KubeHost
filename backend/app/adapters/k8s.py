@@ -700,10 +700,6 @@ class K8sAdapter:
                         "allowPrivilegeEscalation": False,
                         "capabilities": {"drop": ["ALL"]},
                     },
-                    "resources": {
-                        "requests": {"cpu": "50m", "memory": "64Mi"},
-                        "limits": {"cpu": "100m", "memory": "128Mi"},
-                    },
                     "volumeMounts": mounts,
                 }],
                 "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": pvc_name}}],
