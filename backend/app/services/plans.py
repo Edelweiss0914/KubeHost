@@ -292,7 +292,7 @@ def build_garrysmod_plan(
         {"name": "GAMEMODE", "value": gamemode},
         {"name": "MAP", "value": map_name},
         {"name": "MAXPLAYERS", "value": str(max_players)},
-        {"name": "SERVER_NAME", "value": request.name},
+        {"name": "NAME", "value": request.name},
     ]
     resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
         "metadata": {"name": name, "namespace": namespace},

@@ -62,3 +62,7 @@ def test_garrysmod_plan_allows_game_udp_only_for_its_pod():
         "matchLabels": {"app.kubernetes.io/name": plan.sts_name}
     }
     assert policy["spec"]["ingress"] == [{"ports": [{"port": 27015, "protocol": "UDP"}]}]
+    stateful = next(r for r in plan.resources if r["kind"] == "StatefulSet")
+    env = {item["name"]: item["value"] for item in stateful["spec"]["template"]["spec"]["containers"][0]["env"]}
+    assert env["NAME"] == "GMod server"
+    assert "SERVER_NAME" not in env
