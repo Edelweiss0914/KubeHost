@@ -895,3 +895,61 @@ def library_extract_ep(body: _ExtractBody, owner: Owner, svc: Service) -> dict:
 def library_storage_ep(owner: Owner, svc: Service) -> dict:
     svc.adapter.library_ensure(_lib_ns(owner))
     return svc.adapter.library_storage(_lib_ns(owner))
+
+
+# ── Server clone ──────────────────────────────────────────────────────────────
+
+class _CloneBody(_BaseModel):
+    name: str
+
+
+@router.post("/api/v1/servers/{server_id}/clone", status_code=201)
+def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, request: Request) -> dict:
+    from app.models.server import ServerCreate
+    # 원본 서버 조회 (owner 검증 포함)
+    try:
+        src = svc.get(owner, server_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+
+    # 원본 서버 PVC 이름 계산 (k8s._pvc_name 로직과 동일)
+    src_sts = src.resource_plan.sts_name or f"mc-{src.id.replace('-', '')}"
+    src_pvc = f"data-{src_sts}-0"
+    src_ns = src.resource_plan.namespace
+
+    # 원본 설정으로 새 서버 생성
+    clone_input = ServerCreate(
+        name=body.name,
+        game=src.game,  # type: ignore[arg-type]
+        cpu=src.cpu,
+        memory_mb=src.memory_mb,
+        storage_gb=src.storage_gb,
+        node_id=src.node_id,  # type: ignore[arg-type]
+        version=src.version,  # type: ignore[arg-type]
+        game_type=src.game_type,  # type: ignore[arg-type]
+        server_password=src.server_password,
+        world_name=src.world_name,
+        server_public=src.server_public,
+        map_name=src.map_name,
+        gamemode_name=src.gamemode_name,
+    )
+    try:
+        new_server = svc.create(owner, clone_input)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    # 새 서버 PVC 이름 계산
+    dst_sts = new_server.resource_plan.sts_name or f"mc-{new_server.id.replace('-', '')}"
+    dst_pvc = f"data-{dst_sts}-0"
+    dst_ns = new_server.resource_plan.namespace
+
+    # 파일 복사
+    try:
+        svc.adapter.copy_pvc_files(src_ns, src_pvc, dst_ns, dst_pvc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"파일 복사 실패: {exc}")
+
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "server.clone", new_server.id, new_server.name,
+           detail=f"cloned_from={server_id}")
+    return {"id": new_server.id}

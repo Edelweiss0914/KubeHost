@@ -992,3 +992,65 @@ class K8sAdapter:
         except Exception:
             used = 0
         return {"used_bytes": used, "total_bytes": total}
+
+    # ── PVC copy (clone) ──────────────────────────────────────────────────────
+
+    def copy_pvc_files(self, src_namespace: str, src_pvc: str, dst_namespace: str, dst_pvc: str) -> None:
+        """두 PVC를 동시에 마운트하는 임시 파드를 띄워 cp -a /src/. /dst/ 를 실행한다."""
+        import time
+        from uuid import uuid4
+
+        node_name = self._get_pvc_node(src_namespace, src_pvc)
+        pod_name = f"kubehost-clone-{uuid4().hex[:8]}"
+        pod_body = {
+            "apiVersion": "v1", "kind": "Pod",
+            "metadata": {
+                "name": pod_name, "namespace": src_namespace,
+                "labels": {"app.kubernetes.io/managed-by": "kubehost",
+                           "kubehost.io/role": "clone"},
+            },
+            "spec": {
+                "restartPolicy": "Never",
+                "automountServiceAccountToken": False,
+                "securityContext": {
+                    "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,
+                    "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"},
+                },
+                **({"nodeSelector": {"kubernetes.io/hostname": node_name}} if node_name else {}),
+                "containers": [{
+                    "name": "copy",
+                    "image": "busybox:stable",
+                    "command": ["sh", "-c", "cp -a /src/. /dst/ && echo done"],
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "capabilities": {"drop": ["ALL"]},
+                    },
+                    "volumeMounts": [
+                        {"name": "src", "mountPath": "/src"},
+                        {"name": "dst", "mountPath": "/dst"},
+                    ],
+                }],
+                "volumes": [
+                    {"name": "src", "persistentVolumeClaim": {"claimName": src_pvc}},
+                    {"name": "dst", "persistentVolumeClaim": {"claimName": dst_pvc}},
+                ],
+            },
+        }
+        core = self._fresh_core()
+        try:
+            core.create_namespaced_pod(src_namespace, pod_body)
+            for _ in range(300):
+                pod = core.read_namespaced_pod(pod_name, src_namespace)
+                phase = pod.status.phase if pod.status else None
+                if phase == "Succeeded":
+                    break
+                if phase in ("Failed", "Unknown"):
+                    raise RuntimeError(f"파일 복사 파드가 실패했습니다 (phase={phase}).")
+                time.sleep(1)
+            else:
+                raise RuntimeError("파일 복사 타임아웃 (300초).")
+        finally:
+            try:
+                core.delete_namespaced_pod(pod_name, src_namespace)
+            except Exception:
+                pass

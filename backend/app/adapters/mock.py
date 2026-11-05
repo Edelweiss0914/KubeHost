@@ -391,3 +391,6 @@ class MockKubernetesAdapter:
         used = sum(e.get("size", 0) for e in lib.values() if e.get("type") == "file")
         return {"used_bytes": used, "total_bytes": 10 * 1024 ** 3}
 
+    def copy_pvc_files(self, src_namespace: str, src_pvc: str, dst_namespace: str, dst_pvc: str) -> None:
+        pass  # mock no-op
+

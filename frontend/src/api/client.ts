@@ -155,6 +155,7 @@ export interface ServerGateway {
   libraryExtract(path: string): Promise<{path: string}>;
   libraryStorage(): Promise<{used_bytes: number; total_bytes: number}>;
   githubClone(serverId: string, url: string, branch: string, path: string): Promise<{ owner: string; repo: string; branch: string; path: string }>;
+  cloneServer(serverId: string, name: string): Promise<{ id: string }>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -330,4 +331,5 @@ export const api: ServerGateway = {
   libraryExtract: (path) => versioned(`/library/fs/extract`, { method: 'POST', body: JSON.stringify({ path }) }),
   libraryStorage: () => versioned('/library/storage'),
   githubClone: (serverId, url, branch, path) => versioned(`/servers/${encodeURIComponent(serverId)}/fs/github`, { method: 'POST', body: JSON.stringify({ url, branch, path }) }),
+  cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
 };

@@ -693,6 +693,10 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
+  const [cloning, setCloning] = useState(false);
+  const [cloneName, setCloneName] = useState('');
+  const [cloneBusy, setCloneBusy] = useState(false);
+  const [cloneError, setCloneError] = useState('');
   const [gameCaps, setGameCaps] = useState<Set<string>>(new Set());
   const [gameDef, setGameDef] = useState<GameDefinition | null>(null);
   const canStart = server.status === 'stopped' || server.status === 'error';
@@ -755,6 +759,13 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
           ))}
           <hr className="server-sidebar-sep"/>
           <button
+            className="secondary"
+            disabled={busy || cloneBusy}
+            onClick={() => { setCloning(d => !d); setCloneError(''); setCloneName(server.name + '-copy'); }}
+          >
+            <span aria-hidden="true">⎘</span> 복제
+          </button>
+          <button
             className="server-sidebar-danger"
             disabled={busy}
             onClick={() => setDeleting(d => !d)}
@@ -762,6 +773,36 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             <span aria-hidden="true">✕</span>서버 삭제
           </button>
         </nav>
+        {cloning && (
+          <form className="server-delete-form" onSubmit={e => {
+            e.preventDefault();
+            const name = cloneName.trim();
+            if (!name) return;
+            setCloneBusy(true);
+            setCloneError('');
+            api.cloneServer(server.id, name)
+              .then(() => { setCloning(false); onBack(); })
+              .catch(err => setCloneError(err instanceof Error ? err.message : '복제 실패'))
+              .finally(() => setCloneBusy(false));
+          }}>
+            <p>새 서버 이름을 입력하세요.</p>
+            <label>서버 이름
+              <input
+                value={cloneName}
+                onChange={e => setCloneName(e.target.value)}
+                placeholder={server.name + '-copy'}
+                disabled={cloneBusy}
+              />
+            </label>
+            {cloneError && <p style={{ color: 'var(--danger, #f87171)', fontSize: '0.85em' }}>{cloneError}</p>}
+            <div className="actions">
+              <button type="button" className="secondary" onClick={() => setCloning(false)} disabled={cloneBusy}>취소</button>
+              <button disabled={cloneBusy || !cloneName.trim()}>
+                {cloneBusy ? '복제 중…' : '복제'}
+              </button>
+            </div>
+          </form>
+        )}
         {deleting && (
           <form className="server-delete-form" onSubmit={e => { e.preventDefault(); onDelete(deleteData, confirmation); }}>
             <p>기본값은 데이터 보존입니다.</p>
