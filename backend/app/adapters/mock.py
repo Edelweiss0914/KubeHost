@@ -385,9 +385,6 @@ class MockKubernetesAdapter:
     def library_extract(self, namespace: str, path: str) -> None:
         pass  # mock no-op
 
-    def github_clone(self, server_id: str, namespace: str, url: str, branch: str, path: str,
-                     sts_name: str | None = None, game: str = "minecraft-java") -> None:
-        pass  # mock no-op
 
     def library_storage(self, namespace: str) -> dict:
         lib = self._lib_for(namespace)

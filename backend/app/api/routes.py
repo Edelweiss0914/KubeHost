@@ -750,6 +750,7 @@ def _parse_github_url(url: str) -> tuple[str, str, str]:
 
 @router.post("/api/v1/servers/{server_id}/fs/github", status_code=200)
 def fs_github_clone(server_id: str, body: _GithubCloneBody, owner: Owner, svc: Service) -> dict:
+    import urllib.request
     server = svc.get(owner, server_id)
     try:
         gh_owner, gh_repo, branch = _parse_github_url(body.url)
@@ -758,11 +759,16 @@ def fs_github_clone(server_id: str, body: _GithubCloneBody, owner: Owner, svc: S
         download_url = f"https://github.com/{gh_owner}/{gh_repo}/archive/refs/heads/{branch}.zip"
         from app.services.file_paths import file_path as _file_path
         safe_path = _file_path(server.game, body.path)
-        svc.adapter.github_clone(
-            server_id, server.resource_plan.namespace,
-            download_url, branch, safe_path,
-            sts_name=server.resource_plan.sts_name, game=server.game,
-        )
+        # 백엔드에서 직접 다운로드 (게임 컨테이너에 curl 불필요)
+        req = urllib.request.Request(download_url, headers={"User-Agent": "kubehost/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            zip_data = resp.read()
+        zip_dest = safe_path.rstrip("/") + f"/{gh_repo}-{branch}.zip"
+        ns = server.resource_plan.namespace
+        sts = server.resource_plan.sts_name
+        svc.adapter.write_file(server_id, ns, zip_dest, zip_data, sts_name=sts, game=server.game)
+        svc.adapter.extract(server_id, ns, zip_dest, sts_name=sts, game=server.game)
+        svc.adapter.delete_path(server_id, ns, zip_dest, sts_name=sts, game=server.game)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
