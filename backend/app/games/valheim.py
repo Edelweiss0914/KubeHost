@@ -11,6 +11,10 @@ class Valheim(GameDefinition):
     description = "바이킹 서바이벌"
     steam_app_id = 892970
 
+    icon = "⚔"
+    color = "#93c5fd"
+    console_placeholder = ""
+
     capabilities = frozenset({
         "console", "game_settings",
     })

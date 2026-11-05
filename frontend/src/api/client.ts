@@ -21,6 +21,9 @@ export type GameDefinition = {
   capabilities: string[];
   file_root: string;
   quick_access: { folder: string; icon: string; label: string; desc: string }[];
+  icon: string;
+  color: string;
+  console_placeholder: string;
 };
 
 export type Schedule = {

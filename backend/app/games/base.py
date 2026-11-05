@@ -30,6 +30,11 @@ class GameDefinition:
     description: str = ""
     steam_app_id: int | None = None
 
+    # ── UI presentation ───────────────────────────────────────────────────────
+    icon: str = "⬡"
+    color: str = "#6b7280"
+    console_placeholder: str = ""
+
     # ── UI capabilities ───────────────────────────────────────────────────────
     # file_manager  → 파일 탭
     # rcon          → RCON 콘솔 탭
@@ -181,4 +186,7 @@ class GameDefinition:
                 {"folder": qa.folder, "icon": qa.icon, "label": qa.label, "desc": qa.desc}
                 for qa in self.quick_access
             ],
+            "icon": self.icon,
+            "color": self.color,
+            "console_placeholder": self.console_placeholder,
         }

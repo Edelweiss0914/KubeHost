@@ -1,21 +1,21 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { api } from '../api/client';
-import type { Server } from '../domain/server';
 
 type Line = { type: 'cmd' | 'rcon' | 'err'; text: string };
 
 type ServerConsoleProps = {
   serverId: string;
   active: boolean;
-  game: Server['game'];
+  rconEnabled: boolean;
+  consolePlaceholder: string;
 };
 
-export function ServerConsole({ serverId, active, game }: ServerConsoleProps) {
+export function ServerConsole({ serverId, active, rconEnabled, consolePlaceholder }: ServerConsoleProps) {
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const supported = game !== 'valheim';
+  const supported = rconEnabled;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -59,7 +59,7 @@ export function ServerConsole({ serverId, active, game }: ServerConsoleProps) {
       : active
       ? <form onSubmit={send} className="console-form">
           <input value={input} onChange={e => setInput(e.target.value)}
-            placeholder={game === 'garrysmod' ? 'status, changelevel gm_construct …' : '/list, /op 플레이어명, /gamemode creative @a …'}
+            placeholder={consolePlaceholder}
             disabled={busy} autoComplete="off" spellCheck={false}/>
           <button type="submit" disabled={busy || !input.trim()}>{busy ? '…' : '전송'}</button>
         </form>

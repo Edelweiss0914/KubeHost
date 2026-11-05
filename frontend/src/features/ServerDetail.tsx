@@ -8,7 +8,7 @@ import { ServerConsole } from './ServerConsole';
 import { PodLogs } from './PodLogs';
 import { FileManager } from './FileManager';
 import { api } from '../api/client';
-import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
+import type { GameDefinition, Schedule, ScheduleInput, ServerMetrics } from '../api/client';
 import { MetricsChart } from '../components/MetricsChart';
 
 type K8sResource = {
@@ -689,28 +689,35 @@ type ServerDetailProps = {
 };
 
 export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdated }: ServerDetailProps) {
-  const [subView, setSubView] = useState<ServerSubView>(server.game === 'minecraft-java' ? 'console' : 'logs');
+  const [subView, setSubView] = useState<ServerSubView>('logs');
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [gameCaps, setGameCaps] = useState<Set<string>>(new Set());
+  const [gameDef, setGameDef] = useState<GameDefinition | null>(null);
   const canStart = server.status === 'stopped' || server.status === 'error';
   const canStop = server.status === 'running' || server.status === 'provisioning';
   const active = server.status === 'running' || server.status === 'provisioning';
-  const isMinecraft = server.game === 'minecraft-java';
 
   useEffect(() => {
-    api.getGameDefinition(server.game).then(def => setGameCaps(new Set(def.capabilities))).catch(() => {});
-  }, [server.game]);
-
-  useEffect(() => { setSubView(server.game === 'minecraft-java' ? 'console' : 'logs'); }, [server.id, server.game]);
+    setSubView('logs');
+    setGameCaps(new Set());
+    setGameDef(null);
+    api.getGameDefinition(server.game)
+      .then(def => {
+        setGameCaps(new Set(def.capabilities));
+        setGameDef(def);
+        if (def.capabilities.includes('rcon')) setSubView('console');
+      })
+      .catch(() => {});
+  }, [server.id, server.game]);
 
   const NAV_ITEMS: [ServerSubView, string, string][] = [
     ['console', '⌨', 'RCON 콘솔'],
     ['logs', '▤', '파드 로그'],
-    ...(isMinecraft ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
+    ...(gameCaps.has('players') ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
     ...(gameCaps.has('file_manager') ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
-    ...(isMinecraft ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
+    ...(gameCaps.has('manage') ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
     ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
@@ -724,7 +731,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
         <div className="server-sidebar-header">
           <button className="text-button server-sidebar-back" onClick={onBack}>← 목록</button>
           <div className="server-sidebar-identity">
-            <span className="server-sidebar-icon" aria-hidden="true">{server.game === 'minecraft-java' ? '⛏' : server.game === 'valheim' ? '⚔' : server.game === 'garrysmod' ? '🔧' : '⬡'}</span>
+            <span className="server-sidebar-icon" aria-hidden="true">{gameDef?.icon ?? '⬡'}</span>
             <div>
               <strong className="server-sidebar-name">{server.name}</strong>
               <div style={{marginTop:'5px'}}><Status value={server.status}/></div>
@@ -779,12 +786,12 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
 
       {/* Right content area */}
       <div className="server-content">
-        {subView === 'console' && <ServerConsole serverId={server.id} active={server.status === 'running'} game={server.game}/>}
+        {subView === 'console' && <ServerConsole serverId={server.id} active={server.status === 'running'} rconEnabled={gameCaps.has('rcon')} consolePlaceholder={gameDef?.console_placeholder ?? ''}/>}
         {subView === 'logs' && <PodLogs serverId={server.id} active={active}/>}
-        {subView === 'players' && isMinecraft && (
+        {subView === 'players' && gameCaps.has('players') && (
           <PlayerPanel serverId={server.id} active={active} />
         )}
-        {subView === 'manage' && isMinecraft && (
+        {subView === 'manage' && gameCaps.has('manage') && (
           <ManagePanel serverId={server.id} active={active} game={server.game} />
         )}
         {subView === 'overview' && (
@@ -794,7 +801,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                 <div><span className="eyebrow">SERVER INFO</span><h2>서버 정보</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
               </div>
               <dl className="details-grid">
-                {isMinecraft && <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>}
+                {gameCaps.has('version') && <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>}
                 {server.game === 'valheim' && <>
                   <div><dt>게임</dt><dd>Valheim</dd></div>
                   <div><dt>월드</dt><dd>{server.world_name || 'KubeHostWorld'}</dd></div>
@@ -835,7 +842,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
           <FileManager serverId={server.id} game={server.game} />
         )}
         {subView === 'settings' && (
-          isMinecraft
+          gameCaps.has('properties')
             ? <ServerSettingsPanel
                 serverId={server.id}
                 currentVersion={server.version}

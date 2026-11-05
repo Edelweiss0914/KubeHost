@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { api } from '../api/client';
+import type { GameDefinition } from '../api/client';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 
@@ -52,27 +53,40 @@ function CopyBtn({ text }: { text: string | null }) {
   );
 }
 
-function gameIcon(game: string): string {
-  if (game === 'minecraft-java') return '⛏';
-  if (game === 'valheim') return '⚔';
-  if (game === 'garrysmod') return '🔧';
-  return '▦';
+function isLight(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16));
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
 
-function gameBadgeStyle(game: string): React.CSSProperties {
-  if (game === 'minecraft-java') {
-    return { background: '#4ade80', color: '#0a2215', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
-  }
-  if (game === 'valheim') {
-    return { background: '#93c5fd', color: '#0c1a3a', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
-  }
-  if (game === 'garrysmod') {
-    return { background: '#fbbf24', color: '#1a0f00', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
-  }
-  return { background: 'var(--surface-2)', color: 'var(--muted)', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 };
+function badgeStyle(def?: GameDefinition): React.CSSProperties {
+  return {
+    background: def?.color ?? 'var(--surface-2)',
+    color: def ? (isLight(def.color) ? '#1a1a1a' : '#fff') : 'var(--muted)',
+    borderRadius: '10px', width: '40px', height: '40px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '20px', flexShrink: 0,
+  };
 }
 
-function ServerCard({ server, onSelect }: { server: Server; onSelect: (id: string) => void }) {
+function useGameDefs(servers: Server[]): Map<string, GameDefinition> {
+  const [defs, setDefs] = useState<Map<string, GameDefinition>>(new Map());
+  const slugKey = [...new Set(servers.map(s => s.game))].sort().join(',');
+  useEffect(() => {
+    if (!slugKey) return;
+    const slugs = slugKey.split(',');
+    Promise.all(slugs.map(slug =>
+      api.getGameDefinition(slug).then(def => [slug, def] as const).catch(() => null)
+    )).then(entries => {
+      const map = new Map<string, GameDefinition>();
+      entries.forEach(e => { if (e) map.set(e[0], e[1]); });
+      setDefs(map);
+    });
+  }, [slugKey]);
+  return defs;
+}
+
+function ServerCard({ server, onSelect, gameDef }: { server: Server; onSelect: (id: string) => void; gameDef?: GameDefinition }) {
   return (
     <div
       className="server-card"
@@ -83,8 +97,8 @@ function ServerCard({ server, onSelect }: { server: Server; onSelect: (id: strin
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(server.id); } }}
     >
       <div className="server-card-header">
-        <span className="server-card-game-badge" style={gameBadgeStyle(server.game)} aria-hidden="true">
-          {gameIcon(server.game)}
+        <span className="server-card-game-badge" style={badgeStyle(gameDef)} aria-hidden="true">
+          {gameDef?.icon ?? '⬡'}
         </span>
         <div className="server-card-title">
           <strong>{server.name}</strong>
@@ -115,6 +129,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const gameDefs = useGameDefs(servers);
 
   const visible = servers.filter(server =>
     (filter === 'all' || server.status === filter) &&
@@ -173,21 +188,21 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
           viewMode === 'card' ? (
             <div className="server-card-grid">
               {visible.map(server => (
-                <ServerCard key={server.id} server={server} onSelect={onSelect} />
+                <ServerCard key={server.id} server={server} onSelect={onSelect} gameDef={gameDefs.get(server.game)} />
               ))}
             </div>
           ) : (
             <div className="table-wrap">
               <table>
                 <thead><tr><th scope="col">서버</th><th scope="col">상태</th><th scope="col">호스트 서버</th><th scope="col">할당 리소스</th><th scope="col">접속 주소</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
-                <tbody>{visible.map(server => <tr key={server.id}>
-                  <td><strong>{server.name}</strong><small>{server.game === 'minecraft-java' ? `Minecraft Java · Paper ${server.version}` : server.game === 'valheim' ? 'Valheim' : server.game === 'garrysmod' ? "Garry's Mod" : server.game}</small></td>
+                <tbody>{visible.map(server => { const def = gameDefs.get(server.game); return <tr key={server.id}>
+                  <td><div style={{display:'flex',alignItems:'center',gap:'8px'}}><span style={badgeStyle(def)} aria-hidden="true">{def?.icon ?? '⬡'}</span><div><strong>{server.name}</strong><small>{def?.name ?? server.game}{server.version ? ` · ${server.version}` : ''}</small></div></div></td>
                   <td><Status value={server.status}/></td>
                   <td>{server.node_id}</td>
                   <td>{server.cpu} vCPU · {server.memory_mb / 1024} GiB RAM<small>{server.storage_gb} GiB 스토리지</small></td>
                   <td style={{display:'flex', alignItems:'center', gap:'6px'}}><code>{server.connection ?? '배정 대기'}</code><CopyBtn text={server.connection}/></td>
                   <td><button className="secondary" onClick={() => onSelect(server.id)} aria-label={server.name + ' 상세 보기'}>상세 보기</button></td>
-                </tr>)}</tbody>
+                </tr>; })}</tbody>
               </table>
             </div>
           )

@@ -11,9 +11,14 @@ class MinecraftJava(GameDefinition):
     description = "Paper 서버"
     steam_app_id = None
 
+    icon = "⛏"
+    color = "#4ade80"
+    console_placeholder = "/list, /op 플레이어명, /gamemode creative @a …"
+
     capabilities = frozenset({
         "file_manager", "rcon", "console", "backups",
         "properties", "jvm", "game_settings", "auto_restart",
+        "players", "manage", "version",
     })
 
     file_root = "/data"

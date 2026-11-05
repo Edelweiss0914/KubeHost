@@ -12,6 +12,10 @@ class GarrysMod(GameDefinition):
     description = "샌드박스"
     steam_app_id = 4000
 
+    icon = "🔧"
+    color = "#fbbf24"
+    console_placeholder = "status, changelevel gm_construct …"
+
     capabilities = frozenset({
         "file_manager", "rcon", "console", "game_settings",
     })

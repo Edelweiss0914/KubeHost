@@ -50,7 +50,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
 
   return <section className="panel">
     <div className="section-title">
-      <div><span className="eyebrow">GAME SETTINGS</span><h2>{server.game === 'valheim' ? '발하임 설정' : '게리모드 설정'}</h2></div>
+      <div><span className="eyebrow">GAME SETTINGS</span><h2>{server.name} 게임 설정</h2></div>
       <button className="secondary" onClick={onClose}>닫기</button>
     </div>
     <p className="muted notice">설정을 저장하면 게임 파드가 재시작됩니다. 접속 중인 플레이어의 연결이 끊깁니다.</p>

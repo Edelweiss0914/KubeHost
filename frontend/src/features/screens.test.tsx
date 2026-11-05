@@ -40,10 +40,10 @@ it('opens the Garry\'s Mod game directory in its file manager', () => {
 });
 
 it('enables Garry\'s Mod RCON commands while keeping Valheim read only', () => {
- const gmod = renderToStaticMarkup(<ServerConsole serverId="server-1" active game="garrysmod"/>);
+ const gmod = renderToStaticMarkup(<ServerConsole serverId="server-1" active rconEnabled consolePlaceholder="status, changelevel gm_construct …"/>);
  expect(gmod).toContain('<form');
  expect(gmod).toContain('status');
- const valheim = renderToStaticMarkup(<ServerConsole serverId="server-1" active game="valheim"/>);
+ const valheim = renderToStaticMarkup(<ServerConsole serverId="server-1" active rconEnabled={false} consolePlaceholder=""/>);
  expect(valheim).toContain('RCON 연결이 설정되지 않았습니다');
  expect(valheim).not.toContain('<form');
 });
