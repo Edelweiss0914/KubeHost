@@ -723,6 +723,53 @@ def make_dir(server_id: str, body: _MkdirBody, owner: Owner, svc: Service) -> di
     return {"path": safe}
 
 
+class _GithubCloneBody(_BaseModel):
+    url: str
+    branch: str = "main"
+    path: str | None = None
+
+
+def _parse_github_url(url: str) -> tuple[str, str, str]:
+    """Return (owner, repo, branch) from various GitHub URL forms."""
+    import re
+    url = url.strip()
+    # owner/repo shorthand
+    if re.fullmatch(r"[^/]+/[^/]+", url):
+        owner, repo = url.split("/", 1)
+        return owner, repo, "main"
+    # https://github.com/owner/repo[/tree/branch][.git]
+    m = re.match(
+        r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$",
+        url,
+    )
+    if not m:
+        raise ValueError(f"GitHub URL을 파싱할 수 없습니다: {url!r}")
+    owner, repo, branch = m.group(1), m.group(2), m.group(3) or "main"
+    return owner, repo, branch
+
+
+@router.post("/api/v1/servers/{server_id}/fs/github", status_code=200)
+def fs_github_clone(server_id: str, body: _GithubCloneBody, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    try:
+        gh_owner, gh_repo, branch = _parse_github_url(body.url)
+        if body.branch and body.branch != "main":
+            branch = body.branch
+        download_url = f"https://github.com/{gh_owner}/{gh_repo}/archive/refs/heads/{branch}.zip"
+        from app.services.file_paths import file_path as _file_path
+        safe_path = _file_path(server.game, body.path)
+        svc.adapter.github_clone(
+            server_id, server.resource_plan.namespace,
+            download_url, branch, safe_path,
+            sts_name=server.resource_plan.sts_name, game=server.game,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"owner": gh_owner, "repo": gh_repo, "branch": branch, "path": safe_path}
+
+
 # ── Version upgrade ───────────────────────────────────────────────────────────
 
 _ALLOWED_VERSIONS = {"LATEST", "1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.16.5", "1.14.4", "1.12.2"}

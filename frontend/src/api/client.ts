@@ -154,6 +154,7 @@ export interface ServerGateway {
   libraryMkdir(path: string): Promise<{path: string}>;
   libraryExtract(path: string): Promise<{path: string}>;
   libraryStorage(): Promise<{used_bytes: number; total_bytes: number}>;
+  githubClone(serverId: string, url: string, branch: string, path: string): Promise<{ owner: string; repo: string; branch: string; path: string }>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -328,4 +329,5 @@ export const api: ServerGateway = {
   libraryMkdir: (path) => versioned(`/library/fs/mkdir`, { method: 'POST', body: JSON.stringify({ path }) }),
   libraryExtract: (path) => versioned(`/library/fs/extract`, { method: 'POST', body: JSON.stringify({ path }) }),
   libraryStorage: () => versioned('/library/storage'),
+  githubClone: (serverId, url, branch, path) => versioned(`/servers/${encodeURIComponent(serverId)}/fs/github`, { method: 'POST', body: JSON.stringify({ url, branch, path }) }),
 };

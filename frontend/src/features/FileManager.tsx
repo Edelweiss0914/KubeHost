@@ -55,6 +55,9 @@ export function FileManager({ serverId, game }: Props) {
   const [newDirName, setNewDirName] = useState('');
   const [showMkdir, setShowMkdir] = useState(false);
   const [editing, setEditing] = useState<{ name: string; content: string } | null>(null);
+  const [showGithub, setShowGithub] = useState(false);
+  const [githubUrl, setGithubUrl] = useState('');
+  const [githubBranch, setGithubBranch] = useState('main');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isRoot = path === rootPath;
@@ -194,6 +197,24 @@ export function FileManager({ serverId, game }: Props) {
     }
   }
 
+  async function handleGithubClone() {
+    const url = githubUrl.trim();
+    if (!url) return;
+    setBusy(true);
+    try {
+      const result = await api.githubClone(serverId, url, githubBranch || 'main', path);
+      setGithubUrl('');
+      setGithubBranch('main');
+      setShowGithub(false);
+      showMsg(`${result.owner}/${result.repo}@${result.branch} 클론 완료`);
+      loadDir(path);
+    } catch (err) {
+      showMsg(err instanceof Error ? err.message : 'GitHub 클론 실패', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const crumbs = breadcrumbs();
   // 실제 디스크에 존재하는 폴더 이름 set
   const existingDirs = new Set(entries.filter(e => e.type === 'dir').map(e => e.name));
@@ -226,6 +247,13 @@ export function FileManager({ serverId, game }: Props) {
             <input ref={fileRef} type="file" style={{ display: 'none' }}
               disabled={busy} onChange={handleUpload} />
           </label>
+          <button
+            className="secondary small"
+            disabled={busy}
+            onClick={() => { setShowGithub(s => !s); setGithubUrl(''); setGithubBranch('main'); }}
+          >
+            ⬇ GitHub
+          </button>
         </div>
       </div>
 
@@ -251,6 +279,30 @@ export function FileManager({ serverId, game }: Props) {
             placeholder="폴더 이름" disabled={busy} autoFocus />
           <button onClick={() => void handleMkdir()} disabled={busy || !newDirName.trim()}>생성</button>
           <button className="secondary" onClick={() => { setShowMkdir(false); setNewDirName(''); }}>취소</button>
+        </div>
+      )}
+
+      {/* GitHub 클론 인라인 폼 */}
+      {showGithub && (
+        <div className="manage-add-row" style={{ marginTop: '8px', flexWrap: 'wrap', gap: '6px' }}>
+          <input
+            value={githubUrl}
+            onChange={e => setGithubUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void handleGithubClone(); if (e.key === 'Escape') setShowGithub(false); }}
+            placeholder="https://github.com/owner/repo"
+            disabled={busy}
+            autoFocus
+            style={{ flex: '2 1 200px' }}
+          />
+          <input
+            value={githubBranch}
+            onChange={e => setGithubBranch(e.target.value)}
+            placeholder="main"
+            disabled={busy}
+            style={{ flex: '1 1 80px' }}
+          />
+          <button onClick={() => void handleGithubClone()} disabled={busy || !githubUrl.trim()}>클론</button>
+          <button className="secondary" onClick={() => { setShowGithub(false); setGithubUrl(''); setGithubBranch('main'); }}>취소</button>
         </div>
       )}
 

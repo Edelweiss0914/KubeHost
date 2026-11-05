@@ -857,6 +857,17 @@ class K8sAdapter:
             sts_name=sts_name, game=game,
         )
 
+    def github_clone(self, server_id: str, namespace: str, url: str, branch: str, path: str,
+                     sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        from uuid import uuid4
+        safe_path = file_path(game, path)
+        zip_path = f"/tmp/ghclone-{uuid4().hex[:12]}.zip"
+        cmd = ["sh", "-c",
+               f"curl -fsSL -o '{zip_path}' '{url}' && "
+               f"unzip -o '{zip_path}' -d '{safe_path}' && "
+               f"rm -f '{zip_path}'"]
+        self._exec_anywhere(server_id, namespace, cmd, sts_name=sts_name, game=game)
+
     # ── Library ───────────────────────────────────────────────────────────────
 
     def _get_pvc_node(self, namespace: str, pvc_name: str) -> str:
