@@ -693,10 +693,15 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
+  const [gameCaps, setGameCaps] = useState<Set<string>>(new Set());
   const canStart = server.status === 'stopped' || server.status === 'error';
   const canStop = server.status === 'running' || server.status === 'provisioning';
   const active = server.status === 'running' || server.status === 'provisioning';
   const isMinecraft = server.game === 'minecraft-java';
+
+  useEffect(() => {
+    api.getGameDefinition(server.game).then(def => setGameCaps(new Set(def.capabilities))).catch(() => {});
+  }, [server.game]);
 
   useEffect(() => { setSubView(server.game === 'minecraft-java' ? 'console' : 'logs'); }, [server.id, server.game]);
 
@@ -704,7 +709,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
     ['console', '⌨', 'RCON 콘솔'],
     ['logs', '▤', '파드 로그'],
     ...(isMinecraft ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
-    ...(server.game !== 'valheim' ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
+    ...(gameCaps.has('file_manager') ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
     ...(isMinecraft ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
     ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
@@ -826,7 +831,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             <SchedulePanel serverId={server.id}/>
           </section>
         )}
-        {subView === 'files' && server.game !== 'valheim' && (
+        {subView === 'files' && gameCaps.has('file_manager') && (
           <FileManager serverId={server.id} game={server.game} />
         )}
         {subView === 'settings' && (

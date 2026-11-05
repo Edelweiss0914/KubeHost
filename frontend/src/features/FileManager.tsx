@@ -3,34 +3,9 @@ import { api } from '../api/client';
 import type { FileEntry } from '../api/client';
 import type { Server } from '../domain/server';
 
-const GMOD_ROOT = '/home/gmod/server/garrysmod';
-
-const GMOD_QUICK_ACCESS = [
-  { folder: 'addons', icon: '🧩', label: '애드온', desc: '커스텀 Lua·맵·게임모드' },
-  { folder: 'cfg', icon: '🔧', label: '설정', desc: 'server.cfg 등 서버 설정' },
-  { folder: 'data', icon: '💾', label: '저장 데이터', desc: '게임·애드온 저장 파일' },
-  { folder: 'gamemodes', icon: '🎮', label: '게임모드', desc: '기본·커스텀 게임모드' },
-  { folder: 'maps', icon: '🗺', label: '맵', desc: '기본·커스텀 맵' },
-  { folder: 'lua', icon: '📜', label: 'Lua', desc: '서버 스크립트' },
-] as const;
-
 const TEXT_EXTENSIONS = new Set([
   'cfg', 'conf', 'ini', 'json', 'lua', 'md', 'properties', 'toml', 'txt', 'vdf', 'xml', 'yaml', 'yml',
 ]);
-
-// ── Minecraft 서버 표준 폴더 구조 ────────────────────────────────────────────
-const MC_QUICK_ACCESS = [
-  { folder: 'plugins',       icon: '☕', label: '플러그인',   desc: 'Paper/Spigot 플러그인 (.jar)' },
-  { folder: 'mods',          icon: '⚙', label: '모드',       desc: 'Forge/Fabric 모드 (.jar)' },
-  { folder: 'config',        icon: '🔧', label: '설정',       desc: '플러그인·모드 설정 파일' },
-  { folder: 'world',         icon: '🌍', label: '오버월드',   desc: '메인 월드 세이브 데이터' },
-  { folder: 'world_nether',  icon: '🔥', label: '네더',       desc: '네더 차원 세이브 데이터' },
-  { folder: 'world_the_end', icon: '🐉', label: '엔드',       desc: '엔드 차원 세이브 데이터' },
-  { folder: 'backups',       icon: '💾', label: '백업',       desc: '월드 백업 (.tar.gz)' },
-  { folder: 'logs',          icon: '📋', label: '로그',       desc: '서버 실행 로그' },
-  { folder: 'resourcepacks', icon: '🎨', label: '리소스팩',   desc: '서버 리소스팩' },
-  { folder: 'datapacks',     icon: '📦', label: '데이터팩',   desc: '월드 데이터팩' },
-] as const;
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
 function formatSize(bytes: number): string {
@@ -59,8 +34,17 @@ function fileIcon(entry: FileEntry): string {
 type Props = { serverId: string; game: Server['game'] };
 
 export function FileManager({ serverId, game }: Props) {
-  const rootPath = game === 'garrysmod' ? GMOD_ROOT : '/data';
-  const quickAccess = game === 'garrysmod' ? GMOD_QUICK_ACCESS : MC_QUICK_ACCESS;
+  const [gameRoot, setGameRoot] = useState('/data');
+  const [quickAccess, setQuickAccess] = useState<{ folder: string; icon: string; label: string; desc: string }[]>([]);
+
+  useEffect(() => {
+    api.getGameDefinition(game).then(def => {
+      setGameRoot(def.file_root);
+      setQuickAccess(def.quick_access);
+    }).catch(() => {});
+  }, [game]);
+
+  const rootPath = gameRoot;
   const [path, setPath] = useState(rootPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +80,8 @@ export function FileManager({ serverId, game }: Props) {
   function breadcrumbs() {
     const parts = path.split('/').filter(Boolean);
     const rootParts = rootPath.split('/').filter(Boolean);
-    const crumbs: { label: string; path: string }[] = [{ label: game === 'garrysmod' ? 'garrysmod' : '/data', path: rootPath }];
+    const rootLabel = rootParts[rootParts.length - 1] ?? rootPath;
+    const crumbs: { label: string; path: string }[] = [{ label: rootLabel, path: rootPath }];
     for (let i = rootParts.length; i < parts.length; i++) {
       crumbs.push({ label: parts[i], path: '/' + parts.slice(0, i + 1).join('/') });
     }

@@ -440,6 +440,15 @@ def list_games(svc: Service) -> list[dict]:
     return svc.repository.list_games()  # type: ignore[attr-defined]
 
 
+@router.get("/api/v1/games/{slug}/definition")
+def game_definition(slug: str) -> dict:
+    from app.games.registry import get_game
+    try:
+        return get_game(slug).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 # ── WebSocket log streaming ───────────────────────────────────────────────────
 
 def _diff_log_lines(prev: list[str], current: list[str]) -> list[str]:

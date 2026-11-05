@@ -1,20 +1,13 @@
 """Game-specific file-manager roots and persistent write boundaries."""
 import posixpath
 
-from app.services.gmod_storage import GMOD_ROOT
-
-
-FILE_ROOTS = {
-    "minecraft-java": "/data",
-    "garrysmod": GMOD_ROOT,
-}
-
 
 def file_root(game: str) -> str:
-    try:
-        return FILE_ROOTS[game]
-    except KeyError as exc:
-        raise ValueError("이 게임의 파일 매니저는 아직 지원하지 않습니다.") from exc
+    from app.games.registry import GAMES
+    definition = GAMES.get(game)
+    if definition is None or "file_manager" not in definition.capabilities:
+        raise ValueError("이 게임의 파일 매니저는 아직 지원하지 않습니다.")
+    return definition.file_root
 
 
 def file_path(game: str, path: str | None, *, write: bool = False) -> str:

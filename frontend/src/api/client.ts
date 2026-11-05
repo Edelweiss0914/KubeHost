@@ -14,6 +14,15 @@ export type Game = {
   supported: boolean;
 };
 
+export type GameDefinition = {
+  slug: string;
+  name: string;
+  description: string;
+  capabilities: string[];
+  file_root: string;
+  quick_access: { folder: string; icon: string; label: string; desc: string }[];
+};
+
 export type Schedule = {
   id: string;
   server_id: string;
@@ -99,6 +108,7 @@ export interface ServerGateway {
   adminGetUserQuota(userId: string): Promise<{max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}>;
   adminSetUserQuota(userId: string, quota: {max_cpu: number; max_memory_mb: number; max_storage_gb: number; max_servers: number}): Promise<void>;
   games(): Promise<Game[]>;
+  getGameDefinition(slug: string): Promise<GameDefinition>;
   players(serverId: string): Promise<{ count: number; max: number; names: string[] }>;
   whitelist(serverId: string): Promise<{ enabled: boolean; names: string[] }>;
   addWhitelist(serverId: string, name: string): Promise<{ output: string }>;
@@ -187,6 +197,7 @@ export const api: ServerGateway = {
   adminGetUserQuota: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`),
   adminSetUserQuota: (userId, quota) => versioned(`/admin/users/${encodeURIComponent(userId)}/quota`, {method:'PUT', body:JSON.stringify(quota)}),
   games: () => versioned('/games'),
+  getGameDefinition: (slug) => versioned(`/games/${encodeURIComponent(slug)}/definition`),
   players: (id) => versioned(`/servers/${encodeURIComponent(id)}/players`),
   whitelist: (id) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`),
   addWhitelist: (id, name) => versioned(`/servers/${encodeURIComponent(id)}/whitelist`, { method: 'POST', body: JSON.stringify({ name }) }),
