@@ -685,6 +685,7 @@ class K8sAdapter:
             },
             "spec": {
                 "restartPolicy": "Never",
+                "activeDeadlineSeconds": 360,
                 "automountServiceAccountToken": False,
                 "securityContext": {
                     "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,
@@ -1011,6 +1012,7 @@ class K8sAdapter:
             },
             "spec": {
                 "restartPolicy": "Never",
+                "activeDeadlineSeconds": 360,
                 "automountServiceAccountToken": False,
                 "securityContext": {
                     "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,

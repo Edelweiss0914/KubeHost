@@ -31,7 +31,8 @@ def namespace_resources(namespace: str) -> list[dict]:
          "spec": {"hard": {
              "requests.cpu": "4", "limits.cpu": "4",
              "requests.memory": "8Gi", "limits.memory": "8Gi",
-             "requests.storage": "100Gi", "persistentvolumeclaims": "10", "pods": "10"}}},
+             "requests.storage": "100Gi", "persistentvolumeclaims": "10", "pods": "10"},
+             "scopes": ["NotTerminating"]}},
         {"apiVersion": "v1", "kind": "LimitRange",
          "metadata": {"name": "container-limits", "namespace": namespace},
          "spec": {"limits": [{"type": "Container",
