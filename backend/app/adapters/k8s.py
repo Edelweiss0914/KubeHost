@@ -30,6 +30,7 @@ class K8sAdapter:
         self._api_client = client.ApiClient()
         self._core = client.CoreV1Api(self._api_client)
         self._apps = client.AppsV1Api(self._api_client)
+        self._networking = client.NetworkingV1Api(self._api_client)
 
     @staticmethod
     def _fresh_core() -> "client.CoreV1Api":
@@ -341,6 +342,12 @@ class K8sAdapter:
 
     def delete(self, server_id: str, namespace: str, delete_data: bool, sts_name: str | None = None) -> None:
         name = sts_name or self._sts_name(server_id)
+        if name.startswith("gmod-"):
+            try:
+                self._networking.delete_namespaced_network_policy(f"{name}-ingress", namespace)
+            except ApiException as exc:
+                if exc.status != 404:
+                    raise
         for svc_name in (f"{name}-headless", f"{name}-game"):
             try:
                 self._core.delete_namespaced_service(svc_name, namespace)

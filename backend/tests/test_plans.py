@@ -46,3 +46,19 @@ def test_tenant_resources_are_shared_but_server_resources_are_unique():
     assert first_names.isdisjoint(second_names)
     assert any("idempotently" in warning for warning in first.warnings)
     assert any("namespace deletion" in warning for warning in first.warnings)
+
+
+def test_garrysmod_plan_allows_game_udp_only_for_its_pod():
+    plan = build_resource_plan(
+        ServerCreate(name="GMod server", game="garrysmod"), UUID(int=1), UUID(int=2)
+    )
+    policy = next(
+        resource for resource in plan.resources
+        if resource["kind"] == "NetworkPolicy"
+        and resource["metadata"]["name"] == f"{plan.sts_name}-ingress"
+    )
+    assert policy["metadata"]["namespace"] == plan.namespace
+    assert policy["spec"]["podSelector"] == {
+        "matchLabels": {"app.kubernetes.io/name": plan.sts_name}
+    }
+    assert policy["spec"]["ingress"] == [{"ports": [{"port": 27015, "protocol": "UDP"}]}]

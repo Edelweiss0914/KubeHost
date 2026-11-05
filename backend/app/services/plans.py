@@ -280,6 +280,11 @@ def build_garrysmod_plan(
         "metadata": {"name": f"{name}-game", "namespace": namespace},
         "spec": {"type": "NodePort", "selector": labels, "ports": [game_port]}})
 
+    resources.append({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+        "metadata": {"name": f"{name}-ingress", "namespace": namespace},
+        "spec": {"podSelector": {"matchLabels": labels}, "policyTypes": ["Ingress"],
+                 "ingress": [{"ports": [{"port": 27015, "protocol": "UDP"}]}]}})
+
     map_name = request.map_name or "gm_flatgrass"
     gamemode = request.gamemode_name or "sandbox"
     max_players = 16
