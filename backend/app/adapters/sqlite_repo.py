@@ -392,7 +392,8 @@ class SQLiteServerRepository:
         games = [
             ("mc-java",  "minecraft-java",      "Minecraft Java",          None,    None, "Paper 서버",       1),
             ("cs2",      "cs2",                  "Counter-Strike 2",         730,    None, "팀 기반 FPS",      0),
-            ("valheim",  "valheim",              "Valheim",               892970,    None, "바이킹 서바이벌",  0),
+            ("valheim",  "valheim",              "Valheim",               892970,    None, "바이킹 서바이벌",  1),
+            ("gmod",     "garrysmod",            "Garry's Mod",           4000,      None, "샌드박스",        1),
             ("terraria", "terraria",             "Terraria",              105600,    None, "2D 어드벤처",      0),
             ("pz",       "project-zomboid",      "Project Zomboid",       108600,    None, "좀비 서바이벌",    0),
             ("rust",     "rust",                 "Rust",                  252490,    None, "PvP 서바이벌",     0),
@@ -404,6 +405,7 @@ class SQLiteServerRepository:
                 "INSERT OR IGNORE INTO games (id, slug, name, steam_app_id, image_url, description, supported) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 g,
             )
+        conn.execute("UPDATE games SET supported = 1 WHERE slug IN ('valheim', 'garrysmod')")
 
     def list_games(self) -> list[dict]:
         with self._connect() as conn:
