@@ -21,6 +21,12 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
   const [workshopPage, setWorkshopPage] = useState(1);
   const [workshopItemsLoading, setWorkshopItemsLoading] = useState(false);
 
+  const [addonInput, setAddonInput] = useState('');
+  const [addonItems, setAddonItems] = useState<WorkshopItem[]>([]);
+  const [addonSaving, setAddonSaving] = useState(false);
+  const [addonError, setAddonError] = useState('');
+  const [addonSaved, setAddonSaved] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -30,8 +36,11 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       server.game === 'garrysmod'
         ? api.getWorkshopItems(server.id, 1).catch(() => null)
         : Promise.resolve(null),
+      server.game === 'garrysmod'
+        ? api.getWorkshopAddons(server.id).catch(() => null)
+        : Promise.resolve(null),
     ])
-      .then(([gameResult, workshopResult]) => {
+      .then(([gameResult, workshopResult, addonResult]) => {
         if (!cancelled) {
           setSettings(gameResult);
           if (workshopResult) {
@@ -42,6 +51,10 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
               setWorkshopTotal(workshopResult.total);
               setWorkshopPage(workshopResult.page);
             }
+          }
+          if (addonResult) {
+            setAddonInput(addonResult.addon_ids.join('\n'));
+            setAddonItems(addonResult.items);
           }
         }
       })
@@ -78,6 +91,24 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       setWorkshopError(cause instanceof Error ? cause.message : 'Workshop 설정을 저장하지 못했습니다.');
     } finally {
       setWorkshopSaving(false);
+    }
+  }
+
+  async function saveAddons() {
+    setAddonSaving(true);
+    setAddonError('');
+    setAddonSaved(false);
+    try {
+      const ids = addonInput.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+      const result = await api.setWorkshopAddons(server.id, ids);
+      setAddonInput(result.addon_ids.join('\n'));
+      const addonResult = await api.getWorkshopAddons(server.id).catch(() => null);
+      if (addonResult) setAddonItems(addonResult.items);
+      setAddonSaved(true);
+    } catch (cause) {
+      setAddonError(cause instanceof Error ? cause.message : '애드온 저장 실패');
+    } finally {
+      setAddonSaving(false);
     }
   }
 
@@ -207,6 +238,51 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
               </div>
             </>
           )}
+        </div>
+      )}
+    </section>}
+    {!loading && server.game === 'garrysmod' && <section className="panel" style={{marginTop: '1.5rem'}}>
+      <div className="section-title">
+        <div><span className="eyebrow">WORKSHOP ADDONS</span><h3>개별 애드온</h3></div>
+      </div>
+      <p className="muted notice">애드온 ID를 한 줄에 하나씩 입력하세요. 변경 후 서버를 재시작해야 적용됩니다.</p>
+      <div className="form-grid">
+        <label>애드온 ID 목록
+          <textarea value={addonInput} rows={5}
+            placeholder={"123456789\n987654321\n..."}
+            style={{ fontFamily: 'monospace', resize: 'vertical' }}
+            onChange={e => setAddonInput(e.target.value)} />
+          <small>Steam Workshop 애드온 URL의 숫자 ID. 비우면 개별 애드온 연동이 해제됩니다.</small>
+        </label>
+      </div>
+      {addonError && <p role="alert" className="error">{addonError}</p>}
+      {addonSaved && <p role="status" className="notice">애드온 목록을 저장했습니다. 서버를 재시작하면 적용됩니다.</p>}
+      <div className="actions">
+        <button onClick={() => void saveAddons()} disabled={addonSaving}>
+          {addonSaving ? '저장 중…' : '애드온 저장'}
+        </button>
+      </div>
+      {addonItems.length > 0 && (
+        <div style={{ marginTop: '16px' }}>
+          <span className="eyebrow">등록된 애드온 ({addonItems.length}개)</span>
+          <div className="file-list" style={{ marginTop: '8px' }}>
+            {addonItems.map(item => (
+              <div key={item.id} className="file-row">
+                {item.preview_url && (
+                  <img src={item.preview_url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8 }} />
+                )}
+                <span className="file-name" style={{ flex: 1 }}>
+                  <a href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${item.id}`}
+                    target="_blank" rel="noopener noreferrer" className="text-button">
+                    {item.title}
+                  </a>
+                </span>
+                <span className="file-size muted">
+                  {item.file_size > 0 ? `${(item.file_size / 1024 / 1024).toFixed(1)} MB` : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>}

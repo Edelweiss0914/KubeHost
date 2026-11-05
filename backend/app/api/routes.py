@@ -254,6 +254,9 @@ from pydantic import BaseModel as _BaseModel
 class _WorkshopBody(_BaseModel):
     collection_id: str  # 숫자 문자열, 빈 문자열이면 제거
 
+class _WorkshopAddonsBody(_BaseModel):
+    addon_ids: list[str]  # 개별 애드온 ID 목록
+
 
 @router.post("/api/v1/servers/{server_id}/workshop", status_code=200)
 def set_workshop(server_id: str, body: _WorkshopBody, owner: Owner, svc: Service) -> dict[str, str]:
@@ -272,6 +275,59 @@ def set_workshop(server_id: str, body: _WorkshopBody, owner: Owner, svc: Service
         sts_name=server.resource_plan.sts_name,
     )
     return {"collection_id": cid}
+
+
+@router.post("/api/v1/servers/{server_id}/workshop/addons", status_code=200)
+def set_workshop_addons(server_id: str, body: _WorkshopAddonsBody, owner: Owner, svc: Service) -> dict:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    if server.game != "garrysmod":
+        raise HTTPException(status_code=422, detail="Workshop은 Garry's Mod 서버에서만 사용할 수 있습니다.")
+    ids = [a.strip() for a in body.addon_ids if a.strip()]
+    for aid in ids:
+        if not aid.isdigit() or len(aid) > 20:
+            raise HTTPException(status_code=422, detail=f"유효하지 않은 애드온 ID: {aid!r}")
+    svc.adapter.patch_settings(
+        server_id, server.resource_plan.namespace,
+        {"WORKSHOP_ADDONS": " ".join(ids)},
+        sts_name=server.resource_plan.sts_name,
+    )
+    return {"addon_ids": ids}
+
+
+@router.get("/api/v1/servers/{server_id}/workshop/addons")
+def get_workshop_addons(server_id: str, owner: Owner, svc: Service) -> dict:
+    import urllib.request, urllib.parse as _up, json as _json
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    if server.game != "garrysmod":
+        raise HTTPException(status_code=422, detail="Workshop은 Garry's Mod 서버에서만 사용할 수 있습니다.")
+    ns = server.resource_plan.namespace
+    settings = svc.adapter.get_settings(server_id, ns, sts_name=server.resource_plan.sts_name)
+    raw = settings.get("WORKSHOP_ADDONS", "").strip()
+    ids = [a for a in raw.split() if a] if raw else []
+    if not ids:
+        return {"addon_ids": [], "items": []}
+    try:
+        params = {"itemcount": str(len(ids))}
+        for i, fid in enumerate(ids):
+            params[f"publishedfileids[{i}]"] = fid
+        data = _up.urlencode(params).encode()
+        req = urllib.request.Request(
+            "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/",
+            data=data, headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = _json.loads(resp.read())
+        file_details = result.get("response", {}).get("publishedfiledetails", [])
+        items = [{"id": f.get("publishedfileid", ""), "title": f.get("title", "(이름 없음)"),
+                  "preview_url": f.get("preview_url", ""), "file_size": f.get("file_size", 0)}
+                 for f in file_details]
+    except Exception:
+        items = [{"id": fid, "title": fid, "preview_url": "", "file_size": 0} for fid in ids]
+    return {"addon_ids": ids, "items": items}
 
 
 @router.get("/api/v1/servers/{server_id}/workshop/items")

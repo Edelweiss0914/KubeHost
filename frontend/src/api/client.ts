@@ -172,6 +172,8 @@ export interface ServerGateway {
   deleteTemplate(templateId: string): Promise<void>;
   setWorkshop(serverId: string, collectionId: string): Promise<{ collection_id: string }>;
   getWorkshopItems(serverId: string, page: number): Promise<{ items: WorkshopItem[]; total: number; page: number; per_page: number; collection_id: string }>;
+  setWorkshopAddons(serverId: string, addonIds: string[]): Promise<{ addon_ids: string[] }>;
+  getWorkshopAddons(serverId: string): Promise<{ addon_ids: string[]; items: WorkshopItem[] }>;
 }
 
 export interface WorkshopItem {
@@ -361,4 +363,6 @@ export const api: ServerGateway = {
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
   setWorkshop: (serverId, collectionId) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop`, { method: 'POST', body: JSON.stringify({ collection_id: collectionId }) }),
   getWorkshopItems: (serverId, page) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/items?page=${page}`),
+  setWorkshopAddons: (serverId, addonIds) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/addons`, { method: 'POST', body: JSON.stringify({ addon_ids: addonIds }) }),
+  getWorkshopAddons: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/addons`),
 };
