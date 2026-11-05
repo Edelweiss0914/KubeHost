@@ -692,16 +692,19 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
   const canStart = server.status === 'stopped' || server.status === 'error';
   const canStop = server.status === 'running' || server.status === 'provisioning';
   const active = server.status === 'running' || server.status === 'provisioning';
+  const isMinecraft = server.game === 'minecraft-java';
+
+  useEffect(() => { setSubView('console'); }, [server.id]);
 
   const NAV_ITEMS: [ServerSubView, string, string][] = [
-    ['console', '▶', '콘솔'],
-    ['players', '◉', '플레이어'],
+    ['console', '▶', isMinecraft ? '콘솔' : '파드 로그'],
+    ...(isMinecraft ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
     ['files', '◫', '파일'],
-    ['manage', '⚒', '관리'],
+    ...(isMinecraft ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
     ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
-    ['settings', '⚙', '설정'],
+    ...(isMinecraft ? [['settings', '⚙', '설정'] as [ServerSubView, string, string]] : []),
   ];
 
   return (
@@ -769,15 +772,15 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
         {subView === 'console' && (
           <div className="panel">
             <div className="section-title detail-summary">
-              <div><span className="eyebrow">CONSOLE</span><h2>서버 콘솔</h2></div>
+              <div><span className="eyebrow">{isMinecraft ? 'CONSOLE' : 'POD LOGS'}</span><h2>{isMinecraft ? '서버 콘솔' : '파드 로그'}</h2></div>
             </div>
-            <ServerConsole serverId={server.id} active={active}/>
+            <ServerConsole serverId={server.id} active={active} game={server.game}/>
           </div>
         )}
-        {subView === 'players' && (
+        {subView === 'players' && isMinecraft && (
           <PlayerPanel serverId={server.id} active={active} />
         )}
-        {subView === 'manage' && (
+        {subView === 'manage' && isMinecraft && (
           <ManagePanel serverId={server.id} active={active} game={server.game} />
         )}
         {subView === 'overview' && (
@@ -787,7 +790,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
                 <div><span className="eyebrow">SERVER INFO</span><h2>서버 정보</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
               </div>
               <dl className="details-grid">
-                <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>
+                {isMinecraft && <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>}
                 <div><dt>호스트 서버</dt><dd>{server.node_id}</dd></div>
                 <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
                 <div><dt>저장 공간 <Tooltip text="서버의 월드 데이터와 파일이 저장되는 공간입니다." /></dt><dd>{server.storage_gb} GiB · local-path</dd></div>
@@ -817,7 +820,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
         {subView === 'files' && (
           <FileManager serverId={server.id} />
         )}
-        {subView === 'settings' && (
+        {subView === 'settings' && isMinecraft && (
           <ServerSettingsPanel
             serverId={server.id}
             currentVersion={server.version}

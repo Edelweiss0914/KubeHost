@@ -20,6 +20,15 @@ it('shows start/stop/delete actions without mock gating', () => {
  expect(list).toContain('첫 서버 만들기');
 });
 
+it('shows pod logs without Minecraft management or RCON controls for Garry\'s Mod', () => {
+ const html = renderToStaticMarkup(<ServerDetail server={{...server, game:'garrysmod'}} busy={false} onAction={()=>{}} onDelete={()=>{}} onBack={()=>{}} />);
+ expect(html).toContain('파드 로그');
+ expect(html).not.toContain('명령어를 입력');
+ expect(html).not.toContain('플레이어</button>');
+ expect(html).not.toContain('관리</button>');
+ expect(html).not.toContain('설정</button>');
+});
+
 it('shows node, pod, container and owning game server as a hierarchy', () => {
  const html = renderToStaticMarkup(<ClusterMap
    nodes={[{id:'worker-01',name:'worker-01',role:'worker',status:'Ready',schedulable:true,cpu_capacity:8,memory_mb_capacity:16384,cpu_requested_m:0,memory_mb_requested:0}]}

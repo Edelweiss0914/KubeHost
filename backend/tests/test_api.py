@@ -102,6 +102,15 @@ def test_unknown_mode_is_rejected(monkeypatch):
         create_app()
 
 
+def test_non_minecraft_console_rejects_rcon(client):
+    server = client.post("/api/v1/servers", json={"name": "GMod server", "game": "garrysmod"}).json()
+    url = f"/api/v1/servers/{server['id']}"
+    assert client.post(f"{url}/start").status_code == 200
+    response = client.post(f"{url}/console", json={"command": "status"})
+    assert response.status_code == 422
+    assert "RCON" in response.json()["detail"]
+
+
 def test_mock_nodes_and_openapi(client):
     nodes = client.get("/api/v1/nodes").json()
     assert all(node["mock"] for node in nodes)

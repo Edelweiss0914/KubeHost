@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { api } from '../api/client';
 import { wsApiUrl } from '../api/config';
+import type { Server } from '../domain/server';
 
 type Line = { type: 'cmd' | 'rcon' | 'log' | 'err'; text: string };
 
 type ServerConsoleProps = {
   serverId: string;
   active: boolean;
+  game: Server['game'];
 };
 
-export function ServerConsole({ serverId, active }: ServerConsoleProps) {
+export function ServerConsole({ serverId, active, game }: ServerConsoleProps) {
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -108,7 +110,7 @@ export function ServerConsole({ serverId, active }: ServerConsoleProps) {
 
   return <section className="panel">
     <div className="section-title">
-      <div><span className="eyebrow">RCON + LOGS</span><h2>서버 콘솔</h2></div>
+      <div><span className="eyebrow">{game === 'minecraft-java' ? 'RCON + LOGS' : 'POD LOGS'}</span><h2>{game === 'minecraft-java' ? '서버 콘솔' : '파드 로그'}</h2></div>
       {active && <span className="tag">LIVE</span>}
     </div>
     <div className="console-output">
@@ -119,7 +121,9 @@ export function ServerConsole({ serverId, active }: ServerConsoleProps) {
           : lines.map((line, i) => <div key={i} className={`console-line console-${line.type}`}>{line.text}</div>)}
       <div ref={bottomRef}/>
     </div>
-    {active
+    {game !== 'minecraft-java'
+      ? <p className="muted">게임 파드의 출력 로그입니다. 이 게임의 RCON 명령 전송은 아직 지원하지 않습니다.</p>
+      : active
       ? <form onSubmit={send} className="console-form">
           <input value={input} onChange={e => setInput(e.target.value)}
             placeholder="/list, /op 플레이어명, /gamemode creative @a …"

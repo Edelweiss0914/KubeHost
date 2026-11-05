@@ -149,6 +149,8 @@ class ServerService:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
+        if server.game != "minecraft-java":
+            raise InvalidOperation("이 게임은 RCON 명령 전송을 아직 지원하지 않습니다.")
         if server.status != "running":
             raise InvalidOperation("서버가 실행 중일 때만 명령어를 사용할 수 있습니다.")
         try:
