@@ -27,14 +27,22 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     setError('');
     Promise.all([
       api.getGameSettings(server.id),
-      server.game === 'garrysmod' ? api.getSettings(server.id) : Promise.resolve(null),
+      server.game === 'garrysmod'
+        ? api.getWorkshopItems(server.id, 1).catch(() => null)
+        : Promise.resolve(null),
     ])
-      .then(([gameResult, rawSettings]) => {
+      .then(([gameResult, workshopResult]) => {
         if (!cancelled) {
           setSettings(gameResult);
-          const cid = rawSettings?.['WORKSHOP_COLLECTION_ID'] ?? '';
-          setWorkshopId(cid);
-          if (cid) loadWorkshopItems(1);
+          if (workshopResult) {
+            const cid = workshopResult.collection_id ?? '';
+            setWorkshopId(cid);
+            if (workshopResult.items.length > 0) {
+              setWorkshopItems(workshopResult.items);
+              setWorkshopTotal(workshopResult.total);
+              setWorkshopPage(workshopResult.page);
+            }
+          }
         }
       })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : '설정을 불러오지 못했습니다.'); })
