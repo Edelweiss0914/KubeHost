@@ -1,11 +1,15 @@
 """Real Kubernetes adapter using the kubernetes Python client."""
 import re
+import socket
+import struct
 from typing import Literal
 
 from kubernetes import client, config, utils  # type: ignore[import-untyped]
 from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
 
 from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
+from app.services.file_paths import file_path
+from app.services.gmod_storage import GMOD_ROOT, GMOD_IMAGE, gmod_file_init_container, gmod_volume_mounts
 
 _SHARED_KINDS = {"Namespace", "ResourceQuota", "LimitRange", "NetworkPolicy"}
 
@@ -217,6 +221,68 @@ class K8sAdapter:
             return "error"
         return "provisioning"
 
+    def configure_gmod_rcon(
+        self, server_id: str, namespace: str, password: str,
+        sts_name: str | None = None,
+    ) -> None:
+        """Prepare an existing GMod pod template before scaling it back up."""
+        name = sts_name or f"gmod-{server_id.replace('-', '')}"
+        rcon_ingress = {"from": [{"namespaceSelector": {"matchLabels": {
+            "kubernetes.io/metadata.name": "kubehost-system"}}}],
+            "ports": [{"port": 27015, "protocol": "TCP"}]}
+        policy_name = f"{name}-ingress"
+        try:
+            policy = self._networking.read_namespaced_network_policy(policy_name, namespace)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+            self._networking.create_namespaced_network_policy(namespace, {
+                "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+                "metadata": {"name": policy_name, "namespace": namespace},
+                "spec": {"podSelector": {"matchLabels": {"app.kubernetes.io/name": name}},
+                         "policyTypes": ["Ingress"],
+                         "ingress": [
+                             {"ports": [{"port": 27015, "protocol": "UDP"}]},
+                             rcon_ingress,
+                         ]},
+            })
+        else:
+            ingress = [self._api_client.sanitize_for_serialization(rule)
+                       for rule in (policy.spec.ingress or [])]
+            if rcon_ingress not in ingress:
+                self._networking.patch_namespaced_network_policy(
+                    policy_name, namespace, {"spec": {"ingress": [*ingress, rcon_ingress]}}
+                )
+
+        sts = self._apps.read_namespaced_stateful_set(name, namespace)
+        container = sts.spec.template.spec.containers[0]
+        env = [self._api_client.sanitize_for_serialization(item) for item in (container.env or [])]
+        values = {item["name"]: item.get("value", "") for item in env}
+        args = re.sub(r"(?:^|\s)\+rcon_password\s+\S+", "", values.get("ARGS", "")).strip()
+        args = f"{args} +rcon_password {password}".strip()
+        updates = {"RCON_PASSWORD": password, "ARGS": args, "AUTOUPDATE": "0"}
+        old_mounts = [self._api_client.sanitize_for_serialization(item)
+                      for item in (container.volume_mounts or [])]
+        if not any(item["name"] == "data" for item in old_mounts):
+            raise ValueError("GMod 데이터 볼륨 마운트를 찾을 수 없습니다.")
+        mounts = [item for item in old_mounts if item["name"] != "data"] + gmod_volume_mounts()
+        init_containers = sts.spec.template.spec.init_containers or []
+        needs_init = not any(item.name == "prepare-gmod-files" for item in init_containers)
+        if old_mounts != mounts or needs_init or any(
+            values.get(key) != value for key, value in updates.items()
+        ):
+            env = [item for item in env if item["name"] not in updates]
+            env.extend({"name": key, "value": value} for key, value in updates.items())
+            pod_patch: dict = {"containers": [{
+                "name": container.name, "env": env,
+                "volumeMounts": [{"$patch": "replace"}, *mounts],
+            }]}
+            if needs_init:
+                pod_patch["initContainers"] = [gmod_file_init_container()]
+            self._apps.patch_namespaced_stateful_set(name, namespace, {
+                "spec": {"template": {"spec": pod_patch}}
+            })
+
     def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"], sts_name: str | None = None) -> None:
         name = sts_name or self._sts_name(server_id)
         replicas = 1 if state == "running" else 0
@@ -260,8 +326,10 @@ class K8sAdapter:
             "spec": {"template": {"spec": {"containers": [{"name": container_name, "env": new_env}]}}}
         })
 
-    def rcon(self, server_id: str, namespace: str, command: str, sts_name: str | None = None) -> str:
-        import socket, struct  # noqa: E401
+    def rcon(
+        self, server_id: str, namespace: str, command: str,
+        sts_name: str | None = None, port: int = 25575,
+    ) -> str:
         name = sts_name or self._sts_name(server_id)
         pods = self._core.list_namespaced_pod(
             namespace, label_selector=f"app.kubernetes.io/name={name}"
@@ -274,6 +342,8 @@ class K8sAdapter:
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         password = env.get("RCON_PASSWORD", "")
+        if not password:
+            raise ValueError("RCON이 설정되지 않았습니다. 서버를 중지한 뒤 다시 시작하세요.")
 
         def recv_exact(sock: socket.socket, n: int) -> bytes:
             buf = b""
@@ -290,6 +360,8 @@ class K8sAdapter:
 
         def recv_packet(sock: socket.socket) -> tuple[int, int, str]:
             length = struct.unpack("<i", recv_exact(sock, 4))[0]
+            if length < 10 or length > 4 * 1024 * 1024:
+                raise ValueError("RCON 응답 크기가 올바르지 않습니다.")
             body = recv_exact(sock, length)
             req_id, ptype = struct.unpack("<ii", body[:8])
             payload = body[8:-2].decode("utf-8", errors="replace")
@@ -297,14 +369,34 @@ class K8sAdapter:
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(5.0)
-            sock.connect((pod_ip, 25575))
+            sock.connect((pod_ip, port))
             send_packet(sock, 1, 3, password)
-            auth_id, _, _ = recv_packet(sock)
-            if auth_id == -1:
-                raise ValueError("RCON 인증 실패")
+            for _ in range(3):
+                auth_id, auth_type, _ = recv_packet(sock)
+                if auth_id == -1:
+                    raise ValueError("RCON 인증 실패")
+                if auth_id == 1 and auth_type == 2:
+                    break
+            else:
+                raise ValueError("RCON 인증 응답이 올바르지 않습니다.")
             send_packet(sock, 2, 2, command)
-            _, _, response = recv_packet(sock)
-            return response
+            if port == 27015:
+                # Source RCON can split output; an empty response-value request
+                # produces a sentinel after the command's final packet.
+                send_packet(sock, 3, 0, "")
+                responses: list[str] = []
+                for _ in range(64):
+                    response_id, _, response = recv_packet(sock)
+                    if response_id == 2:
+                        responses.append(response)
+                    elif response_id == 3 and response:
+                        return "".join(responses)
+                raise ValueError("RCON 응답이 너무 깁니다.")
+            for _ in range(3):
+                response_id, _, response = recv_packet(sock)
+                if response_id == 2:
+                    return response
+            raise ValueError("RCON 명령 응답이 올바르지 않습니다.")
 
     def list_pvcs(self, namespace: str) -> list[str]:
         try:
@@ -408,11 +500,17 @@ class K8sAdapter:
             for _off in range(0, len(stdin_data), _CHUNK):
                 resp.write_stdin(stdin_data[_off:_off + _CHUNK])
         out = ""
+        err = ""
         while resp.is_open():
             resp.update(timeout=60)
             if resp.peek_stdout():
                 out += resp.read_stdout()
+            if resp.peek_stderr():
+                err += resp.read_stderr()
+        returncode = resp.returncode
         resp.close()
+        if returncode not in (0, None):
+            raise ValueError(err.strip() or f"파드 명령이 실패했습니다 ({returncode}).")
         return out
 
     # ── JVM memory ───────────────────────────────────────────────────────────
@@ -531,18 +629,21 @@ class K8sAdapter:
 
     # ── File Manager ─────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _safe_path(path: str) -> str:
-        import os as _os
-        path = (path or "/data").strip()
-        if not path.startswith("/"):
-            path = "/data/" + path
-        normalized = _os.path.normpath(path)
-        if normalized != "/data" and not normalized.startswith("/data/"):
-            raise ValueError("경로는 /data/ 이내여야 합니다.")
-        if "'" in normalized:
-            raise ValueError("경로에 사용할 수 없는 문자가 포함돼 있습니다.")
-        return normalized
+    def _require_gmod_file_mount(self, server_id: str, namespace: str, sts_name: str | None) -> None:
+        name = sts_name or f"gmod-{server_id.replace('-', '')}"
+        sts = self._apps.read_namespaced_stateful_set(name, namespace)
+        mounts = sts.spec.template.spec.containers[0].volume_mounts or []
+        if not any(m.mount_path == GMOD_ROOT and m.sub_path == "game-files" for m in mounts):
+            raise ValueError("GMod 파일 매니저를 사용하려면 서버를 중지한 뒤 다시 시작하세요.")
+        pods = self._core.list_namespaced_pod(
+            namespace, label_selector=f"app.kubernetes.io/name={name}"
+        ).items
+        for pod in pods:
+            if pod.status.phase != "Running":
+                continue
+            pod_mounts = pod.spec.containers[0].volume_mounts or []
+            if not any(m.mount_path == GMOD_ROOT and m.sub_path == "game-files" for m in pod_mounts):
+                raise ValueError("GMod 파드가 새 파일 저장소로 재시작되기를 기다려 주세요.")
 
     def _pvc_name(self, server_id: str, sts_name: str | None = None) -> str:
         return f"data-{sts_name or self._sts_name(server_id)}-0"
@@ -559,12 +660,14 @@ class K8sAdapter:
     def _exec_in_temp_pod(
         self, namespace: str, pvc_name: str, node_name: str,
         command: list[str], stdin_data: bytes | None = None,
+        game: str = "minecraft-java",
     ) -> str:
         import time
         from uuid import uuid4
         from kubernetes.stream import stream  # type: ignore[import-untyped]
 
         pod_name = f"kubehost-fs-{uuid4().hex[:8]}"
+        gmod = game == "garrysmod"
         pod_body = {
             "apiVersion": "v1", "kind": "Pod",
             "metadata": {
@@ -580,9 +683,10 @@ class K8sAdapter:
                     "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"},
                 },
                 **({"nodeSelector": {"kubernetes.io/hostname": node_name}} if node_name else {}),
+                **({"initContainers": [gmod_file_init_container()]} if gmod else {}),
                 "containers": [{
                     "name": "fs",
-                    "image": "itzg/minecraft-server:latest",
+                    "image": GMOD_IMAGE if gmod else "itzg/minecraft-server:latest",
                     "command": ["/bin/sh", "-c", "sleep 300"],
                     "securityContext": {
                         "allowPrivilegeEscalation": False,
@@ -592,7 +696,8 @@ class K8sAdapter:
                         "requests": {"cpu": "50m", "memory": "64Mi"},
                         "limits": {"cpu": "100m", "memory": "128Mi"},
                     },
-                    "volumeMounts": [{"name": "data", "mountPath": "/data"}],
+                    "volumeMounts": (gmod_volume_mounts() if gmod
+                                     else [{"name": "data", "mountPath": "/data"}]),
                 }],
                 "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": pvc_name}}],
             },
@@ -600,7 +705,7 @@ class K8sAdapter:
         core = self._fresh_core()
         try:
             core.create_namespaced_pod(namespace, pod_body)
-            for _ in range(30):
+            for _ in range(300 if gmod else 30):
                 pod = core.read_namespaced_pod(pod_name, namespace)
                 phase = (pod.status.phase if pod.status else None)
                 cs = (pod.status.container_statuses or []) if pod.status else []
@@ -623,11 +728,17 @@ class K8sAdapter:
                 for _off in range(0, len(stdin_data), _CHUNK):
                     resp.write_stdin(stdin_data[_off:_off + _CHUNK])
             out = ""
+            err = ""
             while resp.is_open():
                 resp.update(timeout=15)
                 if resp.peek_stdout():
                     out += resp.read_stdout()
+                if resp.peek_stderr():
+                    err += resp.read_stderr()
+            returncode = resp.returncode
             resp.close()
+            if returncode not in (0, None):
+                raise ValueError(err.strip() or f"임시 파드 명령이 실패했습니다 ({returncode}).")
             return out
         finally:
             try:
@@ -639,6 +750,7 @@ class K8sAdapter:
         self, server_id: str, namespace: str,
         command: list[str], stdin_data: bytes | None = None,
         sts_name: str | None = None,
+        game: str = "minecraft-java",
     ) -> str:
         """실행 중인 파드 우선, 없으면 임시 파드로 폴백."""
         try:
@@ -646,12 +758,14 @@ class K8sAdapter:
         except ValueError:
             pvc = self._pvc_name(server_id, sts_name)
             node = self._get_server_node(server_id, namespace, sts_name)
-            return self._exec_in_temp_pod(namespace, pvc, node, command, stdin_data)
+            return self._exec_in_temp_pod(namespace, pvc, node, command, stdin_data, game)
 
     _MAX_FILE_BYTES = 1024 * 1024 * 1024  # 1 GiB
 
-    def list_files(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> list[dict]:
-        safe = self._safe_path(path)
+    def list_files(self, server_id: str, namespace: str, path: str, sts_name: str | None = None, game: str = "minecraft-java") -> list[dict]:
+        safe = file_path(game, path)
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
         # glob for loop — 파이프 없이 안정적으로 각 항목을 출력
         cmd = [
             "sh", "-c",
@@ -665,7 +779,7 @@ class K8sAdapter:
             f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$name\"; "
             f"done",
         ]
-        out = self._exec_anywhere(server_id, namespace, cmd, sts_name=sts_name)
+        out = self._exec_anywhere(server_id, namespace, cmd, sts_name=sts_name, game=game)
         entries = []
         for line in out.strip().splitlines():
             parts = line.split("\t", 3)
@@ -683,34 +797,42 @@ class K8sAdapter:
             })
         return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
 
-    def read_file(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> bytes:
+    def read_file(self, server_id: str, namespace: str, path: str, sts_name: str | None = None, game: str = "minecraft-java") -> bytes:
         import base64
-        safe = self._safe_path(path)
+        safe = file_path(game, path)
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
         size_out = self._exec_anywhere(server_id, namespace,
-            ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"], sts_name=sts_name)
+            ["sh", "-c", f"stat -c %s '{safe}' 2>/dev/null || echo 0"], sts_name=sts_name, game=game)
         size = int(size_out.strip()) if size_out.strip().isdigit() else 0
         if size > self._MAX_FILE_BYTES:
             raise ValueError(f"파일이 너무 큽니다 ({size // (1024 * 1024)} MiB, 최대 1 GiB).")
         out = self._exec_anywhere(server_id, namespace,
-            ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"], sts_name=sts_name)
+            ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"], sts_name=sts_name, game=game)
         return base64.b64decode(out.strip())
 
-    def write_file(self, server_id: str, namespace: str, path: str, content: bytes, sts_name: str | None = None) -> None:
+    def write_file(self, server_id: str, namespace: str, path: str, content: bytes, sts_name: str | None = None, game: str = "minecraft-java") -> None:
         if len(content) > self._MAX_FILE_BYTES:
             raise ValueError(f"파일이 너무 큽니다 ({len(content) // (1024 * 1024)} MiB, 최대 1 GiB).")
-        safe = self._safe_path(path)
+        safe = file_path(game, path, write=True)
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
         parent = safe.rsplit("/", 1)[0] or "/data"
         # head -c N reads exactly N bytes from stdin then exits → EOF 대기 없음, base64 오버헤드 없음
         self._exec_anywhere(server_id, namespace,
             ["sh", "-c", f"mkdir -p '{parent}' && head -c {len(content)} > '{safe}'"],
-            stdin_data=content, sts_name=sts_name)
+            stdin_data=content, sts_name=sts_name, game=game)
 
-    def delete_path(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> None:
-        safe = self._safe_path(path)
-        if safe in ("/data", "/data/"):
-            raise ValueError("/data 루트는 삭제할 수 없습니다.")
-        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"rm -rf '{safe}'"], sts_name=sts_name)
+    def delete_path(self, server_id: str, namespace: str, path: str, sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        safe = file_path(game, path, write=True)
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
+            if safe in {f"{GMOD_ROOT}/{folder}" for folder in ("data", "addons", "cfg")}:
+                raise ValueError("마운트된 폴더는 삭제할 수 없습니다.")
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"rm -rf '{safe}'"], sts_name=sts_name, game=game)
 
-    def mkdir(self, server_id: str, namespace: str, path: str, sts_name: str | None = None) -> None:
-        safe = self._safe_path(path)
-        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"], sts_name=sts_name)
+    def mkdir(self, server_id: str, namespace: str, path: str, sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        safe = file_path(game, path, write=True)
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
+        self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"], sts_name=sts_name, game=game)

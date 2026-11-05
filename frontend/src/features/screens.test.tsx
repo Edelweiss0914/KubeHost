@@ -3,13 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { CreateServer } from './CreateServer';
 import { ServerList } from './ServerList';
 import { ServerDetail } from './ServerDetail';
+import { ServerConsole } from './ServerConsole';
+import { FileManager } from './FileManager';
 import { ClusterMap } from './ClusterMap';
 import { defaults, type Server } from '../domain/server';
 const server:Server={...defaults,id:'server-1',name:'world',node_id:'worker-01',owner_id:'demo-user',status:'stopped',created_at:'2026-11-01T00:00:00Z',connection:null,resource_plan:{namespace:'tenant-opaque',resources:[],warnings:[]},logs:[]};
 describe('console screens',()=>{
  it('gives empty workspaces an actionable first step',()=>{const html=renderToStaticMarkup(<ServerList servers={[]} retained={[]} onSelect={()=>{}} onCreate={()=>{}} onRestore={()=>{}}/>);expect(html).toContain('첫 서버 만들기');expect(html).not.toContain('<table');});
  it('keeps control plane nodes out of deployment choices',()=>{const html=renderToStaticMarkup(<CreateServer nodes={[{id:'cp',name:'control-plane',role:'control-plane',status:'Ready',schedulable:false,cpu_capacity:4,memory_mb_capacity:16384,cpu_requested_m:0,memory_mb_requested:0}]} busy={false} onCreate={async()=>{}} onCancel={()=>{}}/>);expect(html).toContain('사용 가능한 호스트 서버 없음');expect(html).toContain('disabled');expect(html).toContain('aria-describedby');});
- it('shows server identity and navigation in server details',()=>{const html=renderToStaticMarkup(<ServerDetail server={server} busy={false} onAction={()=>{}} onDelete={()=>{}} onBack={()=>{}} />);expect(html).toContain('world');expect(html).toContain('서버 정보');expect(html).toContain('서버 콘솔');});
+ it('shows server identity and navigation in server details',()=>{const html=renderToStaticMarkup(<ServerDetail server={server} busy={false} onAction={()=>{}} onDelete={()=>{}} onBack={()=>{}} />);expect(html).toContain('world');expect(html).toContain('서버 정보');expect(html).toContain('RCON 콘솔');});
 });
 
 it('shows start/stop/delete actions without mock gating', () => {
@@ -20,14 +22,37 @@ it('shows start/stop/delete actions without mock gating', () => {
  expect(list).toContain('첫 서버 만들기');
 });
 
-it('shows pod logs without Minecraft management or RCON controls for Garry\'s Mod', () => {
+it('shows separate pod logs and RCON views without Minecraft management for Garry\'s Mod', () => {
  const html = renderToStaticMarkup(<ServerDetail server={{...server, game:'garrysmod'}} busy={false} onAction={()=>{}} onDelete={()=>{}} onBack={()=>{}} />);
  expect(html).toContain('파드 로그');
+ expect(html).toContain('RCON 콘솔');
  expect(html).not.toContain('명령어를 입력');
  expect(html).not.toContain('플레이어</button>');
  expect(html).not.toContain('관리</button>');
- expect(html).not.toContain('파일</button>');
+ expect(html).toContain('파일</button>');
  expect(html).toContain('설정</button>');
+});
+
+it('opens the Garry\'s Mod game directory in its file manager', () => {
+ const html = renderToStaticMarkup(<FileManager serverId="server-1" game="garrysmod"/>);
+ expect(html).toContain('garrysmod');
+ expect(html).not.toContain('/data</span>');
+});
+
+it('enables Garry\'s Mod RCON commands while keeping Valheim read only', () => {
+ const gmod = renderToStaticMarkup(<ServerConsole serverId="server-1" active game="garrysmod"/>);
+ expect(gmod).toContain('<form');
+ expect(gmod).toContain('status');
+ const valheim = renderToStaticMarkup(<ServerConsole serverId="server-1" active game="valheim"/>);
+ expect(valheim).toContain('RCON 연결이 설정되지 않았습니다');
+ expect(valheim).not.toContain('<form');
+});
+
+it('keeps Minecraft RCON commands and pod logs in separate views', () => {
+ const html = renderToStaticMarkup(<ServerDetail server={server} busy={false} onAction={()=>{}} onDelete={()=>{}} onBack={()=>{}} />);
+ expect(html).toContain('RCON 콘솔');
+ expect(html).toContain('파드 로그');
+ expect(html).not.toContain('로그를 불러오는 중');
 });
 
 it('shows node, pod, container and owning game server as a hierarchy', () => {

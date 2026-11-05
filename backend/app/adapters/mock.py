@@ -2,6 +2,7 @@
 from typing import Literal
 
 from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
+from app.services.file_paths import file_path, file_root
 
 
 class InMemoryServerRepository:
@@ -33,6 +34,9 @@ class InMemoryServerRepository:
 
     def retained_for(self, owner_id: str) -> list[Server]:
         return [s.model_copy(deep=True) for s in self.retained.values() if s.owner_id == owner_id]
+
+    def get_user_quota(self, user_id: str) -> dict:
+        return {"max_cpu": 4.0, "max_memory_mb": 8192, "max_storage_gb": 100, "max_servers": 10}
 
     _GAMES: list[dict] = [
         {"id": "mc-java",  "slug": "minecraft-java",  "name": "Minecraft Java",         "steam_app_id": None,    "image_url": None, "description": "Paper 서버", "supported": True},
@@ -122,7 +126,10 @@ class MockKubernetesAdapter:
     def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"], sts_name: str | None = None) -> None:
         pass
 
-    def delete(self, server_id: str, namespace: str, delete_data: bool) -> None:
+    def delete(
+        self, server_id: str, namespace: str, delete_data: bool,
+        sts_name: str | None = None,
+    ) -> None:
         pass
 
     def logs(self, server_id: str, namespace: str, tail: int = 100) -> list[str]:
@@ -137,7 +144,18 @@ class MockKubernetesAdapter:
     def patch_settings(self, server_id: str, namespace: str, updates: dict[str, str], sts_name: str | None = None) -> None:
         pass
 
-    def rcon(self, server_id: str, namespace: str, command: str) -> str:
+    def configure_gmod_rcon(
+        self, server_id: str, namespace: str, password: str,
+        sts_name: str | None = None,
+    ) -> None:
+        pass
+
+    def rcon(
+        self, server_id: str, namespace: str, command: str,
+        sts_name: str | None = None, port: int = 25575,
+    ) -> str:
+        if port == 27015:
+            return f"[MOCK] Garry's Mod: {command}"
         cmd = command.lstrip("/").strip().lower()
         if cmd == "list":
             return "There are 2 of a max of 20 players online: Steve, Alex"
@@ -230,18 +248,28 @@ class MockKubernetesAdapter:
     ]
     _EPOCH = 1_700_000_000
 
-    def _fs_for(self, server_id: str) -> dict[str, dict]:
+    _GMOD_FS = [
+        ("data", "dir", 0), ("addons", "dir", 0), ("cfg", "dir", 0),
+        ("maps", "dir", 0), ("gamemodes", "dir", 0), ("lua", "dir", 0),
+        ("cfg/server.cfg", "file", 128),
+    ]
+
+    def _fs_for(self, server_id: str, game: str = "minecraft-java") -> dict[str, dict]:
         if server_id not in self._fs:
+            source = self._DEFAULT_FS if game == "minecraft-java" else [
+                (f"{file_root(game)}/{path}", kind, size) for path, kind, size in self._GMOD_FS
+            ]
             self._fs[server_id] = {
                 path: {"name": path.rsplit("/", 1)[-1], "type": ftype,
                        "size": size, "modified": self._EPOCH, "content": b""}
-                for path, ftype, size in self._DEFAULT_FS
+                for path, ftype, size in source
             }
         return self._fs[server_id]
 
-    def list_files(self, server_id: str, namespace: str, path: str) -> list[dict]:
-        path = path.rstrip("/")
-        fs = self._fs_for(server_id)
+    def list_files(self, server_id: str, namespace: str, path: str,
+                   sts_name: str | None = None, game: str = "minecraft-java") -> list[dict]:
+        path = file_path(game, path).rstrip("/")
+        fs = self._fs_for(server_id, game)
         entries = []
         for fpath, entry in fs.items():
             parent = fpath.rsplit("/", 1)[0]
@@ -250,16 +278,20 @@ class MockKubernetesAdapter:
                                  "size": entry["size"], "modified": entry["modified"]})
         return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
 
-    def read_file(self, server_id: str, namespace: str, path: str) -> bytes:
-        fs = self._fs_for(server_id)
+    def read_file(self, server_id: str, namespace: str, path: str,
+                  sts_name: str | None = None, game: str = "minecraft-java") -> bytes:
+        path = file_path(game, path)
+        fs = self._fs_for(server_id, game)
         entry = fs.get(path)
         if entry is None:
             raise ValueError("파일을 찾을 수 없습니다.")
         return entry.get("content", b"")
 
-    def write_file(self, server_id: str, namespace: str, path: str, content: bytes) -> None:
+    def write_file(self, server_id: str, namespace: str, path: str, content: bytes,
+                   sts_name: str | None = None, game: str = "minecraft-java") -> None:
         import time
-        fs = self._fs_for(server_id)
+        path = file_path(game, path, write=True)
+        fs = self._fs_for(server_id, game)
         name = path.rsplit("/", 1)[-1]
         # Ensure parent dir entry exists
         parent = path.rsplit("/", 1)[0]
@@ -270,15 +302,23 @@ class MockKubernetesAdapter:
         fs[path] = {"name": name, "type": "file", "size": len(content),
                     "modified": int(time.time()), "content": content}
 
-    def delete_path(self, server_id: str, namespace: str, path: str) -> None:
-        fs = self._fs_for(server_id)
+    def delete_path(self, server_id: str, namespace: str, path: str,
+                    sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        path = file_path(game, path, write=True)
+        if game == "garrysmod" and path in {
+            f"{file_root(game)}/{folder}" for folder in ("data", "addons", "cfg")
+        }:
+            raise ValueError("마운트된 폴더는 삭제할 수 없습니다.")
+        fs = self._fs_for(server_id, game)
         to_del = [k for k in fs if k == path or k.startswith(path + "/")]
         for k in to_del:
             del fs[k]
 
-    def mkdir(self, server_id: str, namespace: str, path: str) -> None:
+    def mkdir(self, server_id: str, namespace: str, path: str,
+              sts_name: str | None = None, game: str = "minecraft-java") -> None:
         import time
-        fs = self._fs_for(server_id)
+        path = file_path(game, path, write=True)
+        fs = self._fs_for(server_id, game)
         name = path.rsplit("/", 1)[-1]
         fs[path] = {"name": name, "type": "dir", "size": 0,
                     "modified": int(time.time()), "content": b""}

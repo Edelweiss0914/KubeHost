@@ -126,6 +126,7 @@ export interface ServerGateway {
   setVersion(id: string, version: string): Promise<void>;
   listFiles(serverId: string, path: string): Promise<FileEntry[]>;
   downloadFile(serverId: string, path: string): Promise<void>;
+  readTextFile(serverId: string, path: string): Promise<string>;
   uploadFile(serverId: string, path: string, file: File, onProgress?: (pct: number) => void): Promise<{ path: string; name: string; size: number }>;
   deletePath(serverId: string, path: string): Promise<void>;
   mkdirFs(serverId: string, path: string): Promise<{ path: string }>;
@@ -225,6 +226,17 @@ export const api: ServerGateway = {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
+  },
+  readTextFile: async (id, path) => {
+    const token = getToken();
+    const resp = await fetch(apiUrl(`/api/v1/servers/${encodeURIComponent(id)}/fs/download?path=${encodeURIComponent(path)}`), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) {
+      const detail = await resp.json().then(body => body.detail as string).catch(() => '파일 열기 실패');
+      throw new ApiError(resp.status, detail);
+    }
+    return resp.text();
   },
   uploadFile: (id, path, file, onProgress) => {
     return new Promise((resolve, reject) => {

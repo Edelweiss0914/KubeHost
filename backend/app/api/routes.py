@@ -10,6 +10,7 @@ from app.models.server import (
     ValheimSettings,
 )
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
+from app.services.file_paths import file_path
 
 router = APIRouter()
 
@@ -610,19 +611,26 @@ from fastapi.responses import Response as _Response
 # ── File Manager ──────────────────────────────────────────────────────────────
 
 @router.get("/api/v1/servers/{server_id}/fs")
-def list_files(server_id: str, owner: Owner, svc: Service, path: str = "/data") -> list[dict]:
+def list_files(server_id: str, owner: Owner, svc: Service, path: str | None = None) -> list[dict]:
     server = svc.get(owner, server_id)
-    return svc.adapter.list_files(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
+    try:
+        safe = file_path(server.game, path)
+        return svc.adapter.list_files(server_id, server.resource_plan.namespace, safe,
+                                      sts_name=server.resource_plan.sts_name, game=server.game)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/api/v1/servers/{server_id}/fs/download")
 def download_file(server_id: str, owner: Owner, svc: Service, path: str) -> _Response:
     server = svc.get(owner, server_id)
     try:
-        content = svc.adapter.read_file(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
+        safe = file_path(server.game, path)
+        content = svc.adapter.read_file(server_id, server.resource_plan.namespace, safe,
+                                        sts_name=server.resource_plan.sts_name, game=server.game)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    filename = path.rsplit("/", 1)[-1]
+    filename = safe.rsplit("/", 1)[-1]
     return _Response(
         content=content,
         media_type="application/octet-stream",
@@ -633,15 +641,20 @@ def download_file(server_id: str, owner: Owner, svc: Service, path: str) -> _Res
 @router.post("/api/v1/servers/{server_id}/fs/upload", status_code=201)
 async def upload_file(
     server_id: str, owner: Owner, svc: Service,
-    path: str = "/data",
+    path: str | None = None,
     file: UploadFile = _File(...),
 ) -> dict:
     filename = (file.filename or "").strip()
     if not filename:
         raise HTTPException(status_code=422, detail="파일명이 없습니다.")
-    dest = path.rstrip("/") + "/" + filename
-    content = await file.read()
     server = svc.get(owner, server_id)
+    if "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=422, detail="파일명에 경로 구분자를 사용할 수 없습니다.")
+    try:
+        dest = file_path(server.game, (path or file_path(server.game, None)).rstrip("/") + "/" + filename, write=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    content = await file.read()
     import asyncio
     loop = asyncio.get_event_loop()
     try:
@@ -650,7 +663,7 @@ async def upload_file(
             None, _functools.partial(
                 svc.adapter.write_file,
                 server_id, server.resource_plan.namespace, dest, content,
-                sts_name=server.resource_plan.sts_name,
+                sts_name=server.resource_plan.sts_name, game=server.game,
             ),
         )
     except ValueError as exc:
@@ -662,7 +675,9 @@ async def upload_file(
 def delete_path(server_id: str, owner: Owner, svc: Service, path: str) -> None:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.delete_path(server_id, server.resource_plan.namespace, path, sts_name=server.resource_plan.sts_name)
+        safe = file_path(server.game, path, write=True)
+        svc.adapter.delete_path(server_id, server.resource_plan.namespace, safe,
+                                sts_name=server.resource_plan.sts_name, game=server.game)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -675,10 +690,12 @@ class _MkdirBody(_BaseModel):
 def make_dir(server_id: str, body: _MkdirBody, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)
     try:
-        svc.adapter.mkdir(server_id, server.resource_plan.namespace, body.path, sts_name=server.resource_plan.sts_name)
+        safe = file_path(server.game, body.path, write=True)
+        svc.adapter.mkdir(server_id, server.resource_plan.namespace, safe,
+                          sts_name=server.resource_plan.sts_name, game=server.game)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {"path": body.path}
+    return {"path": safe}
 
 
 # ── Version upgrade ───────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { Tooltip } from '../components/Tooltip';
 import { ServerSettingsPanel } from './ServerSettings';
 import { GameSettingsPanel } from './GameSettings';
 import { ServerConsole } from './ServerConsole';
+import { PodLogs } from './PodLogs';
 import { FileManager } from './FileManager';
 import { api } from '../api/client';
 import type { Schedule, ScheduleInput, ServerMetrics } from '../api/client';
@@ -676,7 +677,7 @@ function ScheduleForm({ initial, onSave, onCancel }: {
   );
 }
 
-type ServerSubView = 'console' | 'players' | 'manage' | 'overview' | 'metrics' | 'schedule' | 'settings' | 'files';
+type ServerSubView = 'console' | 'logs' | 'players' | 'manage' | 'overview' | 'metrics' | 'schedule' | 'settings' | 'files';
 
 type ServerDetailProps = {
   server: Server;
@@ -688,7 +689,7 @@ type ServerDetailProps = {
 };
 
 export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdated }: ServerDetailProps) {
-  const [subView, setSubView] = useState<ServerSubView>('console');
+  const [subView, setSubView] = useState<ServerSubView>(server.game === 'minecraft-java' ? 'console' : 'logs');
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -697,12 +698,13 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const active = server.status === 'running' || server.status === 'provisioning';
   const isMinecraft = server.game === 'minecraft-java';
 
-  useEffect(() => { setSubView('console'); }, [server.id]);
+  useEffect(() => { setSubView(server.game === 'minecraft-java' ? 'console' : 'logs'); }, [server.id, server.game]);
 
   const NAV_ITEMS: [ServerSubView, string, string][] = [
-    ['console', '▶', isMinecraft ? '콘솔' : '파드 로그'],
+    ['console', '⌨', 'RCON 콘솔'],
+    ['logs', '▤', '파드 로그'],
     ...(isMinecraft ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
-    ...(isMinecraft ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
+    ...(server.game !== 'valheim' ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
     ...(isMinecraft ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
     ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
@@ -772,14 +774,8 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
 
       {/* Right content area */}
       <div className="server-content">
-        {subView === 'console' && (
-          <div className="panel">
-            <div className="section-title detail-summary">
-              <div><span className="eyebrow">{isMinecraft ? 'CONSOLE' : 'POD LOGS'}</span><h2>{isMinecraft ? '서버 콘솔' : '파드 로그'}</h2></div>
-            </div>
-            <ServerConsole serverId={server.id} active={active} game={server.game}/>
-          </div>
-        )}
+        {subView === 'console' && <ServerConsole serverId={server.id} active={server.status === 'running'} game={server.game}/>}
+        {subView === 'logs' && <PodLogs serverId={server.id} active={active}/>}
         {subView === 'players' && isMinecraft && (
           <PlayerPanel serverId={server.id} active={active} />
         )}
@@ -830,8 +826,8 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             <SchedulePanel serverId={server.id}/>
           </section>
         )}
-        {subView === 'files' && isMinecraft && (
-          <FileManager serverId={server.id} />
+        {subView === 'files' && server.game !== 'valheim' && (
+          <FileManager serverId={server.id} game={server.game} />
         )}
         {subView === 'settings' && (
           isMinecraft
@@ -841,7 +837,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                 onVersionSaved={() => {}}
                 onClose={() => setSubView('console')}
               />
-            : <GameSettingsPanel server={server} onClose={() => setSubView('console')} onSaved={onUpdated}/>
+            : <GameSettingsPanel server={server} onClose={() => setSubView('logs')} onSaved={onUpdated}/>
         )}
       </div>
     </div>

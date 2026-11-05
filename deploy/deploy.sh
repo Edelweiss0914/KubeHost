@@ -30,6 +30,7 @@ fi
 
 # 4. 매니페스트 적용
 echo "[4/5] K8s 매니페스트 적용..."
+kubectl apply -f "$REPO_DIR/deploy/storageclass.yaml"
 kubectl apply -f "$REPO_DIR/deploy/namespace.yaml"
 kubectl apply -f "$REPO_DIR/deploy/rbac.yaml"
 kubectl apply -f "$REPO_DIR/deploy/backend.yaml"

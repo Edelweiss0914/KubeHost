@@ -93,7 +93,7 @@ def test_topology_pods_follow_server_state_and_owner(client):
 def test_quota_counts_retained_storage(client):
     server = client.post("/api/v1/servers", json={"name": "Large world", "storage_gb": 100}).json()
     client.delete(f"/api/v1/servers/{server['id']}")
-    assert client.post("/api/v1/servers", json={"name": "Another world"}).status_code == 409
+    assert client.post("/api/v1/servers", json={"name": "Another world"}).status_code == 422
 
 
 def test_unknown_mode_is_rejected(monkeypatch):
@@ -102,8 +102,17 @@ def test_unknown_mode_is_rejected(monkeypatch):
         create_app()
 
 
-def test_non_minecraft_console_rejects_rcon(client):
+def test_garrysmod_console_accepts_rcon(client):
     server = client.post("/api/v1/servers", json={"name": "GMod server", "game": "garrysmod"}).json()
+    url = f"/api/v1/servers/{server['id']}"
+    assert client.post(f"{url}/start").status_code == 200
+    response = client.post(f"{url}/console", json={"command": "status"})
+    assert response.status_code == 200
+    assert response.json()["output"]
+
+
+def test_valheim_console_rejects_rcon(client):
+    server = client.post("/api/v1/servers", json={"name": "Valheim server", "game": "valheim"}).json()
     url = f"/api/v1/servers/{server['id']}"
     assert client.post(f"{url}/start").status_code == 200
     response = client.post(f"{url}/console", json={"command": "status"})
@@ -140,7 +149,7 @@ def test_game_settings_reject_mismatched_payload(client):
 
 def test_mock_nodes_and_openapi(client):
     nodes = client.get("/api/v1/nodes").json()
-    assert all(node["mock"] for node in nodes)
+    assert all(node["status"] == "Ready" for node in nodes)
     assert not next(node for node in nodes if node["role"] == "control-plane")["schedulable"]
     assert "/api/v1/servers" in client.get("/openapi.json").json()["paths"]
     assert "/api/v1/topology/pods" in client.get("/openapi.json").json()["paths"]

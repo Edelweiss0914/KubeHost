@@ -1,6 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api/client';
 import type { FileEntry } from '../api/client';
+import type { Server } from '../domain/server';
+
+const GMOD_ROOT = '/home/gmod/server/garrysmod';
+
+const GMOD_QUICK_ACCESS = [
+  { folder: 'addons', icon: '🧩', label: '애드온', desc: '커스텀 Lua·맵·게임모드' },
+  { folder: 'cfg', icon: '🔧', label: '설정', desc: 'server.cfg 등 서버 설정' },
+  { folder: 'data', icon: '💾', label: '저장 데이터', desc: '게임·애드온 저장 파일' },
+  { folder: 'gamemodes', icon: '🎮', label: '게임모드', desc: '기본·커스텀 게임모드' },
+  { folder: 'maps', icon: '🗺', label: '맵', desc: '기본·커스텀 맵' },
+  { folder: 'lua', icon: '📜', label: 'Lua', desc: '서버 스크립트' },
+] as const;
+
+const TEXT_EXTENSIONS = new Set([
+  'cfg', 'conf', 'ini', 'json', 'lua', 'md', 'properties', 'toml', 'txt', 'vdf', 'xml', 'yaml', 'yml',
+]);
 
 // ── Minecraft 서버 표준 폴더 구조 ────────────────────────────────────────────
 const MC_QUICK_ACCESS = [
@@ -40,10 +56,12 @@ function fileIcon(entry: FileEntry): string {
 }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────────────
-type Props = { serverId: string };
+type Props = { serverId: string; game: Server['game'] };
 
-export function FileManager({ serverId }: Props) {
-  const [path, setPath] = useState('/data');
+export function FileManager({ serverId, game }: Props) {
+  const rootPath = game === 'garrysmod' ? GMOD_ROOT : '/data';
+  const quickAccess = game === 'garrysmod' ? GMOD_QUICK_ACCESS : MC_QUICK_ACCESS;
+  const [path, setPath] = useState(rootPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -52,31 +70,34 @@ export function FileManager({ serverId }: Props) {
   const [flashError, setFlashError] = useState(false);
   const [newDirName, setNewDirName] = useState('');
   const [showMkdir, setShowMkdir] = useState(false);
+  const [editing, setEditing] = useState<{ name: string; content: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isRoot = path === '/data';
+  const isRoot = path === rootPath;
 
-  function showMsg(msg: string, error = false) {
+  const showMsg = useCallback((msg: string, error = false) => {
     setFlash(msg);
     setFlashError(error);
     setTimeout(() => setFlash(''), 4000);
-  }
+  }, []);
 
-  function loadDir(p: string) {
+  const loadDir = useCallback((p: string) => {
+    setEditing(null);
     setLoading(true);
     setPath(p);
     api.listFiles(serverId, p)
       .then(setEntries)
       .catch(e => showMsg(e instanceof Error ? e.message : '불러오기 실패', true))
       .finally(() => setLoading(false));
-  }
+  }, [serverId, showMsg]);
 
-  useEffect(() => { loadDir('/data'); }, [serverId]);
+  useEffect(() => { loadDir(rootPath); }, [loadDir, rootPath]);
 
   function breadcrumbs() {
     const parts = path.split('/').filter(Boolean);
-    const crumbs: { label: string; path: string }[] = [{ label: '/data', path: '/data' }];
-    for (let i = 1; i < parts.length; i++) {
+    const rootParts = rootPath.split('/').filter(Boolean);
+    const crumbs: { label: string; path: string }[] = [{ label: game === 'garrysmod' ? 'garrysmod' : '/data', path: rootPath }];
+    for (let i = rootParts.length; i < parts.length; i++) {
       crumbs.push({ label: parts[i], path: '/' + parts.slice(0, i + 1).join('/') });
     }
     return crumbs;
@@ -106,6 +127,38 @@ export function FileManager({ serverId }: Props) {
     } catch (err) {
       showMsg(err instanceof Error ? err.message : '다운로드 실패', true);
     }
+  }
+
+  async function handleEdit(entry: FileEntry) {
+    setBusy(true);
+    try {
+      const content = await api.readTextFile(serverId, path + '/' + entry.name);
+      setEditing({ name: entry.name, content });
+    } catch (err) {
+      showMsg(err instanceof Error ? err.message : '파일 열기 실패', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      const file = new File([editing.content], editing.name, { type: 'text/plain' });
+      await api.uploadFile(serverId, path, file);
+      showMsg(`${editing.name} 저장됨`);
+      loadDir(path);
+    } catch (err) {
+      showMsg(err instanceof Error ? err.message : '저장 실패', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function canEdit(entry: FileEntry) {
+    return entry.type === 'file' && entry.size <= 1024 * 1024 &&
+      TEXT_EXTENSIONS.has(entry.name.split('.').pop()?.toLowerCase() ?? '');
   }
 
   async function handleDelete(entry: FileEntry) {
@@ -146,7 +199,7 @@ export function FileManager({ serverId }: Props) {
   // 실제 디스크에 존재하는 폴더 이름 set
   const existingDirs = new Set(entries.filter(e => e.type === 'dir').map(e => e.name));
   // 빠른 접근에 없는 나머지 항목만 파일 목록에 표시
-  const quickFolderNames = new Set<string>(MC_QUICK_ACCESS.map(q => q.folder));
+  const quickFolderNames = new Set<string>(quickAccess.map(q => q.folder));
   const otherEntries = isRoot
     ? entries.filter(e => !(e.type === 'dir' && quickFolderNames.has(e.name)))
     : entries;
@@ -231,13 +284,13 @@ export function FileManager({ serverId }: Props) {
                 서버 폴더 구조
               </p>
               <div className="fm-quick-grid">
-                {MC_QUICK_ACCESS.map(({ folder, icon, label, desc }) => {
+                {quickAccess.map(({ folder, icon, label, desc }) => {
                   const exists = existingDirs.has(folder);
                   return (
                     <button
                       key={folder}
                       className={`fm-quick-card${exists ? ' fm-quick-card--exists' : ' fm-quick-card--missing'}`}
-                      onClick={() => loadDir('/data/' + folder)}
+                      onClick={() => loadDir(rootPath + '/' + folder)}
                       title={exists ? folder : `${folder} (아직 없음 — 클릭하면 빈 폴더로 열림)`}
                     >
                       <span className="fm-quick-icon">{icon}</span>
@@ -280,6 +333,10 @@ export function FileManager({ serverId }: Props) {
                   </span>
                   <span className="file-mtime muted">{formatDate(entry.modified)}</span>
                   <span className="file-actions">
+                    {canEdit(entry) && (
+                      <button className="secondary small" disabled={busy} title="텍스트 편집"
+                        onClick={() => void handleEdit(entry)}>편집</button>
+                    )}
                     {entry.type === 'file' && (
                       <button className="secondary small" disabled={busy} title="다운로드"
                         onClick={() => void handleDownload(entry)}>↓</button>
@@ -293,6 +350,18 @@ export function FileManager({ serverId }: Props) {
             </div>
           ) : (
             !isRoot && <p className="muted" style={{ marginTop: '16px' }}>빈 폴더입니다.</p>
+          )}
+          {editing && (
+            <div className="fm-editor" style={{ marginTop: '20px' }}>
+              <div className="section-title"><h3>{editing.name} 편집</h3></div>
+              <textarea value={editing.content}
+                onChange={e => setEditing({ ...editing, content: e.target.value })}
+                spellCheck={false} rows={18} style={{ width: '100%', fontFamily: 'monospace' }}/>
+              <div className="actions">
+                <button onClick={() => void handleSave()} disabled={busy}>저장</button>
+                <button className="secondary" onClick={() => setEditing(null)} disabled={busy}>취소</button>
+              </div>
+            </div>
           )}
         </>
       )}

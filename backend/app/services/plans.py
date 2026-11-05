@@ -3,6 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from app.models.server import ALLOWED_WORKERS, ResourcePlan, ServerCreate
+from app.services.gmod_storage import GMOD_IMAGE, gmod_file_init_container, gmod_volume_mounts
 
 _REAL_WARNINGS = [
     "호스트 서버 장애 시 저장 데이터가 자동으로 다른 서버로 이동하지 않습니다.",
@@ -167,7 +168,7 @@ def build_resource_plan(
                                     "capabilities": {"drop": ["ALL"]}},
                 "volumeMounts": [{"name": "data", "mountPath": "/data"}]}]}},
         "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
-            "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+            "accessModes": ["ReadWriteOnce"], "storageClassName": "kubehost-local",
             "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
     }, "apps/v1")
     return ResourcePlan(
@@ -239,7 +240,7 @@ def build_valheim_plan(
                     "volumeMounts": [{"name": "data", "mountPath": "/config"}]}]},
             },
             "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
-                "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                "accessModes": ["ReadWriteOnce"], "storageClassName": "kubehost-local",
                 "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
         }})
 
@@ -283,7 +284,12 @@ def build_garrysmod_plan(
     resources.append({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
         "metadata": {"name": f"{name}-ingress", "namespace": namespace},
         "spec": {"podSelector": {"matchLabels": labels}, "policyTypes": ["Ingress"],
-                 "ingress": [{"ports": [{"port": 27015, "protocol": "UDP"}]}]}})
+                 "ingress": [
+                     {"ports": [{"port": 27015, "protocol": "UDP"}]},
+                     {"from": [{"namespaceSelector": {"matchLabels": {
+                         "kubernetes.io/metadata.name": "kubehost-system"}}}],
+                      "ports": [{"port": 27015, "protocol": "TCP"}]},
+                 ]}})
 
     map_name = request.map_name or "gm_flatgrass"
     gamemode = request.gamemode_name or "sandbox"
@@ -293,6 +299,10 @@ def build_garrysmod_plan(
         {"name": "MAP", "value": map_name},
         {"name": "MAXPLAYERS", "value": str(max_players)},
         {"name": "NAME", "value": request.name},
+        {"name": "RCON_PASSWORD", "value": rcon_password(server_id)},
+        {"name": "ARGS", "value": f"+rcon_password {rcon_password(server_id)}"},
+        # The image already includes srcds_run; SteamCMD must not reinstall on every pod start.
+        {"name": "AUTOUPDATE", "value": "0"},
     ]
     resources.append({"apiVersion": "apps/v1", "kind": "StatefulSet",
         "metadata": {"name": name, "namespace": namespace},
@@ -304,17 +314,18 @@ def build_garrysmod_plan(
                 "automountServiceAccountToken": False,
                 "nodeSelector": {"kubernetes.io/hostname": request.node_id},
                 "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000},
-                "containers": [{"name": "garrysmod", "image": "ceifa/garrysmod:latest",
+                "initContainers": [gmod_file_init_container()],
+                "containers": [{"name": "garrysmod", "image": GMOD_IMAGE,
                     "env": env,
                     "ports": [{"containerPort": 27015, "protocol": "UDP", "name": "gmod"},
                               {"containerPort": 27015, "protocol": "TCP", "name": "gmod-rcon"}],
                     "resources": {"requests": {"cpu": cpu, "memory": memory},
                                   "limits": {"cpu": cpu, "memory": memory}},
                     "securityContext": {"allowPrivilegeEscalation": False},
-                    "volumeMounts": [{"name": "data", "mountPath": "/home/gmod/server"}]}]},
+                    "volumeMounts": gmod_volume_mounts()}]},
             },
             "volumeClaimTemplates": [{"metadata": {"name": "data"}, "spec": {
-                "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                "accessModes": ["ReadWriteOnce"], "storageClassName": "kubehost-local",
                 "resources": {"requests": {"storage": f"{request.storage_gb}Gi"}}}}],
         }})
 

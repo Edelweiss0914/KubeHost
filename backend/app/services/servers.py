@@ -2,13 +2,18 @@
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Literal
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from app.models.server import (
-    DeletionResult, GarrysModSettings, Server, ServerCreate, ServerSettings, ValheimSettings,
+    DeletionResult,
+    GarrysModSettings,
+    Server,
+    ServerCreate,
+    ServerSettings,
+    ValheimSettings,
 )
 from app.ports import KubernetesAdapter, ServerRepository
-from app.services.plans import build_resource_plan, namespace_resources
+from app.services.plans import build_resource_plan, namespace_resources, rcon_password
 
 
 class ServerNotFound(Exception):
@@ -117,6 +122,11 @@ class ServerService:
             server = self.get(owner_id, server_id)
             if server.status == state:
                 raise InvalidOperation(f"Server is already {state}")
+            if state == "running" and server.game == "garrysmod" and self.mode == "real":
+                self.adapter.configure_gmod_rcon(
+                    server.id, server.resource_plan.namespace,
+                    rcon_password(UUID(server.id)), sts_name=server.resource_plan.sts_name,
+                )
             self.adapter.set_state(server.id, server.resource_plan.namespace, state, sts_name=server.resource_plan.sts_name)
             server.status = state
             server.logs.append(
@@ -151,12 +161,16 @@ class ServerService:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
-        if server.game != "minecraft-java":
+        if server.game not in ("minecraft-java", "garrysmod"):
             raise InvalidOperation("이 게임은 RCON 명령 전송을 아직 지원하지 않습니다.")
         if server.status != "running":
             raise InvalidOperation("서버가 실행 중일 때만 명령어를 사용할 수 있습니다.")
         try:
-            return self.adapter.rcon(server_id, server.resource_plan.namespace, command, sts_name=server.resource_plan.sts_name)
+            return self.adapter.rcon(
+                server_id, server.resource_plan.namespace, command,
+                sts_name=server.resource_plan.sts_name,
+                port=27015 if server.game == "garrysmod" else 25575,
+            )
         except Exception as exc:
             raise InvalidOperation(str(exc))
 
