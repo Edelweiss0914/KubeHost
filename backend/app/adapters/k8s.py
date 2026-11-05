@@ -1054,3 +1054,42 @@ class K8sAdapter:
                 core.delete_namespaced_pod(pod_name, src_namespace)
             except Exception:
                 pass
+
+    # ── Template snapshot / restore ───────────────────────────────────────────
+
+    def snapshot_pvc_to_library(self, server_id: str, namespace: str, library_namespace: str,
+                                archive_path: str, sts_name: str | None = None,
+                                game: str = "minecraft-java") -> None:
+        """서버 PVC 내용을 tar.gz로 묶어 라이브러리에 저장한다.
+
+        namespace 경계를 넘기 위해:
+          1. 서버 namespace의 임시 파드에서 tar czf → stdout (stdin_data 없음)으로 읽기
+          2. library_write_file()로 라이브러리 PVC에 저장
+        """
+        pvc = self._pvc_name(server_id, sts_name)
+        node = self._get_server_node(server_id, namespace, sts_name)
+        # tar 결과를 stdout으로 출력 (바이너리를 base64로 감싸 텍스트로 전달)
+        cmd = ["sh", "-c", "tar czf - -C /data . 2>/dev/null | base64 -w 0"]
+        b64_out = self._exec_in_temp_pod(namespace, pvc, node, cmd, game=game)
+        import base64
+        archive_bytes = base64.b64decode(b64_out.strip())
+        if len(archive_bytes) > self._MAX_FILE_BYTES:
+            raise ValueError(
+                f"스냅샷 크기가 너무 큽니다 ({len(archive_bytes) // (1024 * 1024)} MiB, 최대 1 GiB)."
+            )
+        self.library_write_file(library_namespace, archive_path, archive_bytes)
+
+    def restore_library_to_pvc(self, server_id: str, namespace: str, library_namespace: str,
+                               archive_path: str, sts_name: str | None = None,
+                               game: str = "minecraft-java") -> None:
+        """라이브러리의 tar.gz를 서버 PVC에 복원한다.
+
+        namespace 경계를 넘기 위해:
+          1. library_read_file()로 tar.gz 읽기
+          2. 서버 namespace의 임시 파드에 stdin으로 전달하여 tar xzf
+        """
+        archive_bytes = self.library_read_file(library_namespace, archive_path)
+        pvc = self._pvc_name(server_id, sts_name)
+        node = self._get_server_node(server_id, namespace, sts_name)
+        cmd = ["sh", "-c", "tar xzf - -C /data 2>/dev/null"]
+        self._exec_in_temp_pod(namespace, pvc, node, cmd, stdin_data=archive_bytes, game=game)

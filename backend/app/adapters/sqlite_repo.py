@@ -5,6 +5,7 @@ from typing import Generator
 
 from app.models.invite import InviteCode
 from app.models.server import Server
+from app.models.template import Template
 from app.models.user import User
 
 
@@ -122,6 +123,22 @@ class SQLiteServerRepository:
                     PRIMARY KEY (server_id, player_name)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS templates (
+                    id TEXT PRIMARY KEY,
+                    owner_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    game TEXT NOT NULL,
+                    cpu REAL NOT NULL,
+                    memory_mb INTEGER NOT NULL,
+                    storage_gb INTEGER NOT NULL,
+                    archive_path TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates(owner_id)"
+            )
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -425,3 +442,78 @@ class SQLiteServerRepository:
                 "description": r[5], "supported": bool(r[6]),
             })
         return result
+
+
+class SQLiteTemplateRepository:
+    """SQLite-backed template repository."""
+
+    def __init__(self, db_path: str = "kubehost.db") -> None:
+        self._db_path = db_path
+        self._init_db()
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS templates (
+                    id TEXT PRIMARY KEY,
+                    owner_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    game TEXT NOT NULL,
+                    cpu REAL NOT NULL,
+                    memory_mb INTEGER NOT NULL,
+                    storage_gb INTEGER NOT NULL,
+                    archive_path TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates(owner_id)"
+            )
+
+    @contextmanager
+    def _connect(self) -> Generator[sqlite3.Connection, None, None]:
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def _row_to_template(self, row: tuple) -> Template:
+        return Template(
+            id=row[0], owner_id=row[1], name=row[2], game=row[3],
+            cpu=row[4], memory_mb=row[5], storage_gb=row[6],
+            archive_path=row[7], created_at=row[8],
+        )
+
+    def list_by_owner(self, owner_id: str) -> list[Template]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at FROM templates WHERE owner_id = ? ORDER BY created_at DESC",
+                (owner_id,),
+            ).fetchall()
+        return [self._row_to_template(r) for r in rows]
+
+    def get(self, template_id: str) -> Template | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at FROM templates WHERE id = ?",
+                (template_id,),
+            ).fetchone()
+        return self._row_to_template(row) if row else None
+
+    def save(self, template: Template) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO templates (id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (template.id, template.owner_id, template.name, template.game,
+                 template.cpu, template.memory_mb, template.storage_gb,
+                 template.archive_path, template.created_at),
+            )
+
+    def delete(self, template_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM templates WHERE id = ?", (template_id,))

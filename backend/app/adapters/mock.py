@@ -2,6 +2,7 @@
 from typing import Literal
 
 from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
+from app.models.template import Template
 from app.services.file_paths import file_path, file_root
 
 
@@ -394,3 +395,31 @@ class MockKubernetesAdapter:
     def copy_pvc_files(self, src_namespace: str, src_pvc: str, dst_namespace: str, dst_pvc: str) -> None:
         pass  # mock no-op
 
+    def snapshot_pvc_to_library(self, server_id: str, namespace: str, library_namespace: str,
+                                archive_path: str, sts_name: str | None = None,
+                                game: str = "minecraft-java") -> None:
+        pass  # mock no-op
+
+    def restore_library_to_pvc(self, server_id: str, namespace: str, library_namespace: str,
+                               archive_path: str, sts_name: str | None = None,
+                               game: str = "minecraft-java") -> None:
+        pass  # mock no-op
+
+
+class InMemoryTemplateRepository:
+    """Process-local in-memory template store."""
+
+    def __init__(self) -> None:
+        self._templates: dict[str, Template] = {}
+
+    def list_by_owner(self, owner_id: str) -> list[Template]:
+        return [t for t in self._templates.values() if t.owner_id == owner_id]
+
+    def get(self, template_id: str) -> Template | None:
+        return self._templates.get(template_id)
+
+    def save(self, template: Template) -> None:
+        self._templates[template.id] = template
+
+    def delete(self, template_id: str) -> None:
+        self._templates.pop(template_id, None)

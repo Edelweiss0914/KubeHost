@@ -9,6 +9,8 @@ from app.models.server import (
     DeletionResult, GarrysModSettings, Node, Server, ServerCreate, ServerPod, ServerSettings,
     ValheimSettings,
 )
+from app.models.template import Template
+from app.ports import TemplateRepository
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
 from app.services.file_paths import file_path, library_path
 
@@ -903,6 +905,13 @@ class _CloneBody(_BaseModel):
     name: str
 
 
+def template_repo(request: Request) -> TemplateRepository:
+    return request.app.state.template_repo  # type: ignore[no-any-return]
+
+
+TemplateRepo = Annotated[TemplateRepository, Depends(template_repo)]
+
+
 @router.post("/api/v1/servers/{server_id}/clone", status_code=201)
 def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, request: Request) -> dict:
     from app.models.server import ServerCreate
@@ -953,3 +962,144 @@ def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, r
     _audit(request, actor_id, actor_name, "server.clone", new_server.id, new_server.name,
            detail=f"cloned_from={server_id}")
     return {"id": new_server.id}
+
+
+# ── Templates ─────────────────────────────────────────────────────────────────
+
+class _SnapshotBody(_BaseModel):
+    name: str
+
+
+class _DeployBody(_BaseModel):
+    name: str
+
+
+@router.get("/api/v1/templates")
+def list_templates(owner: Owner, repo: TemplateRepo) -> list[dict]:
+    templates = repo.list_by_owner(owner)
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "game": t.game,
+            "cpu": t.cpu,
+            "memory_mb": t.memory_mb,
+            "storage_gb": t.storage_gb,
+            "created_at": t.created_at,
+        }
+        for t in templates
+    ]
+
+
+@router.post("/api/v1/servers/{server_id}/snapshot", status_code=201)
+def snapshot_server(
+    server_id: str, body: _SnapshotBody, owner: Owner, svc: Service, repo: TemplateRepo,
+    request: Request,
+) -> dict:
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    try:
+        src = svc.get(owner, server_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="템플릿 이름이 필요합니다.")
+
+    lib_ns = _lib_ns(owner)
+    template_id = str(uuid4())
+    archive_path = f"/library/templates/{template_id}.tar.gz"
+
+    try:
+        svc.adapter.snapshot_pvc_to_library(
+            server_id,
+            src.resource_plan.namespace,
+            lib_ns,
+            archive_path,
+            sts_name=src.resource_plan.sts_name,
+            game=src.game,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"스냅샷 생성 실패: {exc}")
+
+    template = Template(
+        id=template_id,
+        owner_id=owner,
+        name=name,
+        game=src.game,
+        cpu=src.cpu,
+        memory_mb=src.memory_mb,
+        storage_gb=src.storage_gb,
+        archive_path=archive_path,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    repo.save(template)
+
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "template.snapshot", template_id, name,
+           detail=f"source_server={server_id}")
+    return {"id": template_id}
+
+
+@router.post("/api/v1/templates/{template_id}/deploy", status_code=201)
+def deploy_template(
+    template_id: str, body: _DeployBody, owner: Owner, svc: Service, repo: TemplateRepo,
+    request: Request,
+) -> dict:
+    template = repo.get(template_id)
+    if template is None or template.owner_id != owner:
+        raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
+
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="서버 이름이 필요합니다.")
+
+    deploy_input = ServerCreate(
+        name=name,
+        game=template.game,  # type: ignore[arg-type]
+        cpu=template.cpu,
+        memory_mb=template.memory_mb,
+        storage_gb=template.storage_gb,
+    )
+    try:
+        new_server = svc.create(owner, deploy_input)
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    lib_ns = _lib_ns(owner)
+    try:
+        svc.adapter.restore_library_to_pvc(
+            new_server.id,
+            new_server.resource_plan.namespace,
+            lib_ns,
+            template.archive_path,
+            sts_name=new_server.resource_plan.sts_name,
+            game=new_server.game,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"템플릿 복원 실패: {exc}")
+
+    actor_id, actor_name = _actor(request)
+    _audit(request, actor_id, actor_name, "template.deploy", new_server.id, new_server.name,
+           detail=f"template_id={template_id}")
+    return {"id": new_server.id}
+
+
+@router.delete("/api/v1/templates/{template_id}", status_code=204)
+def delete_template(
+    template_id: str, owner: Owner, svc: Service, repo: TemplateRepo,
+) -> None:
+    template = repo.get(template_id)
+    if template is None or template.owner_id != owner:
+        raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
+
+    lib_ns = _lib_ns(owner)
+    try:
+        svc.adapter.library_delete_path(lib_ns, template.archive_path)
+    except Exception:
+        pass  # 파일이 없어도 메타데이터는 삭제
+
+    repo.delete(template_id)

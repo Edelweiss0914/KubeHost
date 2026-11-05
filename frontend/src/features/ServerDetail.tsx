@@ -697,6 +697,11 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [cloneName, setCloneName] = useState('');
   const [cloneBusy, setCloneBusy] = useState(false);
   const [cloneError, setCloneError] = useState('');
+  const [snapshotting, setSnapshotting] = useState(false);
+  const [snapshotName, setSnapshotName] = useState('');
+  const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [snapshotError, setSnapshotError] = useState('');
+  const [snapshotDone, setSnapshotDone] = useState(false);
   const [gameCaps, setGameCaps] = useState<Set<string>>(new Set());
   const [gameDef, setGameDef] = useState<GameDefinition | null>(null);
   const canStart = server.status === 'stopped' || server.status === 'error';
@@ -766,6 +771,13 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             <span aria-hidden="true">⎘</span> 복제
           </button>
           <button
+            className="secondary"
+            disabled={busy || snapshotBusy}
+            onClick={() => { setSnapshotting(d => !d); setSnapshotError(''); setSnapshotName(server.name); setSnapshotDone(false); }}
+          >
+            <span aria-hidden="true">📋</span> 템플릿으로 저장
+          </button>
+          <button
             className="server-sidebar-danger"
             disabled={busy}
             onClick={() => setDeleting(d => !d)}
@@ -773,6 +785,45 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             <span aria-hidden="true">✕</span>서버 삭제
           </button>
         </nav>
+        {snapshotting && (
+          snapshotDone ? (
+            <div className="server-delete-form">
+              <p role="status" className="notice" style={{ marginBottom: '8px' }}>템플릿으로 저장됐습니다.</p>
+              <div className="actions">
+                <button type="button" className="secondary" onClick={() => setSnapshotting(false)}>닫기</button>
+              </div>
+            </div>
+          ) : (
+            <form className="server-delete-form" onSubmit={e => {
+              e.preventDefault();
+              const name = snapshotName.trim();
+              if (!name) return;
+              setSnapshotBusy(true);
+              setSnapshotError('');
+              api.snapshotServer(server.id, name)
+                .then(() => { setSnapshotDone(true); })
+                .catch(err => setSnapshotError(err instanceof Error ? err.message : '저장 실패'))
+                .finally(() => setSnapshotBusy(false));
+            }}>
+              <p>템플릿 이름을 입력하세요.</p>
+              <label>템플릿 이름
+                <input
+                  value={snapshotName}
+                  onChange={e => setSnapshotName(e.target.value)}
+                  placeholder={server.name}
+                  disabled={snapshotBusy}
+                />
+              </label>
+              {snapshotError && <p style={{ color: 'var(--danger, #f87171)', fontSize: '0.85em' }}>{snapshotError}</p>}
+              <div className="actions">
+                <button type="button" className="secondary" onClick={() => setSnapshotting(false)} disabled={snapshotBusy}>취소</button>
+                <button disabled={snapshotBusy || !snapshotName.trim()}>
+                  {snapshotBusy ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </form>
+          )
+        )}
         {cloning && (
           <form className="server-delete-form" onSubmit={e => {
             e.preventDefault();

@@ -17,13 +17,14 @@ def create_app() -> FastAPI:
     mode = os.getenv("KUBEHOST_MODE", "mock")
 
     if mode == "mock":
-        from app.adapters.mock import InMemoryServerRepository, MockKubernetesAdapter
+        from app.adapters.mock import InMemoryServerRepository, InMemoryTemplateRepository, MockKubernetesAdapter
         repository: object = InMemoryServerRepository()
         adapter: object = MockKubernetesAdapter()
         auth_service: object = None
+        template_repository: object = InMemoryTemplateRepository()
     elif mode == "real":
         from app.adapters.k8s import K8sAdapter
-        from app.adapters.sqlite_repo import SQLiteServerRepository
+        from app.adapters.sqlite_repo import SQLiteServerRepository, SQLiteTemplateRepository
         from app.services.auth import AuthService
         kubeconfig = os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
         db_path = os.getenv("KUBEHOST_DB_PATH", "kubehost.db")
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
         repo = SQLiteServerRepository(db_path=db_path)
         repository = repo
         auth_service = AuthService(repo)
+        template_repository = SQLiteTemplateRepository(db_path=db_path)
     else:
         raise RuntimeError(f"Unknown KUBEHOST_MODE: {mode!r}. Use 'mock' or 'real'.")
 
@@ -49,6 +51,7 @@ def create_app() -> FastAPI:
     application.state.server_service = ServerService(repository, adapter, mode=mode)  # type: ignore[arg-type]
     application.state.auth_service = auth_service
     application.state.mode = mode
+    application.state.template_repo = template_repository
 
     @application.on_event("startup")
     def _start_scheduler() -> None:

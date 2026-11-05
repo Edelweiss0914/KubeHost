@@ -26,6 +26,16 @@ export type GameDefinition = {
   console_placeholder: string;
 };
 
+export type Template = {
+  id: string;
+  name: string;
+  game: string;
+  cpu: number;
+  memory_mb: number;
+  storage_gb: number;
+  created_at: string;
+};
+
 export type Schedule = {
   id: string;
   server_id: string;
@@ -156,6 +166,10 @@ export interface ServerGateway {
   libraryStorage(): Promise<{used_bytes: number; total_bytes: number}>;
   githubClone(serverId: string, url: string, branch: string, path: string): Promise<{ owner: string; repo: string; branch: string; path: string }>;
   cloneServer(serverId: string, name: string): Promise<{ id: string }>;
+  listTemplates(): Promise<Template[]>;
+  snapshotServer(serverId: string, name: string): Promise<{ id: string }>;
+  deployTemplate(templateId: string, name: string): Promise<{ id: string }>;
+  deleteTemplate(templateId: string): Promise<void>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -332,4 +346,8 @@ export const api: ServerGateway = {
   libraryStorage: () => versioned('/library/storage'),
   githubClone: (serverId, url, branch, path) => versioned(`/servers/${encodeURIComponent(serverId)}/fs/github`, { method: 'POST', body: JSON.stringify({ url, branch, path }) }),
   cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
+  listTemplates: () => versioned('/templates'),
+  snapshotServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deployTemplate: (templateId, name) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
 };
