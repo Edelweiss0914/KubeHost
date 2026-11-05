@@ -10,7 +10,7 @@ from app.models.server import (
     ValheimSettings,
 )
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
-from app.services.file_paths import file_path
+from app.services.file_paths import file_path, library_path
 
 router = APIRouter()
 
@@ -743,3 +743,88 @@ def set_version(server_id: str, body: _VersionBody, owner: Owner, svc: Service, 
     actor_id, actor_name = _actor(request)
     _audit(request, actor_id, actor_name, "server.version", server_id, server.name,
            detail=f"version={body.version}")
+
+
+# ── Library ───────────────────────────────────────────────────────────────────
+
+def _lib_ns(owner: str) -> str:
+    from uuid import NAMESPACE_URL, uuid5
+    return f"tenant-{uuid5(NAMESPACE_URL, owner).hex}"
+
+
+@router.get("/api/v1/library/fs")
+def library_list(owner: Owner, svc: Service, path: str | None = None) -> list[dict]:
+    try:
+        safe = library_path(path)
+        return svc.adapter.library_list_files(_lib_ns(owner), safe)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/api/v1/library/fs/download")
+def library_download(owner: Owner, svc: Service, path: str) -> _Response:
+    try:
+        safe = library_path(path)
+        content = svc.adapter.library_read_file(_lib_ns(owner), safe)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    filename = safe.rsplit("/", 1)[-1]
+    return _Response(content=content, media_type="application/octet-stream",
+                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.post("/api/v1/library/fs/upload", status_code=201)
+async def library_upload(
+    owner: Owner, svc: Service, path: str | None = None,
+    file: UploadFile = _File(...),
+) -> dict:
+    filename = (file.filename or "").strip()
+    if not filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=422, detail="파일명이 올바르지 않습니다.")
+    try:
+        dest = library_path((path or "/library").rstrip("/") + "/" + filename, write=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    content = await file.read()
+    import functools as _functools
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, _functools.partial(svc.adapter.library_write_file, _lib_ns(owner), dest, content))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"path": dest, "name": filename, "size": len(content)}
+
+
+@router.delete("/api/v1/library/fs", status_code=204)
+def library_delete(owner: Owner, svc: Service, path: str) -> None:
+    try:
+        safe = library_path(path, write=True)
+        svc.adapter.library_delete_path(_lib_ns(owner), safe)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/api/v1/library/fs/mkdir", status_code=201)
+def library_mkdir_ep(body: _MkdirBody, owner: Owner, svc: Service) -> dict:
+    try:
+        safe = library_path(body.path, write=True)
+        svc.adapter.library_mkdir(_lib_ns(owner), safe)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"path": safe}
+
+
+@router.post("/api/v1/library/fs/extract", status_code=200)
+def library_extract_ep(body: _ExtractBody, owner: Owner, svc: Service) -> dict:
+    try:
+        safe = library_path(body.path)
+        svc.adapter.library_extract(_lib_ns(owner), safe)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"path": safe}
+
+
+@router.get("/api/v1/library/storage")
+def library_storage_ep(owner: Owner, svc: Service) -> dict:
+    svc.adapter.library_ensure(_lib_ns(owner))
+    return svc.adapter.library_storage(_lib_ns(owner))

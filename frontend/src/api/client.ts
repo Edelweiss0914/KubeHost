@@ -147,6 +147,13 @@ export interface ServerGateway {
   serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
   namespaceMetrics(minutes?: number): Promise<NamespaceMetrics>;
   clusterMetrics(): Promise<ClusterMetrics>;
+  libraryList(path?: string): Promise<FileEntry[]>;
+  libraryDownload(path: string): Promise<void>;
+  libraryUpload(path: string | undefined, file: File, onProgress?: (pct: number) => void): Promise<{path: string; name: string; size: number}>;
+  libraryDelete(path: string): Promise<void>;
+  libraryMkdir(path: string): Promise<{path: string}>;
+  libraryExtract(path: string): Promise<{path: string}>;
+  libraryStorage(): Promise<{used_bytes: number; total_bytes: number}>;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -282,4 +289,43 @@ export const api: ServerGateway = {
   serverMetrics: (serverId, minutes = 60) => versioned(`/metrics/server/${encodeURIComponent(serverId)}?minutes=${minutes}`),
   namespaceMetrics: (minutes = 60) => versioned(`/metrics/namespace?minutes=${minutes}`),
   clusterMetrics: () => versioned('/metrics/cluster'),
+  libraryList: (path) => versioned(`/library/fs${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+  libraryDownload: async (path) => {
+    const token = getToken();
+    const resp = await fetch(apiUrl(`/api/v1/library/fs/download?path=${encodeURIComponent(path)}`), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.json().then((b: {detail: string}) => b.detail).catch(() => '다운로드 실패'));
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = path.split('/').pop() ?? 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  },
+  libraryUpload: (path, file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const token = getToken();
+      const form = new FormData();
+      form.append('file', file);
+      const url = apiUrl(`/api/v1/library/fs/upload${path ? `?path=${encodeURIComponent(path)}` : ''}`);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100)); };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText) as {path: string; name: string; size: number});
+        else reject(new ApiError(xhr.status, (JSON.parse(xhr.responseText) as {detail?: string})?.detail ?? '업로드 실패'));
+      };
+      xhr.onerror = () => reject(new Error('네트워크 오류'));
+      xhr.send(form);
+    });
+  },
+  libraryDelete: (path) => versioned(`/library/fs?path=${encodeURIComponent(path)}`, { method: 'DELETE' }).then(() => undefined),
+  libraryMkdir: (path) => versioned(`/library/fs/mkdir`, { method: 'POST', body: JSON.stringify({ path }) }),
+  libraryExtract: (path) => versioned(`/library/fs/extract`, { method: 'POST', body: JSON.stringify({ path }) }),
+  libraryStorage: () => versioned('/library/storage'),
 };

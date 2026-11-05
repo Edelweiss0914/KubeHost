@@ -8,7 +8,7 @@ from kubernetes import client, config, utils  # type: ignore[import-untyped]
 from kubernetes.client.rest import ApiException  # type: ignore[import-untyped]
 
 from app.models.server import Node, PodContainer, ResourcePlan, Server, ServerPod
-from app.services.file_paths import file_path
+from app.services.file_paths import file_path, library_path
 from app.services.gmod_storage import GMOD_ROOT, GMOD_IMAGE, gmod_file_init_container, gmod_volume_mounts
 
 _SHARED_KINDS = {"Namespace", "ResourceQuota", "LimitRange", "NetworkPolicy"}
@@ -668,6 +668,14 @@ class K8sAdapter:
 
         pod_name = f"kubehost-fs-{uuid4().hex[:8]}"
         gmod = game == "garrysmod"
+        library = game == "library"
+        image = GMOD_IMAGE if gmod else "itzg/minecraft-server:latest"
+        if gmod:
+            mounts = gmod_volume_mounts()
+        elif library:
+            mounts = [{"name": "data", "mountPath": "/library"}]
+        else:
+            mounts = [{"name": "data", "mountPath": "/data"}]
         pod_body = {
             "apiVersion": "v1", "kind": "Pod",
             "metadata": {
@@ -686,7 +694,7 @@ class K8sAdapter:
                 **({"initContainers": [gmod_file_init_container()]} if gmod else {}),
                 "containers": [{
                     "name": "fs",
-                    "image": GMOD_IMAGE if gmod else "itzg/minecraft-server:latest",
+                    "image": image,
                     "command": ["/bin/sh", "-c", "sleep 300"],
                     "securityContext": {
                         "allowPrivilegeEscalation": False,
@@ -696,8 +704,7 @@ class K8sAdapter:
                         "requests": {"cpu": "50m", "memory": "64Mi"},
                         "limits": {"cpu": "100m", "memory": "128Mi"},
                     },
-                    "volumeMounts": (gmod_volume_mounts() if gmod
-                                     else [{"name": "data", "mountPath": "/data"}]),
+                    "volumeMounts": mounts,
                 }],
                 "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": pvc_name}}],
             },
@@ -849,3 +856,126 @@ class K8sAdapter:
             ["sh", "-c", f"unzip -o '{safe}' -d '{dest}'"],
             sts_name=sts_name, game=game,
         )
+
+    # ── Library ───────────────────────────────────────────────────────────────
+
+    def _get_pvc_node(self, namespace: str, pvc_name: str) -> str:
+        try:
+            pvc = self._core.read_namespaced_persistent_volume_claim(pvc_name, namespace)
+            pv_name = pvc.spec.volume_name
+            if not pv_name:
+                return ""
+            pv = self._core.read_persistent_volume(pv_name)
+            affinity = pv.spec.node_affinity
+            if affinity and affinity.required:
+                for term in (affinity.required.node_selector_terms or []):
+                    for expr in (term.match_expressions or []):
+                        if expr.key == "kubernetes.io/hostname" and expr.values:
+                            return expr.values[0]
+            return ""
+        except ApiException:
+            return ""
+
+    def _ensure_library_pvc(self, namespace: str) -> None:
+        try:
+            self._core.read_namespaced_persistent_volume_claim("library", namespace)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+            self._core.create_namespaced_persistent_volume_claim(namespace, {
+                "apiVersion": "v1", "kind": "PersistentVolumeClaim",
+                "metadata": {"name": "library", "namespace": namespace},
+                "spec": {
+                    "accessModes": ["ReadWriteOnce"],
+                    "storageClassName": "kubehost-local",
+                    "resources": {"requests": {"storage": "10Gi"}},
+                },
+            })
+
+    def _exec_in_library_pod(self, namespace: str, command: list[str], stdin_data: bytes | None = None) -> str:
+        self._ensure_library_pvc(namespace)
+        node = self._get_pvc_node(namespace, "library")
+        return self._exec_in_temp_pod(namespace, "library", node, command, stdin_data, game="library")
+
+    def library_ensure(self, namespace: str) -> None:
+        self._ensure_library_pvc(namespace)
+
+    def library_list_files(self, namespace: str, path: str) -> list[dict]:
+        safe = library_path(path)
+        cmd = ["sh", "-c",
+            f"for fp in '{safe}'/* '{safe}'/.*; do "
+            f"  [ -e \"$fp\" ] || continue; "
+            f"  name=$(basename \"$fp\"); "
+            f"  [ \"$name\" = '.' ] || [ \"$name\" = '..' ] && continue; "
+            f"  if [ -d \"$fp\" ]; then t=d; else t=f; fi; "
+            f"  sz=$(stat -c %s \"$fp\" 2>/dev/null || echo 0); "
+            f"  mt=$(stat -c %Y \"$fp\" 2>/dev/null || echo 0); "
+            f"  printf '%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$sz\" \"$mt\" \"$name\"; "
+            f"done"]
+        out = self._exec_in_library_pod(namespace, cmd)
+        entries = []
+        for line in out.strip().splitlines():
+            parts = line.split("\t", 3)
+            if len(parts) != 4:
+                continue
+            ftype, size_s, mtime_s, name = parts
+            name = name.strip()
+            if not name or name in (".", ".."):
+                continue
+            entries.append({
+                "name": name,
+                "type": "dir" if ftype.strip() == "d" else "file",
+                "size": int(size_s) if size_s.strip().isdigit() else 0,
+                "modified": int(mtime_s) if mtime_s.strip().isdigit() else 0,
+            })
+        return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
+
+    def library_read_file(self, namespace: str, path: str) -> bytes:
+        import base64
+        safe = library_path(path)
+        out = self._exec_in_library_pod(namespace, ["sh", "-c", f"base64 -w 0 '{safe}' 2>/dev/null"])
+        return base64.b64decode(out.strip())
+
+    def library_write_file(self, namespace: str, path: str, content: bytes) -> None:
+        if len(content) > self._MAX_FILE_BYTES:
+            raise ValueError("파일이 너무 큽니다.")
+        safe = library_path(path, write=True)
+        parent = safe.rsplit("/", 1)[0] or "/library"
+        self._exec_in_library_pod(namespace,
+            ["sh", "-c", f"mkdir -p '{parent}' && head -c {len(content)} > '{safe}'"],
+            stdin_data=content)
+
+    def library_delete_path(self, namespace: str, path: str) -> None:
+        safe = library_path(path, write=True)
+        self._exec_in_library_pod(namespace, ["sh", "-c", f"rm -rf '{safe}'"])
+
+    def library_mkdir(self, namespace: str, path: str) -> None:
+        safe = library_path(path, write=True)
+        self._exec_in_library_pod(namespace, ["sh", "-c", f"mkdir -p '{safe}'"])
+
+    def library_extract(self, namespace: str, path: str) -> None:
+        safe = library_path(path)
+        if not safe.endswith(".zip"):
+            raise ValueError("ZIP 파일만 압축 해제할 수 있습니다.")
+        dest = safe.rsplit("/", 1)[0]
+        self._exec_in_library_pod(namespace, ["sh", "-c", f"unzip -o '{safe}' -d '{dest}'"])
+
+    def library_storage(self, namespace: str) -> dict:
+        self._ensure_library_pvc(namespace)
+        try:
+            pvc = self._core.read_namespaced_persistent_volume_claim("library", namespace)
+            raw = (pvc.spec.resources.requests or {}).get("storage", "10Gi")
+            if raw.endswith("Gi"):
+                total = int(raw[:-2]) * 1024 ** 3
+            elif raw.endswith("Mi"):
+                total = int(raw[:-2]) * 1024 ** 2
+            else:
+                total = 10 * 1024 ** 3
+        except Exception:
+            total = 10 * 1024 ** 3
+        try:
+            out = self._exec_in_library_pod(namespace, ["sh", "-c", "du -sb /library 2>/dev/null | cut -f1"])
+            used = int(out.strip()) if out.strip().isdigit() else 0
+        except Exception:
+            used = 0
+        return {"used_bytes": used, "total_bytes": total}

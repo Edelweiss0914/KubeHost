@@ -13,6 +13,7 @@ import { ClusterMap } from './features/ClusterMap';
 import { Login } from './features/Login';
 import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
+import { LibraryManager } from './features/LibraryManager';
 import { useToast, ToastContainer } from './components/Toast';
 import { Tooltip } from './components/Tooltip';
 import { HelpModal } from './features/HelpModal';
@@ -25,7 +26,7 @@ function getStoredAuth(): { token: string; username: string } | null {
   } catch { return null; }
 }
 
-type View = 'dashboard' | 'servers' | 'create' | 'detail' | 'cluster' | 'admin';
+type View = 'dashboard' | 'servers' | 'create' | 'detail' | 'cluster' | 'admin' | 'library';
 
 type QuotaEntry = { used: string; hard: string };
 type TenantInfo = { namespace: string; quota: Record<string, QuotaEntry> };
@@ -477,7 +478,7 @@ export function App() {
   }
 
   const titles: Record<View, string> = {
-    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '서버 현황 맵', admin: '관리자',
+    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '서버 현황 맵', admin: '관리자', library: '내 라이브러리',
   };
 
   return <div className="shell">
@@ -496,6 +497,9 @@ export function App() {
         </button>
         <button className={view === 'cluster' ? 'active' : ''} aria-current={view === 'cluster' ? 'page' : undefined} onClick={() => navigate('cluster')}>
           ▧ <span>서버 현황 맵</span>
+        </button>
+        <button className={view === 'library' ? 'active' : ''} aria-current={view === 'library' ? 'page' : undefined} onClick={() => navigate('library')}>
+          📦 <span>라이브러리</span>
         </button>
         {isAdmin && <button className={view === 'admin' ? 'active' : ''} aria-current={view === 'admin' ? 'page' : undefined} onClick={() => navigate('admin')}>
           ◈ <span>관리자</span>
@@ -536,7 +540,7 @@ export function App() {
       </header>
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
-          <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
+          <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : view === 'library' ? 'LIBRARY' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
           <button className="secondary" onClick={() => void refreshView()} disabled={loading || busy}>↻ 새로고침</button>
         </div>
         {notice && <p role="status" className="notice">{notice}</p>}
@@ -549,6 +553,7 @@ export function App() {
             {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}
             {view === 'admin' && (meLoaded ? (isAdmin ? <AdminPage currentUserId={currentUserId}/> : <div className="panel muted">관리자 권한이 없습니다.</div>) : <div className="panel loading" role="status">사용자 정보를 확인하는 중…</div>)}
+            {view === 'library' && <LibraryManager />}
             {view === 'detail' && selected && <ServerDetail
               key={selected.id}
               server={selected}

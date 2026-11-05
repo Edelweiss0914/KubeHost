@@ -85,6 +85,7 @@ class MockKubernetesAdapter:
         self._backups: dict[str, list[str]] = {}
         self._fs: dict[str, dict[str, dict]] = {}
         self._auto_restart: dict[str, bool] = {}
+        self._library: dict[str, dict[str, dict]] = {}
 
     _MOCK_PROPERTIES = (
         "difficulty=easy\ngamemode=survival\nmax-players=20\n"
@@ -327,4 +328,65 @@ class MockKubernetesAdapter:
         fs[path] = {"name": name, "type": "dir", "size": 0,
                     "modified": int(time.time()), "content": b""}
 
+    # ── Library ───────────────────────────────────────────────────────────────
+
+    def _lib_for(self, namespace: str) -> dict[str, dict]:
+        if namespace not in self._library:
+            self._library[namespace] = {}
+        return self._library[namespace]
+
+    def library_ensure(self, namespace: str) -> None:
+        self._lib_for(namespace)
+
+    def library_list_files(self, namespace: str, path: str) -> list[dict]:
+        from app.services.file_paths import library_path
+        safe = library_path(path).rstrip("/")
+        lib = self._lib_for(namespace)
+        entries = []
+        for fpath, entry in lib.items():
+            parent = fpath.rsplit("/", 1)[0]
+            if parent == safe:
+                entries.append({"name": entry["name"], "type": entry["type"],
+                                 "size": entry["size"], "modified": entry["modified"]})
+        return sorted(entries, key=lambda e: (e["type"] == "file", e["name"].lower()))
+
+    def library_read_file(self, namespace: str, path: str) -> bytes:
+        from app.services.file_paths import library_path
+        safe = library_path(path)
+        entry = self._lib_for(namespace).get(safe)
+        if entry is None:
+            raise ValueError("파일을 찾을 수 없습니다.")
+        return entry.get("content", b"")
+
+    def library_write_file(self, namespace: str, path: str, content: bytes) -> None:
+        import time
+        from app.services.file_paths import library_path
+        safe = library_path(path, write=True)
+        lib = self._lib_for(namespace)
+        lib[safe] = {"name": safe.rsplit("/", 1)[-1], "type": "file",
+                     "size": len(content), "modified": int(time.time()), "content": content}
+
+    def library_delete_path(self, namespace: str, path: str) -> None:
+        from app.services.file_paths import library_path
+        safe = library_path(path, write=True)
+        lib = self._lib_for(namespace)
+        keys = [k for k in lib if k == safe or k.startswith(safe + "/")]
+        for k in keys:
+            del lib[k]
+
+    def library_mkdir(self, namespace: str, path: str) -> None:
+        import time
+        from app.services.file_paths import library_path
+        safe = library_path(path, write=True)
+        lib = self._lib_for(namespace)
+        lib[safe] = {"name": safe.rsplit("/", 1)[-1], "type": "dir",
+                     "size": 0, "modified": int(time.time())}
+
+    def library_extract(self, namespace: str, path: str) -> None:
+        pass  # mock no-op
+
+    def library_storage(self, namespace: str) -> dict:
+        lib = self._lib_for(namespace)
+        used = sum(e.get("size", 0) for e in lib.values() if e.get("type") == "file")
+        return {"used_bytes": used, "total_bytes": 10 * 1024 ** 3}
 
