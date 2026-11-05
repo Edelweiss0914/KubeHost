@@ -24,7 +24,10 @@ function fileIcon(entry: FileEntry): string {
 
 const LIBRARY_ROOT = '/library';
 
+const NOTICE_KEY = 'kubehost_library_notice_dismissed';
+
 export function LibraryManager() {
+  const [showNotice, setShowNotice] = useState(() => !localStorage.getItem(NOTICE_KEY));
   const [path, setPath] = useState(LIBRARY_ROOT);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +159,38 @@ export function LibraryManager() {
   const pct = storage ? Math.min(100, Math.round(storage.used_bytes / storage.total_bytes * 100)) : 0;
   const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e';
 
+  function dismissNotice() {
+    localStorage.setItem(NOTICE_KEY, '1');
+    setShowNotice(false);
+  }
+
   return (
+    <>
+    {showNotice && (
+      <div style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div style={{
+          background: 'var(--surface, #1e1e2e)', border: '1px solid var(--border, #333)',
+          borderRadius: '12px', padding: '28px 32px', maxWidth: '420px', width: '90%',
+        }}>
+          <h3 style={{ marginBottom: '12px' }}>📦 라이브러리 주의사항</h3>
+          <p style={{ lineHeight: 1.6, marginBottom: '8px' }}>
+            라이브러리는 <strong>테넌트 할당 스토리지를 공유</strong>합니다.
+          </p>
+          <ul style={{ lineHeight: 1.8, paddingLeft: '20px', marginBottom: '20px', fontSize: '14px' }}>
+            <li>업로드 용량은 게임 서버 스토리지와 합산됩니다.</li>
+            <li>템플릿 파일(.tar.gz)이 자동 저장되는 공간입니다.</li>
+            <li>불필요한 파일은 주기적으로 정리해 주세요.</li>
+          </ul>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button onClick={dismissNotice}>확인, 다시 보지 않기</button>
+            <button className="secondary" onClick={() => setShowNotice(false)}>닫기</button>
+          </div>
+        </div>
+      </div>
+    )}
     <section className="panel">
       <div className="section-title">
         <div>
@@ -286,5 +320,6 @@ export function LibraryManager() {
         </p>
       )}
     </section>
+    </>
   );
 }
