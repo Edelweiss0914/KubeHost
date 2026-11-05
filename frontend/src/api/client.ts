@@ -130,6 +130,7 @@ export interface ServerGateway {
   uploadFile(serverId: string, path: string, file: File, onProgress?: (pct: number) => void): Promise<{ path: string; name: string; size: number }>;
   deletePath(serverId: string, path: string): Promise<void>;
   mkdirFs(serverId: string, path: string): Promise<{ path: string }>;
+  extractZip(serverId: string, path: string): Promise<{ path: string }>;
   serverMetrics(serverId: string, minutes?: number): Promise<ServerMetrics>;
   namespaceMetrics(minutes?: number): Promise<NamespaceMetrics>;
   clusterMetrics(): Promise<ClusterMetrics>;
@@ -263,6 +264,7 @@ export const api: ServerGateway = {
   },
   deletePath: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
   mkdirFs: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs/mkdir`, { method: 'POST', body: JSON.stringify({ path }) }),
+  extractZip: (id, path) => versioned(`/servers/${encodeURIComponent(id)}/fs/extract`, { method: 'POST', body: JSON.stringify({ path }) }),
   serverMetrics: (serverId, minutes = 60) => versioned(`/metrics/server/${encodeURIComponent(serverId)}?minutes=${minutes}`),
   namespaceMetrics: (minutes = 60) => versioned(`/metrics/namespace?minutes=${minutes}`),
   clusterMetrics: () => versioned('/metrics/cluster'),

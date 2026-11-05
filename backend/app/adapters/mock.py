@@ -314,6 +314,10 @@ class MockKubernetesAdapter:
         for k in to_del:
             del fs[k]
 
+    def extract(self, server_id: str, namespace: str, path: str,
+                sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        pass  # mock: no-op
+
     def mkdir(self, server_id: str, namespace: str, path: str,
               sts_name: str | None = None, game: str = "minecraft-java") -> None:
         import time

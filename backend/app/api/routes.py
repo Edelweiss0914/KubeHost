@@ -686,6 +686,22 @@ class _MkdirBody(_BaseModel):
     path: str
 
 
+class _ExtractBody(_BaseModel):
+    path: str
+
+
+@router.post("/api/v1/servers/{server_id}/fs/extract", status_code=200)
+def extract_zip(server_id: str, body: _ExtractBody, owner: Owner, svc: Service) -> dict:
+    server = svc.get(owner, server_id)
+    try:
+        safe = file_path(server.game, body.path)
+        svc.adapter.extract(server_id, server.resource_plan.namespace, safe,
+                            sts_name=server.resource_plan.sts_name, game=server.game)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"path": safe}
+
+
 @router.post("/api/v1/servers/{server_id}/fs/mkdir", status_code=201)
 def make_dir(server_id: str, body: _MkdirBody, owner: Owner, svc: Service) -> dict:
     server = svc.get(owner, server_id)

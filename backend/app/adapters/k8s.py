@@ -836,3 +836,16 @@ class K8sAdapter:
         if game == "garrysmod":
             self._require_gmod_file_mount(server_id, namespace, sts_name)
         self._exec_anywhere(server_id, namespace, ["sh", "-c", f"mkdir -p '{safe}'"], sts_name=sts_name, game=game)
+
+    def extract(self, server_id: str, namespace: str, path: str, sts_name: str | None = None, game: str = "minecraft-java") -> None:
+        safe = file_path(game, path)
+        if not safe.endswith(".zip"):
+            raise ValueError("ZIP 파일만 압축 해제할 수 있습니다.")
+        if game == "garrysmod":
+            self._require_gmod_file_mount(server_id, namespace, sts_name)
+        dest = safe.rsplit("/", 1)[0]
+        self._exec_anywhere(
+            server_id, namespace,
+            ["sh", "-c", f"unzip -o '{safe}' -d '{dest}'"],
+            sts_name=sts_name, game=game,
+        )

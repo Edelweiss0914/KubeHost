@@ -178,6 +178,20 @@ export function FileManager({ serverId, game }: Props) {
     }
   }
 
+  async function handleExtract(entry: FileEntry) {
+    if (!confirm(`"${entry.name}"을 현재 폴더에 압축 해제하시겠습니까?`)) return;
+    setBusy(true);
+    try {
+      await api.extractZip(serverId, path + '/' + entry.name);
+      showMsg(`${entry.name} 압축 해제 완료`);
+      await loadDir(path);
+    } catch (err) {
+      showMsg(err instanceof Error ? err.message : '압축 해제 실패', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleMkdir() {
     const name = newDirName.trim();
     if (!name) return;
@@ -336,6 +350,10 @@ export function FileManager({ serverId, game }: Props) {
                     {canEdit(entry) && (
                       <button className="secondary small" disabled={busy} title="텍스트 편집"
                         onClick={() => void handleEdit(entry)}>편집</button>
+                    )}
+                    {entry.type === 'file' && entry.name.endsWith('.zip') && (
+                      <button className="secondary small" disabled={busy} title="압축 해제"
+                        onClick={() => void handleExtract(entry)}>압축 해제</button>
                     )}
                     {entry.type === 'file' && (
                       <button className="secondary small" disabled={busy} title="다운로드"
