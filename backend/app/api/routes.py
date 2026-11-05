@@ -756,13 +756,27 @@ def fs_github_clone(server_id: str, body: _GithubCloneBody, owner: Owner, svc: S
         gh_owner, gh_repo, branch = _parse_github_url(body.url)
         if body.branch and body.branch != "main":
             branch = body.branch
-        download_url = f"https://github.com/{gh_owner}/{gh_repo}/archive/refs/heads/{branch}.zip"
         from app.services.file_paths import file_path as _file_path
         safe_path = _file_path(server.game, body.path)
         # 백엔드에서 직접 다운로드 (게임 컨테이너에 curl 불필요)
-        req = urllib.request.Request(download_url, headers={"User-Agent": "kubehost/1.0"})
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            zip_data = resp.read()
+        # main 실패 시 master 폴백 (사용자가 브랜치를 명시하지 않은 경우)
+        from urllib.error import HTTPError
+        branches_to_try = [branch] if body.branch != "main" else ["main", "master"]
+        zip_data = None
+        for b in branches_to_try:
+            try:
+                url = f"https://github.com/{gh_owner}/{gh_repo}/archive/refs/heads/{b}.zip"
+                req = urllib.request.Request(url, headers={"User-Agent": "kubehost/1.0"})
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    zip_data = resp.read()
+                branch = b
+                break
+            except HTTPError as e:
+                if e.code == 404 and b != branches_to_try[-1]:
+                    continue
+                raise ValueError(f"레포지토리를 찾을 수 없습니다: {gh_owner}/{gh_repo} (브랜치: {b})")
+        if zip_data is None:
+            raise ValueError(f"레포지토리를 찾을 수 없습니다: {gh_owner}/{gh_repo}")
         zip_dest = safe_path.rstrip("/") + f"/{gh_repo}-{branch}.zip"
         ns = server.resource_plan.namespace
         sts = server.resource_plan.sts_name
