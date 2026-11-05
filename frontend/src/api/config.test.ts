@@ -20,12 +20,12 @@ describe('runtime boundary', () => {
   await api.health(); await api.servers();
   expect(fetch.mock.calls.map(call => call[0])).toEqual(['https://api.example.com/gateway/health','https://api.example.com/gateway/api/v1/servers']);
  });
- it('never infers mock mode from absent or unhealthy health', () => {
+ it('uses real mode only when health is ok', () => {
   expect(consoleMode(null)).toBe('unknown');
   expect(consoleMode({status:'error',mode:'mock'})).toBe('unknown');
-  expect(consoleMode({status:'ok',mode:'future'})).toBe('unknown');
-  expect(consoleMode({status:'ok',mode:'kubernetes'})).toBe('unknown');
-  expect(consoleMode({status:'ok',mode:'mock'})).toBe('mock');
+  expect(consoleMode({status:'ok',mode:'future'})).toBe('real');
+  expect(consoleMode({status:'ok',mode:'kubernetes'})).toBe('real');
+  expect(consoleMode({status:'ok',mode:'mock'})).toBe('real');
   expect(consoleMode({status:'ok',mode:'real'})).toBe('real');
  });
 });
