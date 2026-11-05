@@ -11,6 +11,7 @@ dist/
 coverage/
 .coverage
 *.pyc
+*.egg-info/
 *.db
 *.sqlite3
 .omc/
