@@ -749,7 +749,7 @@ def set_version(server_id: str, body: _VersionBody, owner: Owner, svc: Service, 
 
 def _lib_ns(owner: str) -> str:
     from uuid import NAMESPACE_URL, uuid5
-    return f"tenant-{uuid5(NAMESPACE_URL, owner).hex}"
+    return f"library-{uuid5(NAMESPACE_URL, owner).hex}"
 
 
 @router.get("/api/v1/library/fs")
