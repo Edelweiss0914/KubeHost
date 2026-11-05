@@ -251,6 +251,29 @@ from uuid import uuid4 as _uuid4
 from pydantic import BaseModel as _BaseModel
 
 
+class _WorkshopBody(_BaseModel):
+    collection_id: str  # 숫자 문자열, 빈 문자열이면 제거
+
+
+@router.post("/api/v1/servers/{server_id}/workshop", status_code=200)
+def set_workshop(server_id: str, body: _WorkshopBody, owner: Owner, svc: Service) -> dict[str, str]:
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    if server.game != "garrysmod":
+        raise HTTPException(status_code=422, detail="Workshop은 Garry's Mod 서버에서만 사용할 수 있습니다.")
+    cid = body.collection_id.strip()
+    if cid and (not cid.isdigit() or len(cid) > 20):
+        raise HTTPException(status_code=422, detail="컬렉션 ID는 숫자만 입력하세요 (최대 20자리).")
+    svc.adapter.patch_settings(
+        server_id,
+        server.resource_plan.namespace,
+        {"WORKSHOP_COLLECTION_ID": cid},
+        sts_name=server.resource_plan.sts_name,
+    )
+    return {"collection_id": cid}
+
+
 class ScheduleIn(_BaseModel):
     days: list[int] = []  # 0=월~6=일, 빈 배열=매일
     start_time: str | None = None  # "HH:MM"

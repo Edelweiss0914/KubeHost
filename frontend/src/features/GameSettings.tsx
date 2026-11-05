@@ -11,16 +11,44 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
+  const [workshopId, setWorkshopId] = useState('');
+  const [workshopSaving, setWorkshopSaving] = useState(false);
+  const [workshopError, setWorkshopError] = useState('');
+  const [workshopSaved, setWorkshopSaved] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
-    api.getGameSettings(server.id)
-      .then(result => { if (!cancelled) setSettings(result); })
+    Promise.all([
+      api.getGameSettings(server.id),
+      server.game === 'garrysmod' ? api.getSettings(server.id) : Promise.resolve(null),
+    ])
+      .then(([gameResult, rawSettings]) => {
+        if (!cancelled) {
+          setSettings(gameResult);
+          if (rawSettings) setWorkshopId(rawSettings['WORKSHOP_COLLECTION_ID'] ?? '');
+        }
+      })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : '설정을 불러오지 못했습니다.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [server.id]);
+  }, [server.id, server.game]);
+
+  async function saveWorkshop() {
+    setWorkshopSaving(true);
+    setWorkshopError('');
+    setWorkshopSaved(false);
+    try {
+      const result = await api.setWorkshop(server.id, workshopId.trim());
+      setWorkshopId(result.collection_id);
+      setWorkshopSaved(true);
+    } catch (cause) {
+      setWorkshopError(cause instanceof Error ? cause.message : 'Workshop 설정을 저장하지 못했습니다.');
+    } finally {
+      setWorkshopSaving(false);
+    }
+  }
 
   async function save() {
     if (!settings) return;
@@ -82,5 +110,29 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     {settings && <div className="actions"><button onClick={() => void save()} disabled={saving}>
       {saving ? '저장 중…' : '설정 저장'}
     </button></div>}
+    {!loading && server.game === 'garrysmod' && <section className="panel" style={{marginTop: '1.5rem'}}>
+      <div className="section-title">
+        <div><span className="eyebrow">STEAM WORKSHOP</span><h3>Workshop 컬렉션</h3></div>
+      </div>
+      <p className="muted notice">변경 후 서버를 재시작해야 적용됩니다.</p>
+      <div className="form-grid">
+        <label>컬렉션 ID
+          <input
+            value={workshopId}
+            maxLength={20}
+            placeholder="예: 2982223457"
+            onChange={e => setWorkshopId(e.target.value)}
+          />
+          <small>Steam Workshop 컬렉션 URL의 숫자 ID를 입력하세요. 비우면 Workshop 연동이 해제됩니다.</small>
+        </label>
+      </div>
+      {workshopError && <p role="alert" className="error">{workshopError}</p>}
+      {workshopSaved && <p role="status" className="notice">Workshop 설정을 저장했습니다. 서버를 재시작하면 적용됩니다.</p>}
+      <div className="actions">
+        <button onClick={() => void saveWorkshop()} disabled={workshopSaving}>
+          {workshopSaving ? '저장 중…' : 'Workshop 저장'}
+        </button>
+      </div>
+    </section>}
   </section>;
 }
