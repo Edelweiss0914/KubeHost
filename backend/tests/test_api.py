@@ -111,6 +111,33 @@ def test_non_minecraft_console_rejects_rcon(client):
     assert "RCON" in response.json()["detail"]
 
 
+@pytest.mark.parametrize("game,update,expected_env", [
+    ("garrysmod", {"map_name": "gm_construct", "gamemode_name": "sandbox"},
+     {"MAP": "gm_construct", "GAMEMODE": "sandbox"}),
+    ("valheim", {"world_name": "NewWorld", "server_public": True},
+     {"WORLD_NAME": "NewWorld", "SERVER_PUBLIC": "1"}),
+])
+def test_game_settings_update_server_and_restore_plan(client, game, update, expected_env):
+    server = client.post("/api/v1/servers", json={"name": "Game server", "game": game}).json()
+    url = f"/api/v1/servers/{server['id']}"
+    assert client.put(f"{url}/game-settings", json=update).status_code == 204
+    assert client.get(f"{url}/game-settings").json() == update
+    saved = client.get(url).json()
+    for key, value in update.items():
+        assert saved[key] == value
+    stateful = next(r for r in saved["resource_plan"]["resources"] if r["kind"] == "StatefulSet")
+    env = {item["name"]: item["value"] for item in stateful["spec"]["template"]["spec"]["containers"][0]["env"]}
+    assert all(env[key] == value for key, value in expected_env.items())
+
+
+def test_game_settings_reject_mismatched_payload(client):
+    server = client.post("/api/v1/servers", json={"name": "GMod server", "game": "garrysmod"}).json()
+    url = f"/api/v1/servers/{server['id']}/game-settings"
+    response = client.put(url, json={"world_name": "Nope", "server_public": True})
+    assert response.status_code == 422
+    assert client.get(f"/api/v1/servers/{server['id']}/settings").status_code == 422
+
+
 def test_mock_nodes_and_openapi(client):
     nodes = client.get("/api/v1/nodes").json()
     assert all(node["mock"] for node in nodes)

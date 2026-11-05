@@ -81,7 +81,7 @@ def server_metrics(
         raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
 
     namespace = server.resource_plan.namespace
-    pod_prefix = f"mc-{server_id.replace('-', '')}"
+    pod_prefix = server.resource_plan.sts_name or f"mc-{server_id.replace('-', '')}"
 
     end = int(time.time())
     start = end - minutes * 60

@@ -3,6 +3,7 @@ import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { Tooltip } from '../components/Tooltip';
 import { ServerSettingsPanel } from './ServerSettings';
+import { GameSettingsPanel } from './GameSettings';
 import { ServerConsole } from './ServerConsole';
 import { FileManager } from './FileManager';
 import { api } from '../api/client';
@@ -29,7 +30,7 @@ function kindSummary(r: K8sResource): string {
   const spec = r.spec
   switch (r.kind) {
     case 'Namespace':
-      return 'pod-security: restricted'
+      return '테넌트 격리 공간'
     case 'ResourceQuota': {
       const hard = (spec?.hard ?? {}) as Record<string, string>
       return `CPU ${hard['limits.cpu'] ?? '?'} · 메모리 ${hard['limits.memory'] ?? '?'} · 스토리지 ${hard['requests.storage'] ?? '?'}`
@@ -40,12 +41,13 @@ function kindSummary(r: K8sResource): string {
       return `기본 CPU ${def.cpu ?? '?'} · 기본 메모리 ${def.memory ?? '?'}`
     }
     case 'NetworkPolicy':
-      return 'Ingress: 게임(25565) + 원격 콘솔(25575 내부) · Egress: DNS + 외부'
+      return '게임 파드의 네트워크 접근 규칙'
     case 'Service': {
       const ports = spec?.ports as Array<Record<string, unknown>> | undefined
-      if (spec?.clusterIP === 'None') return 'Headless · 포트 25565'
-      const np = ports?.[0]?.nodePort
-      return `NodePort · 포트 25565 → ${np ?? '미할당'}`
+      const gamePorts = ports?.map(p => `${p.port}/${p.protocol ?? 'TCP'}`).join(', ') ?? '?'
+      if (spec?.clusterIP === 'None') return `Headless · ${gamePorts}`
+      const nodePort = ports?.find(p => p.nodePort)?.nodePort
+      return `NodePort · ${gamePorts} → ${nodePort ?? '미할당'}`
     }
     case 'StatefulSet': {
       const tplSpec = ((spec?.template as Record<string, unknown> | undefined)?.spec ?? {}) as Record<string, unknown>
@@ -64,7 +66,7 @@ function kindSummary(r: K8sResource): string {
 function maskResource(res: unknown): string {
   return JSON.stringify(res, (_key, value: unknown) => {
     if (value && typeof value === 'object' && 'name' in value &&
-        (value as Record<string, unknown>).name === 'RCON_PASSWORD') {
+        ['RCON_PASSWORD', 'SERVER_PASS', 'CF_API_KEY'].includes(String((value as Record<string, unknown>).name))) {
       return { ...(value as object), value: '[숨김]' }
     }
     return value
@@ -682,9 +684,10 @@ type ServerDetailProps = {
   onAction: (action: 'start' | 'stop') => void;
   onDelete: (deleteData: boolean, confirmation: string) => void;
   onBack: () => void;
+  onUpdated?: () => void;
 };
 
-export function ServerDetail({ server, busy, onAction, onDelete, onBack }: ServerDetailProps) {
+export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdated }: ServerDetailProps) {
   const [subView, setSubView] = useState<ServerSubView>('console');
   const [deleting, setDeleting] = useState(false);
   const [deleteData, setDeleteData] = useState(false);
@@ -699,12 +702,12 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
   const NAV_ITEMS: [ServerSubView, string, string][] = [
     ['console', '▶', isMinecraft ? '콘솔' : '파드 로그'],
     ...(isMinecraft ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
-    ['files', '◫', '파일'],
+    ...(isMinecraft ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
     ...(isMinecraft ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
     ['overview', '⬡', '서버 정보'],
     ['metrics', '▦', '메트릭'],
     ['schedule', '◷', '스케줄'],
-    ...(isMinecraft ? [['settings', '⚙', '설정'] as [ServerSubView, string, string]] : []),
+    ['settings', '⚙', '설정'],
   ];
 
   return (
@@ -791,6 +794,16 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
               </div>
               <dl className="details-grid">
                 {isMinecraft && <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>}
+                {server.game === 'valheim' && <>
+                  <div><dt>게임</dt><dd>Valheim</dd></div>
+                  <div><dt>월드</dt><dd>{server.world_name || 'KubeHostWorld'}</dd></div>
+                  <div><dt>공개 목록</dt><dd>{server.server_public ? '표시' : '비공개'}</dd></div>
+                </>}
+                {server.game === 'garrysmod' && <>
+                  <div><dt>게임</dt><dd>Garry's Mod</dd></div>
+                  <div><dt>맵</dt><dd>{server.map_name || 'gm_flatgrass'}</dd></div>
+                  <div><dt>게임모드</dt><dd>{server.gamemode_name || 'sandbox'}</dd></div>
+                </>}
                 <div><dt>호스트 서버</dt><dd>{server.node_id}</dd></div>
                 <div><dt>CPU / 메모리</dt><dd>{server.cpu} 코어 / {server.memory_mb} MiB</dd></div>
                 <div><dt>저장 공간 <Tooltip text="서버의 월드 데이터와 파일이 저장되는 공간입니다." /></dt><dd>{server.storage_gb} GiB · local-path</dd></div>
@@ -817,16 +830,18 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack }: Serve
             <SchedulePanel serverId={server.id}/>
           </section>
         )}
-        {subView === 'files' && (
+        {subView === 'files' && isMinecraft && (
           <FileManager serverId={server.id} />
         )}
-        {subView === 'settings' && isMinecraft && (
-          <ServerSettingsPanel
-            serverId={server.id}
-            currentVersion={server.version}
-            onVersionSaved={() => {}}
-            onClose={() => setSubView('console')}
-          />
+        {subView === 'settings' && (
+          isMinecraft
+            ? <ServerSettingsPanel
+                serverId={server.id}
+                currentVersion={server.version}
+                onVersionSaved={() => {}}
+                onClose={() => setSubView('console')}
+              />
+            : <GameSettingsPanel server={server} onClose={() => setSubView('console')} onSaved={onUpdated}/>
         )}
       </div>
     </div>

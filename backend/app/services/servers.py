@@ -4,7 +4,9 @@ from threading import RLock
 from typing import Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
-from app.models.server import DeletionResult, Server, ServerCreate, ServerSettings
+from app.models.server import (
+    DeletionResult, GarrysModSettings, Server, ServerCreate, ServerSettings, ValheimSettings,
+)
 from app.ports import KubernetesAdapter, ServerRepository
 from app.services.plans import build_resource_plan, namespace_resources
 
@@ -162,12 +164,16 @@ class ServerService:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
+        if server.game != "minecraft-java":
+            raise InvalidOperation("이 게임은 게임별 설정 화면에서 관리합니다.")
         return self.adapter.get_settings(server_id, server.resource_plan.namespace, sts_name=server.resource_plan.sts_name)
 
     def update_settings(self, owner_id: str, server_id: str, settings: ServerSettings) -> None:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
+        if server.game != "minecraft-java":
+            raise InvalidOperation("이 게임은 게임별 설정 화면에서 관리합니다.")
         self.adapter.patch_settings(server_id, server.resource_plan.namespace, {
             "DIFFICULTY": settings.difficulty,
             "GAMEMODE": settings.gamemode,
@@ -180,6 +186,45 @@ class ServerService:
             "OPS": settings.ops,
             "FORCE_GAMEMODE": "TRUE" if settings.force_gamemode else "FALSE",
         }, sts_name=server.resource_plan.sts_name)
+
+    def get_game_settings(self, owner_id: str, server_id: str) -> dict[str, str | bool]:
+        server = self.get(owner_id, server_id)
+        if server.game == "valheim":
+            return {"world_name": server.world_name or "KubeHostWorld",
+                    "server_public": server.server_public}
+        if server.game == "garrysmod":
+            return {"map_name": server.map_name or "gm_flatgrass",
+                    "gamemode_name": server.gamemode_name or "sandbox"}
+        raise InvalidOperation("Minecraft 설정은 기존 설정 화면에서 관리합니다.")
+
+    def update_game_settings(
+        self, owner_id: str, server_id: str, settings: ValheimSettings | GarrysModSettings,
+    ) -> None:
+        with self._lock:
+            server = self.get(owner_id, server_id)
+            if server.game == "valheim" and isinstance(settings, ValheimSettings):
+                values = settings.model_dump()
+                env_updates = {"WORLD_NAME": settings.world_name,
+                               "SERVER_PUBLIC": "1" if settings.server_public else "0"}
+            elif server.game == "garrysmod" and isinstance(settings, GarrysModSettings):
+                values = settings.model_dump()
+                env_updates = {"MAP": settings.map_name, "GAMEMODE": settings.gamemode_name}
+            else:
+                raise InvalidOperation("서버 게임과 설정 종류가 일치하지 않습니다.")
+
+            self.adapter.patch_settings(
+                server.id, server.resource_plan.namespace, env_updates,
+                sts_name=server.resource_plan.sts_name,
+            )
+            for resource in server.resource_plan.resources:
+                if resource["kind"] != "StatefulSet":
+                    continue
+                env = resource["spec"]["template"]["spec"]["containers"][0]["env"]
+                for entry in env:
+                    if entry["name"] in env_updates:
+                        entry["value"] = env_updates[entry["name"]]
+                break
+            self.repository.save(server.model_copy(update=values))
 
     def restore(self, owner_id: str, server_id: str) -> Server:
         with self._lock:

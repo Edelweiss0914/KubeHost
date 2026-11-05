@@ -119,7 +119,7 @@ class MockKubernetesAdapter:
     def get_status(self, server_id: str, namespace: str) -> str | None:
         return None
 
-    def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"]) -> None:
+    def set_state(self, server_id: str, namespace: str, state: Literal["running", "stopped"], sts_name: str | None = None) -> None:
         pass
 
     def delete(self, server_id: str, namespace: str, delete_data: bool) -> None:
@@ -131,10 +131,10 @@ class MockKubernetesAdapter:
     def list_pvcs(self, namespace: str) -> list[str]:
         return []
 
-    def get_settings(self, server_id: str, namespace: str) -> dict[str, str]:
+    def get_settings(self, server_id: str, namespace: str, sts_name: str | None = None) -> dict[str, str]:
         return {}
 
-    def patch_settings(self, server_id: str, namespace: str, updates: dict[str, str]) -> None:
+    def patch_settings(self, server_id: str, namespace: str, updates: dict[str, str], sts_name: str | None = None) -> None:
         pass
 
     def rcon(self, server_id: str, namespace: str, command: str) -> str:

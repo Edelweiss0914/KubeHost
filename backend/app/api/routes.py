@@ -5,7 +5,10 @@ from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
-from app.models.server import DeletionResult, Node, Server, ServerCreate, ServerPod, ServerSettings
+from app.models.server import (
+    DeletionResult, GarrysModSettings, Node, Server, ServerCreate, ServerPod, ServerSettings,
+    ValheimSettings,
+)
 from app.services.servers import InvalidOperation, ServerNotFound, ServerService
 
 router = APIRouter()
@@ -154,6 +157,8 @@ def get_settings(server_id: str, owner: Owner, svc: Service) -> dict[str, str]:
         return svc.get_settings(owner, server_id)
     except ServerNotFound:
         raise HTTPException(status_code=404, detail="Server not found")
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.put("/api/v1/servers/{server_id}/settings", status_code=204)
@@ -162,6 +167,26 @@ def update_settings(server_id: str, payload: ServerSettings, owner: Owner, svc: 
         svc.update_settings(owner, server_id, payload)
     except ServerNotFound:
         raise HTTPException(status_code=404, detail="Server not found")
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/api/v1/servers/{server_id}/game-settings")
+def get_game_settings(server_id: str, owner: Owner, svc: Service) -> dict[str, str | bool]:
+    try:
+        return svc.get_game_settings(owner, server_id)
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.put("/api/v1/servers/{server_id}/game-settings", status_code=204)
+def update_game_settings(
+    server_id: str, payload: ValheimSettings | GarrysModSettings, owner: Owner, svc: Service,
+) -> None:
+    try:
+        svc.update_game_settings(owner, server_id, payload)
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/api/v1/servers/{server_id}/logs")

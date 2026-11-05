@@ -93,6 +93,18 @@ class ServerSettings(BaseModel):
     force_gamemode: bool = False
 
 
+class ValheimSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    world_name: str = Field(min_length=1, max_length=64)
+    server_public: bool
+
+
+class GarrysModSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    map_name: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    gamemode_name: str = Field(min_length=1, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
+
+
 class DeletionResult(BaseModel):
     id: str
     deleted: bool = True

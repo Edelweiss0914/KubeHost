@@ -255,8 +255,9 @@ class K8sAdapter:
         current = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
         current.update(updates)
         new_env = [{"name": k, "value": v} for k, v in current.items()]
+        container_name = sts.spec.template.spec.containers[0].name
         self._apps.patch_namespaced_stateful_set(name, namespace, {
-            "spec": {"template": {"spec": {"containers": [{"name": "minecraft", "env": new_env}]}}}
+            "spec": {"template": {"spec": {"containers": [{"name": container_name, "env": new_env}]}}}
         })
 
     def rcon(self, server_id: str, namespace: str, command: str, sts_name: str | None = None) -> str:

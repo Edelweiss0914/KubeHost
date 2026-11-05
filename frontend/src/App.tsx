@@ -556,6 +556,7 @@ export function App() {
               onBack={() => navigate('servers')}
               onAction={action => void changeStatus(action)}
               onDelete={(deleteData, confirmation) => void remove(deleteData, confirmation)}
+              onUpdated={() => { void api.server(selected.id).then(setSelected).catch(() => {}); }}
             />}
           </>}
         <footer><span>© KubeHost · 게임 서버 운영 콘솔</span><span>호스트 서버 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</span></footer>

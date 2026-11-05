@@ -1,6 +1,6 @@
 import type { Health } from '../domain/mode';
 import { apiUrl } from './config';
-import type { Server, ServerInput, ServerSettings, TopologyPod, WorkerNode } from '../domain/server';
+import type { GameSettings, Server, ServerInput, ServerSettings, TopologyPod, WorkerNode } from '../domain/server';
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 
@@ -75,6 +75,8 @@ export interface ServerGateway {
   pvcs(id: string): Promise<{pvcs: string[]}>;
   getSettings(id: string): Promise<Record<string, string>>;
   updateSettings(id: string, s: ServerSettings): Promise<void>;
+  getGameSettings(id: string): Promise<GameSettings>;
+  updateGameSettings(id: string, s: GameSettings): Promise<void>;
   console(id: string, command: string): Promise<{output: string}>;
   register(username: string, password: string, inviteCode?: string): Promise<{id: string; username: string}>;
   login(username: string, password: string): Promise<{token: string; username: string}>;
@@ -149,6 +151,8 @@ export const api: ServerGateway = {
   pvcs: id => versioned(`/retained/${encodeURIComponent(id)}/pvcs`),
   getSettings: id => versioned(`/servers/${encodeURIComponent(id)}/settings`),
   updateSettings: (id, s) => versioned(`/servers/${encodeURIComponent(id)}/settings`, {method:'PUT', body:JSON.stringify(s)}),
+  getGameSettings: id => versioned(`/servers/${encodeURIComponent(id)}/game-settings`),
+  updateGameSettings: (id, s) => versioned(`/servers/${encodeURIComponent(id)}/game-settings`, {method:'PUT', body:JSON.stringify(s)}),
   console: (id, command) => versioned(`/servers/${encodeURIComponent(id)}/console`, {method:'POST', body:JSON.stringify({command})}),
   register: (username, password, inviteCode) => versioned('/auth/register', {
     method: 'POST',
