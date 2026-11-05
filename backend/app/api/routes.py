@@ -274,6 +274,60 @@ def set_workshop(server_id: str, body: _WorkshopBody, owner: Owner, svc: Service
     return {"collection_id": cid}
 
 
+@router.get("/api/v1/servers/{server_id}/workshop/items")
+def get_workshop_items(server_id: str, owner: Owner, svc: Service, page: int = 1) -> dict:
+    import urllib.request, json as _json
+    server = svc.repository.get(server_id)
+    if server is None or server.owner_id != owner:
+        raise HTTPException(status_code=404, detail="서버를 찾을 수 없습니다.")
+    if server.game != "garrysmod":
+        raise HTTPException(status_code=422, detail="Workshop은 Garry's Mod 서버에서만 사용할 수 있습니다.")
+    ns = server.resource_plan.namespace
+    settings = svc.adapter.get_settings(server_id, ns, sts_name=server.resource_plan.sts_name)
+    cid = settings.get("WORKSHOP_COLLECTION_ID", "").strip()
+    if not cid:
+        return {"items": [], "total": 0, "page": page, "per_page": 10}
+    import urllib.parse as _uparse
+    try:
+        col_data = _uparse.urlencode({"collectioncount": "1", "publishedfileids[0]": cid}).encode()
+        col_req = urllib.request.Request(
+            "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/",
+            data=col_data, headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(col_req, timeout=10) as resp:
+            col_result = _json.loads(resp.read())
+        details = col_result.get("response", {}).get("collectiondetails", [{}])[0]
+        children = details.get("children", [])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Steam API 오류: {exc}")
+    total = len(children)
+    per_page = 10
+    start = (page - 1) * per_page
+    page_ids = [c.get("publishedfileid", "") for c in children[start:start + per_page]]
+    # 아이템 상세 정보 조회
+    items = []
+    if page_ids:
+        try:
+            detail_params = {"itemcount": str(len(page_ids))}
+            for i, fid in enumerate(page_ids):
+                detail_params[f"publishedfileids[{i}]"] = fid
+            detail_data = _uparse.urlencode(detail_params).encode()
+            detail_req = urllib.request.Request(
+                "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/",
+                data=detail_data, headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            with urllib.request.urlopen(detail_req, timeout=10) as resp:
+                detail_result = _json.loads(resp.read())
+            file_details = detail_result.get("response", {}).get("publishedfiledetails", [])
+            items = [{"id": f.get("publishedfileid", ""),
+                      "title": f.get("title", "(이름 없음)"),
+                      "preview_url": f.get("preview_url", ""),
+                      "file_size": f.get("file_size", 0)} for f in file_details]
+        except Exception:
+            items = [{"id": fid, "title": fid, "preview_url": "", "file_size": 0} for fid in page_ids]
+    return {"items": items, "total": total, "page": page, "per_page": per_page, "collection_id": cid}
+
+
 class ScheduleIn(_BaseModel):
     days: list[int] = []  # 0=월~6=일, 빈 배열=매일
     start_time: str | None = None  # "HH:MM"

@@ -171,6 +171,14 @@ export interface ServerGateway {
   deployTemplate(templateId: string, name: string): Promise<{ id: string }>;
   deleteTemplate(templateId: string): Promise<void>;
   setWorkshop(serverId: string, collectionId: string): Promise<{ collection_id: string }>;
+  getWorkshopItems(serverId: string, page: number): Promise<{ items: WorkshopItem[]; total: number; page: number; per_page: number; collection_id: string }>;
+}
+
+export interface WorkshopItem {
+  id: string;
+  title: string;
+  preview_url: string;
+  file_size: number;
 }
 
 const versioned = <T,>(path: string, init?: RequestInit) => request<T>(`/api/v1${path}`, init);
@@ -352,4 +360,5 @@ export const api: ServerGateway = {
   deployTemplate: (templateId, name) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name }) }),
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
   setWorkshop: (serverId, collectionId) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop`, { method: 'POST', body: JSON.stringify({ collection_id: collectionId }) }),
+  getWorkshopItems: (serverId, page) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/items?page=${page}`),
 };
