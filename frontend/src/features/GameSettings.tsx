@@ -160,6 +160,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       <label>시작 맵
         <input value={settings.map_name} maxLength={64}
           onChange={e => setSettings({...settings, map_name: e.target.value})}/>
+        <small>⚠️ Workshop 맵은 먼저 Workshop ID를 저장하고 재시작하여 다운로드한 뒤 변경하세요.</small>
       </label>
       <label>게임모드
         <input value={settings.gamemode_name} maxLength={32}
@@ -176,7 +177,16 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       <div className="section-title">
         <div><span className="eyebrow">STEAM WORKSHOP</span><h3>Workshop 컬렉션</h3></div>
       </div>
-      <p className="muted notice">변경 후 서버를 재시작해야 적용됩니다.</p>
+      <div className="notice" style={{marginBottom: '12px'}}>
+        <strong>⚠️ 순서 주의</strong><br/>
+        Workshop 맵을 사용하려면 반드시 아래 순서를 지키세요:<br/>
+        <ol style={{margin: '6px 0 0 16px', lineHeight: 1.8}}>
+          <li>컬렉션/애드온 ID 입력 → 저장 → 서버 재시작</li>
+          <li>재시작 후 다운로드 완료 대기 (로그 확인)</li>
+          <li>맵 이름 변경 → 저장 → 서버 재시작</li>
+        </ol>
+        한 번에 맵과 Workshop을 동시에 바꾸면 맵 파일이 없어 시작에 실패합니다.
+      </div>
       <div className="form-grid">
         <label>컬렉션 ID
           <input
