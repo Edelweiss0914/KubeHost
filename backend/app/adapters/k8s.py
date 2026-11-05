@@ -876,7 +876,24 @@ class K8sAdapter:
         except ApiException:
             return ""
 
+    def _ensure_library_namespace(self, namespace: str) -> None:
+        try:
+            self._core.read_namespace(namespace)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+            try:
+                self._core.create_namespace({
+                    "apiVersion": "v1", "kind": "Namespace",
+                    "metadata": {"name": namespace, "labels": {
+                        "pod-security.kubernetes.io/enforce": "baseline"}},
+                })
+            except ApiException as ce:
+                if ce.status != 409:
+                    raise
+
     def _ensure_library_pvc(self, namespace: str) -> None:
+        self._ensure_library_namespace(namespace)
         try:
             self._core.read_namespaced_persistent_volume_claim("library", namespace)
         except ApiException as exc:
