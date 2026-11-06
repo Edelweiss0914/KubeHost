@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
+import { LayoutGrid, List, Hexagon } from 'lucide-react';
 import type { GameDefinition } from '../api/client';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
@@ -70,7 +71,7 @@ function ServerCard({ server, onSelect, gameDef }: { server: Server; onSelect: (
     >
       <div className="server-card-header">
         <span className="server-card-game-badge" style={badgeStyle(gameDef)} aria-hidden="true">
-          {gameDef?.icon ?? '⬡'}
+          {gameDef?.icon ?? <Hexagon size={20}/>}
         </span>
         <div className="server-card-title">
           <strong>{server.name}</strong>
@@ -124,7 +125,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
         <button onClick={onCreate}>+ 서버 만들기</button>
       </div>
       {!servers.length ? <div className="empty">
-        <span className="empty-icon" aria-hidden="true">▦</span>
+        <span className="empty-icon" aria-hidden="true"><LayoutGrid size={48}/></span>
         <h3>아직 서버가 없습니다</h3>
         <p>호스트 서버와 리소스를 선택해 첫 Minecraft 서버를 배포하세요.</p>
         <button onClick={onCreate}>첫 서버 만들기</button>
@@ -142,14 +143,14 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
                 aria-pressed={viewMode === 'card'}
                 onClick={() => setViewMode('card')}
                 title="카드 뷰"
-              >⊞</button>
+              ><LayoutGrid size={15}/></button>
               <button
                 type="button"
                 className={viewMode === 'table' ? 'active' : ''}
                 aria-pressed={viewMode === 'table'}
                 onClick={() => setViewMode('table')}
                 title="테이블 뷰"
-              >≡</button>
+              ><List size={15}/></button>
             </div>
           </div>
         </div>

@@ -423,6 +423,14 @@ class SQLiteServerRepository:
                 g,
             )
         conn.execute("UPDATE games SET supported = 1 WHERE slug IN ('valheim', 'garrysmod', 'cs2', 'rust')")
+        conn.execute("UPDATE games SET image_url = '/icons/minecraft-java.png' WHERE slug = 'minecraft-java' AND image_url IS NULL")
+
+    _STEAM_ICON_HASHES: dict[int, str] = {
+        730:    "8dbc71957312bbd3baea65848b545be9eae2a355",  # CS2
+        892970: "2f64c9a826e2c6cf3253fea4834c2e612db09143",  # Valheim
+        4000:   "4a6f25cfa2426445d0d9d6e233408de4d371ce8b",  # Garry's Mod
+        252490: "820be4782639f9c4b64fa3ca7e6c26a95ae4fd1c",  # Rust
+    }
 
     def list_games(self) -> list[dict]:
         with self._connect() as conn:
@@ -432,7 +440,10 @@ class SQLiteServerRepository:
         result = []
         for r in rows:
             steam_id = r[3]
+            icon_hash = self._STEAM_ICON_HASHES.get(steam_id) if steam_id else None
             img = r[4] or (
+                f"https://shared.fastly.steamstatic.com/community_assets/images/apps/{steam_id}/{icon_hash}.jpg"
+                if icon_hash else
                 f"https://cdn.cloudflare.steamstatic.com/steam/apps/{steam_id}/capsule_sm_120.jpg"
                 if steam_id else None
             )

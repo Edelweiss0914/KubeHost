@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { X } from 'lucide-react';
 
 export type ToastLevel = 'info' | 'success' | 'warning' | 'error';
 
@@ -50,7 +51,7 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: nu
   return (
     <div className={`toast toast-${toast.level}${visible ? ' toast-in' : ''}`} role="status">
       <span className="toast-msg">{toast.message}</span>
-      <button className="toast-close" onClick={() => onDismiss(toast.id)} aria-label="닫기">×</button>
+      <button className="toast-close" onClick={() => onDismiss(toast.id)} aria-label="닫기"><X size={14}/></button>
     </div>
   );
 }

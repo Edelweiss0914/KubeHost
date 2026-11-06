@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Check, Copy } from 'lucide-react';
 
 type Props = {
   text: string | null;
@@ -30,7 +31,7 @@ export function CopyBtn({ text, stopPropagation }: Props) {
   if (!text) return null;
   return (
     <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={copy} title="클립보드에 복사">
-      {copied ? '✓ 복사됨' : '복사'}
+      {copied ? <><Check size={13}/> 복사됨</> : <><Copy size={13}/> 복사</>}
     </button>
   );
 }

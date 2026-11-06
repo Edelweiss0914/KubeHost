@@ -1000,9 +1000,10 @@ button.resource-plan-card.selected .resource-plan-tag {
 .game-picker-img {
   width: 40px;
   height: 40px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 7px;
   flex-shrink: 0;
+  background: var(--surface);
 }
 .game-picker-card strong {
   font-size: 13px;
@@ -2903,33 +2904,14 @@ main:has(.mission-grid) .demo-banner { margin-bottom: 17px; padding-top: 12px; p
 [data-theme='light'] .topology-canvas { background-color: #e5edff; }
 [data-theme='light'] .topology-live { color: #27559d; background: #e1edff; }
 @media (max-width: 1180px) {
-  .sidebar { width: calc(100% - 32px); gap: 10px; }
-  .sidebar-footer .environment-pill { display: none; }
   .mission-grid { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); }
 }
 @media (max-width: 900px) {
-  .sidebar { flex-wrap: wrap; }
-  .sidebar nav { order: 3; width: 100%; overflow-x: auto; padding-bottom: 2px; }
-  .sidebar-footer { margin-left: auto; }
   .mission-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hero" "topology" "stats" "activity" "quota"; }
   .topology-panel { min-height: 0; }
   .mission-grid .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 700px) {
-  .sidebar {
-    position: sticky;
-    top: 8px;
-    width: calc(100% - 20px);
-    margin-top: 8px;
-    padding: 10px;
-    border-radius: 14px;
-  }
-  .sidebar-footer { display: flex; }
-  .sidebar .profile { padding-left: 0; border: 0; }
-  .sidebar .profile > div, .sidebar .avatar { display: none; }
-  .sidebar nav { gap: 4px; }
-  .sidebar nav button { flex: none; padding: 8px 11px; white-space: nowrap; }
-  .topbar { padding: 0 15px; }
   main { padding: 14px 14px 42px; }
   .mission-grid { gap: 14px; }
   .mission-grid .hero { min-height: 0; padding: 28px 22px; }
@@ -2943,10 +2925,6 @@ main:has(.mission-grid) .demo-banner { margin-bottom: 17px; padding-top: 12px; p
   .topology-footer { flex-wrap: wrap; }
 }
 @media (max-width: 420px) {
-  .sidebar { width: calc(100% - 12px); }
-  .sidebar .brand { font-size: 17px; }
-  .sidebar .brand-logo { width: 32px; height: 32px; }
-  .sidebar nav button { font-size: 12px; }
   .topology-live { font-size: 10px; }
   .mission-grid .stats article { min-height: 135px; padding: 14px; }
   .mission-grid .stats article strong { font-size: 27px; }

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { api } from '../api/client';
 import type { FileEntry } from '../api/client';
+import { Folder, FileText, Archive, File as FileIcon } from 'lucide-react';
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
 function formatSize(bytes: number): string {
@@ -14,12 +15,12 @@ function formatDate(ts: number): string {
   return new Date(ts * 1000).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function fileIcon(entry: FileEntry): string {
-  if (entry.type === 'dir') return '📁';
+function fileIcon(entry: FileEntry): ReactNode {
+  if (entry.type === 'dir') return <Folder size={15}/>;
   const ext = entry.name.split('.').pop()?.toLowerCase() ?? '';
-  if (['tar', 'gz', 'zip'].includes(ext)) return '🗜';
-  if (['properties', 'yml', 'yaml', 'toml', 'cfg', 'conf', 'txt', 'json'].includes(ext)) return '📄';
-  return '📄';
+  if (['tar', 'gz', 'zip'].includes(ext)) return <Archive size={15}/>;
+  if (['properties', 'yml', 'yaml', 'toml', 'cfg', 'conf', 'txt', 'json'].includes(ext)) return <FileText size={15}/>;
+  return <FileIcon size={15}/>;
 }
 
 const LIBRARY_ROOT = '/library';

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { api } from '../api/client';
 import type { FileEntry } from '../api/client';
 import type { Server } from '../domain/server';
+import { Folder, FileText, Coffee, Braces, ScrollText, Archive, File as FileIcon } from 'lucide-react';
 
 const TEXT_EXTENSIONS = new Set([
   'cfg', 'conf', 'ini', 'json', 'lua', 'md', 'properties', 'toml', 'txt', 'vdf', 'xml', 'yaml', 'yml',
@@ -19,15 +20,15 @@ function formatDate(ts: number): string {
   return new Date(ts * 1000).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function fileIcon(entry: FileEntry): string {
-  if (entry.type === 'dir') return '📁';
+function fileIcon(entry: FileEntry): ReactNode {
+  if (entry.type === 'dir') return <Folder size={15}/>;
   const ext = entry.name.split('.').pop()?.toLowerCase() ?? '';
-  if (ext === 'jar') return '☕';
-  if (ext === 'json') return '{}';
-  if (['properties', 'yml', 'yaml', 'toml', 'cfg', 'conf', 'txt'].includes(ext)) return '📄';
-  if (ext === 'log') return '📋';
-  if (['tar', 'gz', 'zip'].includes(ext)) return '🗜';
-  return '📄';
+  if (ext === 'jar') return <Coffee size={15}/>;
+  if (ext === 'json') return <Braces size={15}/>;
+  if (['properties', 'yml', 'yaml', 'toml', 'cfg', 'conf', 'txt'].includes(ext)) return <FileText size={15}/>;
+  if (ext === 'log') return <ScrollText size={15}/>;
+  if (['tar', 'gz', 'zip'].includes(ext)) return <Archive size={15}/>;
+  return <FileIcon size={15}/>;
 }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────────────

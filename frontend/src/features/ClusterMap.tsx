@@ -1,5 +1,6 @@
 import type { Server, TopologyPod, WorkerNode } from '../domain/server';
 import { Status } from '../components/Status';
+import { ArrowUpRight, Map as MapIcon } from 'lucide-react';
 
 type Props = {
   nodes: WorkerNode[];
@@ -49,7 +50,7 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
         <span className="hierarchy-kind">게임 서버</span>
         <strong>{server.name}</strong>
         <Status value={server.status === 'stopped' ? 'stopped' : pod.containers.some(container => container.ready) ? 'running' : pod.phase === 'Failed' ? 'error' : 'provisioning'} />
-        <span aria-hidden="true">↗</span>
+        <ArrowUpRight size={14} aria-hidden="true"/>
       </button>}
     </li>;
   }
@@ -87,7 +88,7 @@ export function ClusterMap({ nodes, servers, pods, onSelect }: Props) {
   if (workers.length === 0) {
     return (
       <div className="cluster-page"><div className="panel empty">
-        <div className="empty-icon" aria-hidden="true">▧</div>
+        <div className="empty-icon" aria-hidden="true"><MapIcon size={48}/></div>
         <p>표시할 호스트 서버가 없습니다.</p>
       </div><Hierarchy nodes={nodes} servers={servers} pods={pods} onSelect={onSelect}/></div>
     );

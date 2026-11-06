@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { MouseEvent } from 'react';
+import { Box, Zap, Atom, Activity, LayoutGrid, Terminal, ArrowUpRight, Clock, Map as MapIcon, Check, Layers } from 'lucide-react';
 
 type LandingProps = {
   onEnter: () => void;
@@ -27,13 +28,13 @@ const GAMES_ROW2 = [
   { name: 'Team Fortress 2',       id: 440     },
 ];
 
-const STACK = [
-  { icon: '⎈', name: 'K3s',         desc: '경량 Kubernetes' },
-  { icon: '⚡', name: 'FastAPI',     desc: 'Python 백엔드' },
-  { icon: '⚛', name: 'React',       desc: '프론트엔드' },
-  { icon: '◉', name: 'Prometheus',  desc: '메트릭 수집' },
-  { icon: '▦', name: 'StatefulSet', desc: '영속 스토리지' },
-  { icon: '⌨', name: 'Console',     desc: '서버 제어' },
+const STACK: { icon: ReactNode; name: string; desc: string }[] = [
+  { icon: <Box size={18}/>,        name: 'K3s',         desc: '경량 Kubernetes' },
+  { icon: <Zap size={18}/>,        name: 'FastAPI',     desc: 'Python 백엔드' },
+  { icon: <Atom size={18}/>,       name: 'React',       desc: '프론트엔드' },
+  { icon: <Activity size={18}/>,   name: 'Prometheus',  desc: '메트릭 수집' },
+  { icon: <Layers size={18}/>,     name: 'StatefulSet', desc: '영속 스토리지' },
+  { icon: <Terminal size={18}/>,   name: 'Console',     desc: '서버 제어' },
 ];
 
 const FAQ = [
@@ -139,7 +140,7 @@ export function Landing({ onEnter }: LandingProps) {
           <div className="landing-hero-actions landing-hero-enter-4">
             <button className="landing-btn-primary" onClick={onEnter}>
               지금 시작하기
-              <span className="landing-btn-arrow" aria-hidden="true">↗</span>
+              <span className="landing-btn-arrow" aria-hidden="true"><ArrowUpRight size={16}/></span>
             </button>
             <a className="landing-btn-ghost" href="#features">
               기능 살펴보기
@@ -175,16 +176,16 @@ export function Landing({ onEnter }: LandingProps) {
               <span className="landing-terminal-prompt">$</span> kubehost server create --name my-world
             </p>
             <p className="landing-terminal-line landing-terminal-info landing-anim-line" style={{'--li':1} as React.CSSProperties}>
-              ▦ StatefulSet 생성 중...
+              <LayoutGrid size={12}/> StatefulSet 생성 중...
             </p>
             <p className="landing-terminal-line landing-terminal-info landing-anim-line" style={{'--li':2} as React.CSSProperties}>
-              ◷ 네임스페이스 격리 적용 중...
+              <Clock size={12}/> 네임스페이스 격리 적용 중...
             </p>
             <p className="landing-terminal-line landing-terminal-ok landing-anim-line" style={{'--li':3} as React.CSSProperties}>
-              ✓ 서버가 배포되었습니다 (2.3s)
+              <Check size={12}/>서버가 배포되었습니다 (2.3s)
             </p>
             <p className="landing-terminal-line landing-terminal-ok landing-anim-line" style={{'--li':4} as React.CSSProperties}>
-              ✓ 포트 포워딩: 7777 → game-my-world:7777
+              <Check size={12}/>포트 포워딩: 7777 → game-my-world:7777
             </p>
             <p className="landing-terminal-line landing-terminal-muted landing-anim-line" style={{'--li':5} as React.CSSProperties}>
               &gt; 서버 상태: <span className="landing-terminal-running">running</span>
@@ -214,7 +215,7 @@ export function Landing({ onEnter }: LandingProps) {
         </div>
         <div className="landing-feature-grid">
           <article className="landing-feature-card" tabIndex={0}>
-            <div className="landing-feature-icon" aria-hidden="true">▦</div>
+            <div className="landing-feature-icon" aria-hidden="true"><LayoutGrid size={28}/></div>
             <h3 className="landing-feature-title">원클릭 배포</h3>
             <p className="landing-feature-desc">
               K8s StatefulSet을 자동 생성합니다. 네임스페이스 격리로 테넌트 간 완전 분리를 보장합니다.
@@ -226,7 +227,7 @@ export function Landing({ onEnter }: LandingProps) {
             </ul>
           </article>
           <article className="landing-feature-card" tabIndex={0}>
-            <div className="landing-feature-icon" aria-hidden="true">◷</div>
+            <div className="landing-feature-icon" aria-hidden="true"><Clock size={28}/></div>
             <h3 className="landing-feature-title">자동 스케줄</h3>
             <p className="landing-feature-desc">
               요일별 시작·종료를 자동화합니다. 미사용 시간에 파드를 정지해 운영 비용을 절감합니다.
@@ -238,7 +239,7 @@ export function Landing({ onEnter }: LandingProps) {
             </ul>
           </article>
           <article className="landing-feature-card" tabIndex={0}>
-            <div className="landing-feature-icon" aria-hidden="true">▧</div>
+            <div className="landing-feature-icon" aria-hidden="true"><MapIcon size={28}/></div>
             <h3 className="landing-feature-title">실시간 메트릭</h3>
             <p className="landing-feature-desc">
               Prometheus 기반 CPU·메모리 시계열 모니터링. 이상 징후를 즉시 감지합니다.

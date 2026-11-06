@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { api, ApiError } from '../api/client';
+import { X } from 'lucide-react';
 
 type Props = {
   onLogin: (token: string, username: string) => void;
@@ -76,7 +77,7 @@ export function Login({ onLogin, onClose }: Props) {
           onClick={onClose}
           aria-label="닫기"
         >
-          ✕
+          <X size={16}/>
         </button>
       )}
       <div className="login-brand">

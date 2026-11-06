@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, type Game } from '../api/client';
 import { defaults, validate, type GameType, type ServerInput, type WorkerNode } from '../domain/server';
 import { Tooltip } from '../components/Tooltip';
+import { FileText, Pickaxe, Hammer, Layers, Package, Flame } from 'lucide-react';
 
 type CreateServerProps = {
   nodes: WorkerNode[];
@@ -10,13 +11,13 @@ type CreateServerProps = {
   onCancel: () => void;
 };
 
-const GAME_TYPES: { type: GameType; label: string; desc: string; icon: string }[] = [
-  { type: 'PAPER',           label: 'Paper',       desc: '플러그인 서버 (추천)',  icon: '📄' },
-  { type: 'VANILLA',         label: 'Vanilla',     desc: '순정 Minecraft',       icon: '⛏' },
-  { type: 'FORGE',           label: 'Forge',       desc: '모드 서버',             icon: '🔨' },
-  { type: 'FABRIC',          label: 'Fabric',      desc: '경량 모드 서버',        icon: '🧵' },
-  { type: 'MODRINTH',        label: 'Modrinth',    desc: '모드팩 (ID 입력)',      icon: '📦' },
-  { type: 'AUTO_CURSEFORGE', label: 'CurseForge',  desc: '모드팩 (slug 입력)',   icon: '🔥' },
+const GAME_TYPES: { type: GameType; label: string; desc: string; icon: ReactNode }[] = [
+  { type: 'PAPER',           label: 'Paper',       desc: '플러그인 서버 (추천)',  icon: <FileText size={20} color="#22c55e"/> },
+  { type: 'VANILLA',         label: 'Vanilla',     desc: '순정 Minecraft',       icon: <Pickaxe size={20} color="#84cc16"/> },
+  { type: 'FORGE',           label: 'Forge',       desc: '모드 서버',             icon: <Hammer size={20} color="#f97316"/> },
+  { type: 'FABRIC',          label: 'Fabric',      desc: '경량 모드 서버',        icon: <Layers size={20} color="#8b5cf6"/> },
+  { type: 'MODRINTH',        label: 'Modrinth',    desc: '모드팩 (ID 입력)',      icon: <Package size={20} color="#1bd96a"/> },
+  { type: 'AUTO_CURSEFORGE', label: 'CurseForge',  desc: '모드팩 (slug 입력)',   icon: <Flame size={20} color="#f36f1a"/> },
 ];
 
 const MODRINTH_PRESETS = [
@@ -126,7 +127,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
           <div className="game-picker-grid">
             {games.length === 0
               ? <div className="game-picker-card selected" role="radio" aria-checked="true" tabIndex={0}>
-                  <span className="game-picker-icon" aria-hidden="true">⛏</span>
+                  <span className="game-picker-icon" aria-hidden="true"><Pickaxe size={22}/></span>
                   <div><strong>Minecraft Java</strong><small>Paper</small></div>
                 </div>
               : games.map(game => (

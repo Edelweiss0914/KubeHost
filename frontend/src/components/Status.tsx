@@ -1,3 +1,5 @@
+import { Circle } from 'lucide-react';
+
 export function Status({value}:{value:string}) {
   const labels:Record<string,string>={
     running:'실행 중',
@@ -8,6 +10,6 @@ export function Status({value}:{value:string}) {
     NotReady:'비정상',
   };
   return <span className={`status status-${value.toLowerCase()}`}>
-    <span aria-hidden="true">●</span> {labels[value]??value}
+    <Circle size={8} fill="currentColor" aria-hidden="true"/> {labels[value]??value}
   </span>;
 }

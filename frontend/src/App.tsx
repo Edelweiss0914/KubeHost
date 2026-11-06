@@ -18,6 +18,7 @@ import { Templates } from './features/Templates';
 import { useToast, ToastContainer } from './components/Toast';
 import { Tooltip } from './components/Tooltip';
 import { HelpModal } from './features/HelpModal';
+import { LayoutDashboard, Server as ServerIcon, Map as MapIcon, Package, ClipboardList, Shield, Sun, Moon, Timer, HardDrive, LayoutGrid, Circle, Clock, HelpCircle } from 'lucide-react';
 
 function getStoredAuth(): { token: string; username: string } | null {
   try {
@@ -87,11 +88,11 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
       <div className="hero-actions"><button onClick={onCreate}>새 서버 배포</button></div>
     </section>
     <div className="stats">
-      <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
-      <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">서비스 제공 중</p></article>
-      <article><span className="stat-icon" aria-hidden="true">◷</span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 진행 중</p></article>
-      <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
-      {storageUsed !== null && <article><span className="stat-icon" aria-hidden="true">💾</span><span>스토리지</span><strong>{storageUsed}<small> GiB</small></strong><p className="stat-meta">/ {storageTotal} GiB 할당</p></article>}
+      <article><span className="stat-icon" aria-hidden="true"><LayoutGrid size={18}/></span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
+      <article><span className="stat-icon" aria-hidden="true"><Circle size={18} fill="currentColor"/></span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">서비스 제공 중</p></article>
+      <article><span className="stat-icon" aria-hidden="true"><Clock size={18}/></span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 진행 중</p></article>
+      <article><span className="stat-icon" aria-hidden="true"><ServerIcon size={18}/></span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
+      {storageUsed !== null && <article><span className="stat-icon" aria-hidden="true"><HardDrive size={18}/></span><span>스토리지</span><strong>{storageUsed}<small> GiB</small></strong><p className="stat-meta">/ {storageTotal} GiB 할당</p></article>}
     </div>
     <section className="panel mission-activity">
         <div className="section-title"><div><h2>최근 서버</h2><p className="section-copy">가장 최근에 생성한 서버입니다.</p></div><span className="tag">최근 {recent.length}개</span></div>
@@ -139,7 +140,7 @@ function SessionExpiredModal({ onRelogin }: { onRelogin: () => void }) {
   return (
     <dialog ref={dialogRef} className="session-expired-dialog" onCancel={e => e.preventDefault()}>
       <div className="session-expired-inner">
-        <div className="session-expired-icon" aria-hidden="true">⏱</div>
+        <div className="session-expired-icon" aria-hidden="true"><Timer size={32}/></div>
         <h2 className="session-expired-title">세션이 만료되었습니다</h2>
         <p className="session-expired-msg">활동이 없어 자동으로 로그아웃 되었습니다.</p>
         <button className="session-expired-btn" onClick={onRelogin}>다시 로그인</button>
@@ -507,29 +508,29 @@ export function App() {
       <span className="nav-label">워크스페이스</span>
       <nav aria-label="주 메뉴">
         <button className={view === 'dashboard' ? 'active' : ''} aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => navigate('dashboard')}>
-          ◫ <span>대시보드</span>
+          <LayoutDashboard size={16}/> <span>대시보드</span>
         </button>
         <button className={view === 'servers' || view === 'create' || view === 'detail' ? 'active' : ''} aria-current={view === 'servers' || view === 'create' || view === 'detail' ? 'page' : undefined} onClick={() => navigate('servers')}>
-          ▤ <span>게임 서버</span><span className="nav-count">{servers.length}</span>
+          <ServerIcon size={16}/> <span>게임 서버</span><span className="nav-count">{servers.length}</span>
         </button>
         <button className={view === 'cluster' ? 'active' : ''} aria-current={view === 'cluster' ? 'page' : undefined} onClick={() => navigate('cluster')}>
-          ▧ <span>서버 현황 맵</span>
+          <MapIcon size={16}/> <span>서버 현황 맵</span>
         </button>
         <button className={view === 'library' ? 'active' : ''} aria-current={view === 'library' ? 'page' : undefined} onClick={() => navigate('library')}>
-          📦 <span>라이브러리</span>
+          <Package size={16}/> <span>라이브러리</span>
         </button>
         <button className={view === 'templates' ? 'active' : ''} aria-current={view === 'templates' ? 'page' : undefined} onClick={() => navigate('templates')}>
-          📋 <span>템플릿</span>
+          <ClipboardList size={16}/> <span>템플릿</span>
         </button>
         {isAdmin && <button className={view === 'admin' ? 'active' : ''} aria-current={view === 'admin' ? 'page' : undefined} onClick={() => navigate('admin')}>
-          ◈ <span>관리자</span>
+          <Shield size={16}/> <span>관리자</span>
         </button>}
       </nav>
       <div className="sidebar-footer">
         <div className="sidebar-controls">
           <div className="theme-switch" role="group" aria-label="화면 테마">
-            <button className={theme === 'light' ? 'selected' : ''} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>☀ <span>밝게</span></button>
-            <button className={theme === 'dark' ? 'selected' : ''} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>◐ <span>어둡게</span></button>
+            <button className={theme === 'light' ? 'selected' : ''} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}><Sun size={14}/> <span>밝게</span></button>
+            <button className={theme === 'dark' ? 'selected' : ''} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}><Moon size={14}/> <span>어둡게</span></button>
           </div>
           <div className="sidebar-controls-row">
             {auth && (
@@ -537,10 +538,10 @@ export function App() {
                 className={`session-timer${sessionRemaining < 120000 ? sessionRemaining < 60000 ? ' session-timer-urgent' : ' session-timer-warn' : ''}`}
                 aria-label={`세션 만료까지 ${formatRemaining(sessionRemaining)}`}
               >
-                ⏱ {formatRemaining(sessionRemaining)}
+                <Timer size={12}/> {formatRemaining(sessionRemaining)}
               </span>
             )}
-            <button className="text-button topbar-help" onClick={() => setShowHelp(true)} aria-label="도움말">? 도움말</button>
+            <button className="text-button topbar-help" onClick={() => setShowHelp(true)} aria-label="도움말"><HelpCircle size={14}/> 도움말</button>
           </div>
         </div>
         <div className="environment-pill"><span className="demo-dot"/> KUBEHOST<small>플랫폼 연결</small></div>
