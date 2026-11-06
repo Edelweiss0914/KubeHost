@@ -112,7 +112,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
   return <section className="panel create-panel">
     <div className="section-title">
-      <div><span className="eyebrow">서버 생성</span><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
+      <div><h2>새 서버 생성</h2><p className="section-copy">서버 구성은 생성 후 상세 화면에서 확인할 수 있습니다.</p></div>
       <span className="tag">{GAME_TYPES.find(g => g.type === input.game_type)?.label ?? 'Paper'}</span>
     </div>
     <form onSubmit={submit} noValidate>

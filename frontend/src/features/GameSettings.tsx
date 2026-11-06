@@ -149,7 +149,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
 
   return <section className="panel">
     <div className="section-title">
-      <div><span className="eyebrow">GAME SETTINGS</span><h2>{server.name} 게임 설정</h2></div>
+      <div><h2>{server.name} 게임 설정</h2></div>
       <button className="secondary" onClick={onClose}>닫기</button>
     </div>
     <p className="muted notice">설정을 저장하면 게임 파드가 재시작됩니다. 접속 중인 플레이어의 연결이 끊깁니다.</p>
@@ -184,7 +184,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     </button></div>}
     {!loading && server.game === 'garrysmod' && <section className="panel" style={{marginTop: '1.5rem'}}>
       <div className="section-title">
-        <div><span className="eyebrow">STEAM WORKSHOP</span><h3>Workshop 컬렉션</h3></div>
+        <div><h3>Workshop 컬렉션</h3></div>
       </div>
       <div className="notice" style={{marginBottom: '12px'}}>
         <strong>⚠️ 순서 주의</strong><br/>
@@ -217,7 +217,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       {workshopId && (
         <div style={{ marginTop: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span className="eyebrow">컬렉션 아이템 ({workshopTotal}개)</span>
+            <span className="muted" style={{fontSize:'11px'}}>컬렉션 아이템 ({workshopTotal}개)</span>
             <button className="secondary small" disabled={workshopItemsLoading}
               onClick={() => void loadWorkshopItems(workshopPage)}>↺ 새로고침</button>
           </div>
@@ -262,7 +262,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     </section>}
     {!loading && server.game === 'garrysmod' && <section className="panel" style={{marginTop: '1.5rem'}}>
       <div className="section-title">
-        <div><span className="eyebrow">WORKSHOP ADDONS</span><h3>개별 애드온</h3></div>
+        <div><h3>개별 애드온</h3></div>
       </div>
       <p className="muted notice">애드온 ID를 한 줄에 하나씩 입력하세요. 변경 후 서버를 재시작해야 적용됩니다.</p>
       <div className="form-grid">
@@ -283,7 +283,7 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       </div>
       {addonItems.length > 0 && (
         <div style={{ marginTop: '16px' }}>
-          <span className="eyebrow">등록된 애드온 ({addonItems.length}개)</span>
+          <span className="muted" style={{fontSize:'11px'}}>등록된 애드온 ({addonItems.length}개)</span>
           <div className="file-list" style={{ marginTop: '8px' }}>
             {addonItems.map(item => (
               <div key={item.id} className="file-row">

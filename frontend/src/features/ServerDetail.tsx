@@ -124,7 +124,7 @@ function PlayerPanel({ serverId, active }: { serverId: string; active: boolean }
   return (
     <section className="panel player-panel">
       <div className="section-title">
-        <div><span className="eyebrow">PLAYERS</span><h2>접속 플레이어</h2></div>
+        <div><h2>접속 플레이어</h2></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {active && (
             <span className={`player-count-badge${data.count > 0 ? ' has-players' : ''}`}>
@@ -329,7 +329,7 @@ function ManagePanel({ serverId, active, game }: { serverId: string; active: boo
   return (
     <section className="panel">
       <div className="section-title">
-        <div><span className="eyebrow">MANAGE</span><h2>서버 관리</h2></div>
+        <div><h2>서버 관리</h2></div>
       </div>
       {flash && <div className="manage-flash">{flash}</div>}
 
@@ -499,7 +499,7 @@ function ServerMetricsPanel({ serverId }: { serverId: string }) {
   return (
     <div className="metrics-panel">
       <div className="section-title">
-        <div><span className="eyebrow">METRICS</span><h2>리소스 사용량</h2></div>
+        <div><h2>리소스 사용량</h2></div>
         <div className="metrics-time-range" role="group" aria-label="시간 범위 선택">
           {TIME_RANGE_OPTIONS.map(opt => (
             <button
@@ -561,7 +561,7 @@ function SchedulePanel({ serverId }: { serverId: string }) {
   return (
     <div className="schedule-panel">
       <div className="section-title">
-        <div><span className="eyebrow">AUTOMATION</span><h2>자동 스케줄</h2></div>
+        <div><h2>자동 스케줄</h2></div>
         <button onClick={() => { setEditing(null); setShowForm(true); }}>+ 추가</button>
       </div>
       {error && <div role="alert" className="error">{error}</div>}
@@ -869,7 +869,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
           <>
             <section className="panel">
               <div className="section-title detail-summary">
-                <div><span className="eyebrow">SERVER INFO</span><h2>서버 정보</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
+                <div><h2>서버 정보</h2><p className="detail-meta">생성일 {new Date(server.created_at).toLocaleString('ko-KR')} · {server.node_id}</p></div>
               </div>
               <dl className="details-grid">
                 {gameCaps.has('version') && <div><dt>버전</dt><dd>{server.version} · 고정</dd></div>}
@@ -891,7 +891,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
               </dl>
             </section>
             <section className="panel">
-              <div className="section-title"><div><span className="eyebrow">서버 구성</span><h2>서버 구성 정보</h2></div></div>
+              <div className="section-title"><div><h2>서버 구성 정보</h2></div></div>
               <p className="muted">계정 공간: <code>{server.resource_plan.namespace}</code> · 서버 구성 1 replica · 호스트 서버 전용 배치</p>
               <div className="notice">호스트 서버 장애 시 로컬 데이터가 자동으로 이동하지 않습니다.</div>
               {server.resource_plan.warnings.map(w => <p className="muted" key={w}>{w}</p>)}

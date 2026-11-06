@@ -45,7 +45,7 @@ export function ServerConsole({ serverId, active, rconEnabled, consolePlaceholde
 
   return <section className="panel">
     <div className="section-title">
-      <div><span className="eyebrow">RCON</span><h2>RCON 콘솔</h2></div>
+      <div><h2>RCON 콘솔</h2></div>
       {active && supported && <span className="tag">LIVE</span>}
     </div>
     <div className="console-output">

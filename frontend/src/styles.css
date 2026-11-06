@@ -3824,3 +3824,21 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
   opacity: 1;
   background: var(--surface-2);
 }
+
+/* ── B-scope UI improvements ──────────────────────────────────────────────── */
+
+/* Chart title — replaces .eyebrow in MetricsChart */
+.chart-title{font-size:12px;font-weight:600;color:var(--text,#e7edf5);letter-spacing:0}
+
+/* Section label — replaces .eyebrow for inline sub-labels (e.g. FileManager folder list) */
+.section-label{display:block;font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:500}
+
+/* Nested panel: slightly darker bg to show hierarchy without extra chrome */
+.panel .panel{background:#0f1826;border-color:#253040}
+
+/* manage-section h3: add separator line for visual hierarchy within long panels */
+.manage-section h3{border-bottom:1px solid var(--border,#253040);padding-bottom:8px;margin-bottom:14px}
+
+/* Stats card icon color differentiation: total=muted, running=green, provisioning=amber, retained=muted */
+.stats article:nth-child(1) .stat-icon,.stats article:nth-child(4) .stat-icon{color:var(--muted)}
+.stats article:nth-child(3) .stat-icon{color:var(--warn-text,#f0c060)}

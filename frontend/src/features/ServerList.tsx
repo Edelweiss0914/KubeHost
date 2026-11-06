@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import type { GameDefinition } from '../api/client';
 import type { Server } from '../domain/server';
@@ -90,7 +90,7 @@ function ServerCard({ server, onSelect, gameDef }: { server: Server; onSelect: (
         onClick={e => { e.stopPropagation(); onSelect(server.id); }}
         aria-label={`${server.name} 상세 보기`}
       >
-        상세 보기 →
+        상세 보기
       </button>
     </div>
   );
@@ -120,7 +120,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
   return <>
     <section className="panel">
       <div className="section-title">
-        <div><span className="eyebrow">INSTANCES</span><h2>서버 목록 <span className="count">{servers.length}</span></h2><p className="section-copy">상태와 접속 정보를 확인하고 서버를 관리하세요.</p></div>
+        <div><h2>서버 목록 <span className="count">{servers.length}</span></h2><p className="section-copy">상태와 접속 정보를 확인하고 서버를 관리하세요.</p></div>
         <button onClick={onCreate}>+ 서버 만들기</button>
       </div>
       {!servers.length ? <div className="empty">
@@ -183,7 +183,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
     </section>
     {retained.length > 0 && <section className="panel">
       <div className="section-title">
-        <div><span className="eyebrow">RECOVERY</span><h2>보존된 서버 <span className="count">{retained.length}</span></h2><p className="section-copy">기존 월드 데이터가 남아 있는 서버를 복원할 수 있습니다.</p></div>
+        <div><h2>보존된 서버 <span className="count">{retained.length}</span></h2><p className="section-copy">기존 월드 데이터가 남아 있는 서버를 복원할 수 있습니다.</p></div>
       </div>
       <div className="table-wrap">
         <table>

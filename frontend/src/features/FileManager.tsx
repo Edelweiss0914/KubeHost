@@ -228,7 +228,6 @@ export function FileManager({ serverId, game }: Props) {
     <section className="panel">
       <div className="section-title">
         <div>
-          <span className="eyebrow">FILES</span>
           <h2>파일 매니저</h2>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -275,7 +274,7 @@ export function FileManager({ serverId, game }: Props) {
       {showMkdir && (
         <div className="manage-add-row" style={{ marginTop: '8px' }}>
           <input value={newDirName} onChange={e => setNewDirName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.isComposing) void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
             placeholder="폴더 이름" disabled={busy} autoFocus />
           <button onClick={() => void handleMkdir()} disabled={busy || !newDirName.trim()}>생성</button>
           <button className="secondary" onClick={() => { setShowMkdir(false); setNewDirName(''); }}>취소</button>
@@ -288,7 +287,7 @@ export function FileManager({ serverId, game }: Props) {
           <input
             value={githubUrl}
             onChange={e => setGithubUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.isComposing) void handleGithubClone(); if (e.key === 'Escape') setShowGithub(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleGithubClone(); if (e.key === 'Escape') setShowGithub(false); }}
             placeholder="https://github.com/owner/repo"
             disabled={busy}
             autoFocus
@@ -331,9 +330,7 @@ export function FileManager({ serverId, game }: Props) {
           {/* ── 루트일 때만: Minecraft 서버 폴더 구조 빠른 접근 ── */}
           {isRoot && (
             <div style={{ marginTop: '16px' }}>
-              <p className="eyebrow" style={{ marginBottom: '10px', letterSpacing: '.08em' }}>
-                서버 폴더 구조
-              </p>
+              <p className="section-label">서버 폴더 구조</p>
               <div className="fm-quick-grid">
                 {quickAccess.map(({ folder, icon, label, desc }) => {
                   const exists = existingDirs.has(folder);

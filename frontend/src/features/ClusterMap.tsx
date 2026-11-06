@@ -30,7 +30,6 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
   const serverById = new Map(servers.map(server => [server.id, server]));
   const unscheduledPods = ownedPods.filter(pod => (!pod.node_id || !nodes.some(node => node.id === pod.node_id)) && pod.phase !== 'Failed');
   const failedPods = ownedPods.filter(pod => (!pod.node_id || !nodes.some(node => node.id === pod.node_id)) && pod.phase === 'Failed');
-  const pendingPods = [...unscheduledPods, ...failedPods];
 
   function renderPod(pod: TopologyPod) {
     const server = serverById.get(pod.server_id);
@@ -57,7 +56,7 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
 
   return <section className="panel hierarchy" aria-labelledby="hierarchy-title">
     <div className="section-title">
-      <div><span className="eyebrow">WORKLOAD TOPOLOGY</span><h2 id="hierarchy-title">서버 배치 현황</h2>
+      <div><h2 id="hierarchy-title">서버 배치 현황</h2>
         <p className="section-copy">환경 → 호스트 → 게임 서버</p></div>
       <span className="tag">호스트 {nodes.length} · 인스턴스 {ownedPods.length} · 서버 {servers.length}</span>
     </div>
@@ -72,7 +71,7 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
           <small>{nodePods.length}개 서버 인스턴스 · {node.cpu_capacity} 코어 · {node.memory_mb_capacity.toLocaleString()} MiB</small>
           {nodePods.length > 0 && <ul className="hierarchy-pod-list">{nodePods.map(renderPod)}</ul>}
           {withoutPod.length > 0 && <div className="hierarchy-unplaced"><span className="hierarchy-kind">인스턴스 없음</span>
-            {withoutPod.map(server => <button key={server.id} onClick={() => onSelect(server.id)}>{server.name} · {server.status === 'stopped' ? '중지됨' : '배치 대기'} ↗</button>)}</div>}
+            {withoutPod.map(server => <button key={server.id} onClick={() => onSelect(server.id)}>{server.name} · {server.status === 'stopped' ? '중지됨' : '배치 대기'}</button>)}</div>}
           {nodePods.length === 0 && withoutPod.length === 0 && <p className="muted hierarchy-empty">표시할 워크로드가 없습니다.</p>}
         </li>;
       })}
@@ -120,7 +119,7 @@ export function ClusterMap({ nodes, servers, pods, onSelect }: Props) {
             </div>
 
             <div className="cluster-pods-label">
-              <span className="eyebrow">SERVERS</span>
+              <span className="muted" style={{fontSize:'11px'}}>서버</span>
               <span className="count">{assigned.length}개</span>
             </div>
 

@@ -69,11 +69,10 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
   return <div className="mission-grid">
     <section className="hero">
       <div className="hero-copy">
-        <span className="eyebrow">KUBEHOST / MISSION CONTROL</span>
         <h2>서버 환경의 모든 흐름을<br/>한 화면에서.</h2>
         <p>노드 상태와 워크로드를 실시간으로 살피고 다음 배포를 준비하세요.</p>
       </div>
-      <div className="hero-actions"><button onClick={onCreate}>새 서버 배포 <span aria-hidden="true">↗</span></button></div>
+      <div className="hero-actions"><button onClick={onCreate}>새 서버 배포</button></div>
     </section>
     <div className="stats">
       <article><span className="stat-icon" aria-hidden="true">▦</span><span>전체 서버</span><strong>{servers.length}</strong><p className="stat-meta">관리 중인 인스턴스</p></article>
@@ -82,7 +81,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
       <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
     </div>
     <section className="panel mission-activity">
-        <div className="section-title"><div><span className="eyebrow">ACTIVITY</span><h2>최근 서버</h2><p className="section-copy">가장 최근에 생성한 서버입니다.</p></div><span className="tag">최근 {recent.length}개</span></div>
+        <div className="section-title"><div><h2>최근 서버</h2><p className="section-copy">가장 최근에 생성한 서버입니다.</p></div><span className="tag">최근 {recent.length}개</span></div>
         {recent.length ? <ul className="activity">{recent.map(server => <li key={server.id}>
           <span className="demo-dot"/>
           <div>
@@ -94,7 +93,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
     </section>
     {tenant && <section className="panel mission-quota">
       <div className="section-title">
-        <div><span className="eyebrow">TENANT</span><h2>계정 공간</h2>
+        <div><h2>계정 공간</h2>
           <p className="section-copy" style={{fontFamily:'monospace',fontSize:'12px'}}>{tenant.namespace}</p>
         </div>
         <span className="tag">사용 한도 <Tooltip text="이 계정에서 사용할 수 있는 최대 리소스 한도입니다." /></span>
@@ -109,7 +108,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
     {nsMetrics && (
       <section className="panel metrics-panel">
         <div className="section-title">
-          <div><span className="eyebrow">NAMESPACE METRICS</span><h2>리소스 사용 추이</h2></div>
+          <div><h2>리소스 사용 추이</h2></div>
           <span className="muted" style={{fontSize:'12px'}}>최근 1시간</span>
         </div>
         <div className="metrics-grid">
@@ -210,7 +209,7 @@ function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
     <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
       <div className="settings-dialog-inner">
         <div className="section-title">
-          <div><span className="eyebrow">PROFILE</span><h2>프로필 설정</h2></div>
+          <div><h2>프로필 설정</h2></div>
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
         <div className="profile-settings-tabs">
@@ -544,7 +543,7 @@ export function App() {
       </header>
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
-          <div><span className="eyebrow">WORKSPACE / {view === 'dashboard' ? 'OVERVIEW' : view === 'cluster' ? 'INFRASTRUCTURE' : view === 'admin' ? 'ADMIN' : view === 'library' ? 'LIBRARY' : view === 'templates' ? 'TEMPLATES' : 'SERVERS'}</span><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : view === 'templates' ? '서버 설정과 파일을 템플릿으로 저장하고 새 서버를 빠르게 배포하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
+          <div><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : view === 'templates' ? '서버 설정과 파일을 템플릿으로 저장하고 새 서버를 빠르게 배포하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
           <button className="secondary" onClick={() => void refreshView()} disabled={loading || busy}>↻ 새로고침</button>
         </div>
         {notice && <p role="status" className="notice">{notice}</p>}

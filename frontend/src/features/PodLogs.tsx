@@ -84,7 +84,7 @@ export function PodLogs({ serverId, active }: { serverId: string; active: boolea
 
   return <section className="panel">
     <div className="section-title">
-      <div><span className="eyebrow">POD LOGS</span><h2>파드 로그</h2></div>
+      <div><h2>파드 로그</h2></div>
       {active && <span className="tag">LIVE</span>}
     </div>
     <div className="console-output">

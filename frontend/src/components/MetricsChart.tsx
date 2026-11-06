@@ -23,7 +23,7 @@ type Props = {
 export function MetricsChart({ title, data, color = '#79aaff', unit = 'cpu', height = 140 }: Props) {
   if (!data.length) return (
     <div className="metrics-chart-empty">
-      <span className="eyebrow">{title}</span>
+      <strong className="chart-title">{title}</strong>
       <p className="muted">데이터 없음</p>
     </div>
   );
@@ -51,7 +51,7 @@ export function MetricsChart({ title, data, color = '#79aaff', unit = 'cpu', hei
   return (
     <div className="metrics-chart">
       <div className="metrics-stats-row">
-        <span className="eyebrow">{title}</span>
+        <strong className="chart-title">{title}</strong>
         <div className="metrics-stats-values">
           <span className="metrics-stat-item">
             <span className="metrics-stat-label">현재</span>

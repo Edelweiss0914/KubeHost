@@ -78,7 +78,7 @@ export function ServerSettingsPanel({ serverId, currentVersion, onVersionSaved, 
     <div className="panel">
       <div className="settings-dialog-inner">
         <div className="section-title">
-          <div><span className="eyebrow">SERVER CONFIG</span><h2>서버 설정</h2></div>
+          <div><h2>서버 설정</h2></div>
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
         <p className="muted notice">설정 저장 시 파드가 재시작됩니다. 접속 중인 플레이어는 연결이 끊깁니다.</p>

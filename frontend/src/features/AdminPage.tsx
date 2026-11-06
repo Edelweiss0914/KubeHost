@@ -49,7 +49,7 @@ function QuotaModal({ userId, username, onClose }: { userId: string; username: s
     <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
       <div className="settings-dialog-inner">
         <div className="section-title">
-          <div><span className="eyebrow">QUOTA</span><h2>{username} 사용 한도</h2></div>
+          <div><h2>{username} 사용 한도</h2></div>
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
         {loading ? <p className="muted">불러오는 중…</p> : (
@@ -100,7 +100,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => { void load(); }, []);
 
   const deleteUser = (id: string, username: string) => {
     if (!confirm(`'${username}' 계정을 삭제하시겠습니까?`)) return;
@@ -201,7 +201,7 @@ function InvitesTab() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => { void load(); }, []);
 
   const createInvite = () => {
     setBusy('create');
@@ -402,12 +402,12 @@ function OverviewTab() {
     {clusterMetrics && Object.keys(clusterMetrics.cpu_pct).length > 0 && (
       <div className="metrics-panel">
         <div className="section-title">
-          <div><span className="eyebrow">CLUSTER METRICS</span><h2>노드 리소스 현황</h2></div>
+          <div><h2>노드 리소스 현황</h2></div>
         </div>
         <div className="metrics-grid">
           {Object.entries(clusterMetrics.cpu_pct).map(([node, pct]) => (
             <div key={node} className="metric-card">
-              <span className="eyebrow">{node}</span>
+              <strong style={{fontSize:'12px',display:'block',marginBottom:'.25rem'}}>{node}</strong>
               <div style={{display:'flex',gap:'2rem',marginTop:'.5rem'}}>
                 <div><small className="muted">CPU</small><strong style={{display:'block'}}>{pct.toFixed(1)}%</strong></div>
                 <div><small className="muted">메모리</small><strong style={{display:'block'}}>{(clusterMetrics.mem_pct[node] ?? 0).toFixed(1)}%</strong></div>

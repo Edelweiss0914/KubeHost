@@ -194,7 +194,6 @@ export function LibraryManager() {
     <section className="panel">
       <div className="section-title">
         <div>
-          <span className="eyebrow">LIBRARY</span>
           <h2>내 라이브러리</h2>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -247,7 +246,7 @@ export function LibraryManager() {
       {showMkdir && (
         <div className="manage-add-row" style={{ marginTop: '8px' }}>
           <input value={newDirName} onChange={e => setNewDirName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.isComposing) void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
             placeholder="폴더 이름" disabled={busy} autoFocus />
           <button onClick={() => void handleMkdir()} disabled={busy || !newDirName.trim()}>생성</button>
           <button className="secondary" onClick={() => { setShowMkdir(false); setNewDirName(''); }}>취소</button>
