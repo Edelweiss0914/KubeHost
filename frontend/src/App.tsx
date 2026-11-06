@@ -66,6 +66,18 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
   const provisioning = servers.filter(server => server.status === 'provisioning').length;
   const recent = [...servers].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 4);
 
+  function parseK8sGib(v: string): number {
+    const n = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+    if (v.endsWith('Ti')) return n * 1024;
+    if (v.endsWith('Gi')) return n;
+    if (v.endsWith('Mi')) return n / 1024;
+    if (v.endsWith('Ki')) return n / (1024 * 1024);
+    return n / (1024 ** 3);
+  }
+  const storageEntry = tenant?.quota['requests.storage'];
+  const storageUsed = storageEntry ? parseK8sGib(storageEntry.used).toFixed(1) : null;
+  const storageTotal = storageEntry ? parseK8sGib(storageEntry.hard).toFixed(0) : null;
+
   return <div className="mission-grid">
     <section className="hero">
       <div className="hero-copy">
@@ -79,6 +91,7 @@ function Dashboard({ servers, retainedCount, tenant, onSelect, onCreate }: {
       <article><span className="stat-icon" aria-hidden="true">●</span><span>실행 중</span><strong>{running}</strong><p className="stat-meta">서비스 제공 중</p></article>
       <article><span className="stat-icon" aria-hidden="true">◷</span><span>준비 중</span><strong>{provisioning}</strong><p className="stat-meta">배포 진행 중</p></article>
       <article><span className="stat-icon" aria-hidden="true">▤</span><span>보존 데이터</span><strong>{retainedCount}</strong><p className="stat-meta">복원 가능한 서버</p></article>
+      {storageUsed !== null && <article><span className="stat-icon" aria-hidden="true">💾</span><span>스토리지</span><strong>{storageUsed}<small> GiB</small></strong><p className="stat-meta">/ {storageTotal} GiB 할당</p></article>}
     </div>
     <section className="panel mission-activity">
         <div className="section-title"><div><h2>최근 서버</h2><p className="section-copy">가장 최근에 생성한 서버입니다.</p></div><span className="tag">최근 {recent.length}개</span></div>
@@ -312,6 +325,7 @@ export function App() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [view, setView] = useState<View>('dashboard');
+  const [prevView, setPrevView] = useState<View>('servers');
   const [selected, setSelected] = useState<Server | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -414,6 +428,7 @@ export function App() {
   }
 
   async function open(id: string) {
+    setPrevView(view);
     await run(async () => {
       setSelected(await api.server(id));
       setView('detail');
@@ -423,6 +438,7 @@ export function App() {
   async function create(input: ServerInput) {
     await run(async () => {
       setSelected(await api.create(input));
+      setPrevView('servers');
       setView('detail');
       setNotice('서버를 생성했습니다.');
       await refresh();
@@ -441,6 +457,7 @@ export function App() {
   async function restore(server: Server) {
     await run(async () => {
       setSelected(await api.restore(server.id));
+      setPrevView('servers');
       setView('detail');
       setNotice('서버를 복구했습니다. 기존 월드 데이터가 연결됩니다.');
       await refresh();
@@ -509,6 +526,23 @@ export function App() {
         </button>}
       </nav>
       <div className="sidebar-footer">
+        <div className="sidebar-controls">
+          <div className="theme-switch" role="group" aria-label="화면 테마">
+            <button className={theme === 'light' ? 'selected' : ''} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>☀ <span>밝게</span></button>
+            <button className={theme === 'dark' ? 'selected' : ''} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>◐ <span>어둡게</span></button>
+          </div>
+          <div className="sidebar-controls-row">
+            {auth && (
+              <span
+                className={`session-timer${sessionRemaining < 120000 ? sessionRemaining < 60000 ? ' session-timer-urgent' : ' session-timer-warn' : ''}`}
+                aria-label={`세션 만료까지 ${formatRemaining(sessionRemaining)}`}
+              >
+                ⏱ {formatRemaining(sessionRemaining)}
+              </span>
+            )}
+            <button className="text-button topbar-help" onClick={() => setShowHelp(true)} aria-label="도움말">? 도움말</button>
+          </div>
+        </div>
         <div className="environment-pill"><span className="demo-dot"/> KUBEHOST<small>플랫폼 연결</small></div>
         <div className="profile">
           <span className="avatar">{auth ? auth.username[0].toUpperCase() : 'D'}</span>
@@ -522,25 +556,6 @@ export function App() {
       </div>
     </aside>
     <div className="workspace">
-      <header className="topbar">
-        <span>워크스페이스 <span className="muted">/</span> <strong>{titles[view]}</strong></span>
-        <div className="topbar-actions">
-          <span className="topbar-status"><span className="demo-dot"/>서버 환경 연결</span>
-          {auth && (
-            <span
-              className={`session-timer${sessionRemaining < 120000 ? sessionRemaining < 60000 ? ' session-timer-urgent' : ' session-timer-warn' : ''}`}
-              aria-label={`세션 만료까지 ${formatRemaining(sessionRemaining)}`}
-            >
-              ⏱ {formatRemaining(sessionRemaining)}
-            </span>
-          )}
-          <button className="text-button topbar-help" onClick={() => setShowHelp(true)} aria-label="도움말">? 도움말</button>
-          <div className="theme-switch" role="group" aria-label="화면 테마">
-            <button className={theme === 'light' ? 'selected' : ''} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>☀ <span>밝게</span></button>
-            <button className={theme === 'dark' ? 'selected' : ''} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>◐ <span>어둡게</span></button>
-          </div>
-        </div>
-      </header>
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
           <div><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : view === 'templates' ? '서버 설정과 파일을 템플릿으로 저장하고 새 서버를 빠르게 배포하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
@@ -552,7 +567,7 @@ export function App() {
         {loading ? <div className="panel loading" role="status">콘솔 데이터를 불러오는 중…</div> : error ?
           <div className="panel error" role="alert"><h2>데이터를 불러오지 못했습니다</h2><p>{error}</p><button onClick={() => void refreshView()}>다시 시도</button></div> : <>
             {view === 'dashboard' && <Dashboard servers={servers} retainedCount={retained.length} tenant={tenant} onSelect={id => void open(id)} onCreate={() => navigate('create')}/>}
-            {(view === 'dashboard' || view === 'servers') && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
+            {view === 'servers' && <ServerList servers={servers} retained={retained} onSelect={id => void open(id)} onCreate={() => navigate('create')} onRestore={server => void restore(server)}/>}
             {view === 'cluster' && <ClusterMap nodes={nodes} servers={servers} pods={topologyPods} onSelect={id => void open(id)}/>}
             {view === 'create' && <CreateServer nodes={nodes} busy={busy} onCreate={create} onCancel={() => navigate('servers')}/>}
             {view === 'admin' && (meLoaded ? (isAdmin ? <AdminPage currentUserId={currentUserId}/> : <div className="panel muted">관리자 권한이 없습니다.</div>) : <div className="panel loading" role="status">사용자 정보를 확인하는 중…</div>)}
@@ -562,7 +577,7 @@ export function App() {
               key={selected.id}
               server={selected}
               busy={busy}
-              onBack={() => navigate('servers')}
+              onBack={() => navigate(prevView)}
               onAction={action => void changeStatus(action)}
               onDelete={(deleteData, confirmation) => void remove(deleteData, confirmation)}
               onUpdated={() => { void api.server(selected.id).then(setSelected).catch(() => {}); }}
