@@ -7,6 +7,13 @@ export interface ServerSettings { difficulty: 'peaceful'|'easy'|'normal'|'hard';
 export type GameSettings = { world_name: string; server_public: boolean } | { map_name: string; gamemode_name: string };
 export const defaultSettings: ServerSettings = { difficulty: 'easy', gamemode: 'survival', max_players: 20, motd: 'A Minecraft Server', pvp: true, online_mode: true, spawn_protection: 16, view_distance: 10, ops: '', force_gamemode: false };
 export const defaults: ServerInput = { name: '', game: 'minecraft-java', edition: 'paper', game_type: 'PAPER', version: 'LATEST', modrinth_project: null, cf_slug: null, cpu: 1, memory_mb: 2048, storage_gb: 10, node_id: '', node_port: null, server_password: null, world_name: null, server_public: false, map_name: null, gamemode_name: null, cs2_workshop_map: null, cs2_workshop_collection: null };
+export const GAME_ICONS: Record<string, string> = {
+  'minecraft-java': '⛏',
+  'valheim': '⚔',
+  'garrysmod': '🔧',
+  'cs2': '🎯',
+  'rust': '🪨',
+};
 export function validate(input: ServerInput): Record<string, string> {
  const errors: Record<string,string> = {};
  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{2,39}$/.test(input.name.trim())) errors.name = '영문, 숫자, 공백, 밑줄, 하이픈으로 3–40자를 입력하세요. 첫 글자는 영문 또는 숫자입니다.';

@@ -35,7 +35,7 @@ function fileIcon(entry: FileEntry): ReactNode {
 type Props = { serverId: string; game: Server['game'] };
 
 export function FileManager({ serverId, game }: Props) {
-  const [gameRoot, setGameRoot] = useState('/data');
+  const [gameRoot, setGameRoot] = useState<string | null>(null);
   const [quickAccess, setQuickAccess] = useState<{ folder: string; icon: string; label: string; desc: string }[]>([]);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function FileManager({ serverId, game }: Props) {
     }).catch(() => {});
   }, [game]);
 
-  const rootPath = gameRoot;
+  const rootPath = gameRoot ?? '';
   const [path, setPath] = useState(rootPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +79,7 @@ export function FileManager({ serverId, game }: Props) {
       .finally(() => setLoading(false));
   }, [serverId, showMsg]);
 
-  useEffect(() => { loadDir(rootPath); }, [loadDir, rootPath]);
+  useEffect(() => { if (gameRoot) loadDir(gameRoot); }, [loadDir, gameRoot]);
 
   function breadcrumbs() {
     const parts = path.split('/').filter(Boolean);

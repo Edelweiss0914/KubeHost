@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CopyBtn } from '../components/CopyBtn';
 import type { Server } from '../domain/server';
+import { GAME_ICONS } from '../domain/server';
 import { Status } from '../components/Status';
 import { Tooltip } from '../components/Tooltip';
 import { ServerSettingsPanel } from './ServerSettings';
@@ -719,7 +720,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
         <div className="server-sidebar-header">
           <button className="text-button server-sidebar-back" onClick={onBack}>← 목록</button>
           <div className="server-sidebar-identity">
-            <span className="server-sidebar-icon" aria-hidden="true">{gameDef?.icon ?? '⬡'}</span>
+            <span className="server-sidebar-icon" aria-hidden="true">{gameDef?.icon ?? GAME_ICONS[server.game] ?? '⬡'}</span>
             <div>
               <strong className="server-sidebar-name">{server.name}</strong>
               <div style={{marginTop:'5px'}}><Status value={server.status}/></div>
@@ -920,7 +921,9 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                 onVersionSaved={() => {}}
                 onClose={() => setSubView('console')}
               />
-            : <GameSettingsPanel server={server} onClose={() => setSubView('logs')} onSaved={onUpdated}/>
+            : (server.game === 'valheim' || server.game === 'garrysmod')
+              ? <GameSettingsPanel server={server} onClose={() => setSubView('logs')} onSaved={onUpdated}/>
+              : <section className="panel"><p className="muted">이 게임은 별도 설정 항목이 없습니다.</p></section>
         )}
       </div>
     </div>
