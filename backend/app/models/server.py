@@ -11,7 +11,7 @@ DEMO_OWNER = "demo-user"
 class ServerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     name: str = Field(min_length=3, max_length=40, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9 _-]*$")
-    game: Literal["minecraft-java", "valheim", "garrysmod"] = "minecraft-java"
+    game: Literal["minecraft-java", "valheim", "garrysmod", "cs2", "rust"] = "minecraft-java"
     edition: Literal["paper"] = "paper"
     game_type: Literal["VANILLA", "PAPER", "FORGE", "FABRIC", "MODRINTH", "AUTO_CURSEFORGE"] = "PAPER"
     version: Literal["LATEST", "1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.16.5", "1.14.4", "1.12.2"] = "LATEST"

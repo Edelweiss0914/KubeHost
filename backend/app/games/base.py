@@ -57,6 +57,7 @@ class GameDefinition:
     container_name: str = ""
     game_port: int = 0
     game_protocol: str = "TCP"
+    rcon_port: int = 25575
 
     # ── K8s resource builders ─────────────────────────────────────────────────
 

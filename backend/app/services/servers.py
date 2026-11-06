@@ -161,15 +161,21 @@ class ServerService:
         server = self.repository.get(server_id)
         if server is None or server.owner_id != owner_id:
             raise ServerNotFound("Server not found")
-        if server.game not in ("minecraft-java", "garrysmod"):
+        from app.games.registry import get_game
+        try:
+            game_def = get_game(server.game)
+        except ValueError:
+            raise InvalidOperation("이 게임은 RCON 명령 전송을 아직 지원하지 않습니다.")
+        if "rcon" not in game_def.capabilities:
             raise InvalidOperation("이 게임은 RCON 명령 전송을 아직 지원하지 않습니다.")
         if server.status != "running":
             raise InvalidOperation("서버가 실행 중일 때만 명령어를 사용할 수 있습니다.")
+        rcon_port = game_def.rcon_port
         try:
             return self.adapter.rcon(
                 server_id, server.resource_plan.namespace, command,
                 sts_name=server.resource_plan.sts_name,
-                port=27015 if server.game == "garrysmod" else 25575,
+                port=rcon_port,
             )
         except Exception as exc:
             raise InvalidOperation(str(exc))

@@ -35,6 +35,7 @@ class GarrysMod(GameDefinition):
     container_name = "garrysmod"
     game_port = 27015
     game_protocol = "UDP"
+    rcon_port = 27015
 
     def volume_mounts(self) -> list[dict]:
         return gmod_volume_mounts()
