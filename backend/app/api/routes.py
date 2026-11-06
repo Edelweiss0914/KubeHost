@@ -248,7 +248,7 @@ def tenant_info(owner: Owner, svc: Service) -> dict[str, object]:
 
 
 from uuid import uuid4 as _uuid4
-from pydantic import BaseModel as _BaseModel
+from pydantic import BaseModel as _BaseModel, Field
 
 
 class _WorkshopBody(_BaseModel):
