@@ -94,13 +94,14 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
 // ── Topology layout ───────────────────────────────────────────────────────────
 const W = 900, H = 500;
 const HUB_X = W / 2, HUB_Y = H / 2;
-const WORKER_DIST = 155;
-const POD_DIST = 80;
+const WORKER_DIST = 185;
+const POD_DIST = 100;
 
 function sColor(s: string): string {
-  if (s === 'running' || s === 'ready') return '#22c55e';
-  if (s === 'provisioning' || s === 'Pending') return '#f59e0b';
-  if (s === 'error' || s === 'Failed' || s === 'not-ready') return '#ef4444';
+  const l = s.toLowerCase();
+  if (l === 'running' || l === 'ready') return '#22c55e';
+  if (l === 'provisioning' || l === 'pending') return '#f59e0b';
+  if (l === 'error' || l === 'failed' || l === 'not-ready') return '#ef4444';
   return '#6b7280';
 }
 
@@ -168,7 +169,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
         {/* Hub */}
         <div className="topo-node topo-hub" style={{ left: p(HUB_X, W), top: p(HUB_Y, H) }}>
           <div className="topo-icon" style={{ borderColor: 'var(--accent)', background: 'var(--accent-bg)' }}>
-            <Share2 size={16} color="var(--accent-text)" />
+            <Share2 size={22} color="var(--accent-text)" />
           </div>
           <span className="topo-label" style={{ color: 'var(--accent-text)', fontWeight: 700 }}>KubeHost</span>
         </div>
@@ -186,7 +187,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
               aria-label={node.name}
               onKeyDown={e => { if (e.key === 'Enter') toggleWorker(node); }}>
               <div className="topo-icon" style={{ borderColor: sel ? 'var(--accent)' : col, background: sel ? 'var(--accent-bg)' : 'var(--surface-2)' }}>
-                <HardDrive size={13} color={sel ? 'var(--accent-text)' : col} />
+                <HardDrive size={18} color={sel ? 'var(--accent-text)' : col} />
               </div>
               <span className="topo-label">{node.name.length > 12 ? node.name.slice(0, 11) + '…' : node.name}</span>
             </div>
@@ -206,7 +207,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
               aria-label={server.name}
               onKeyDown={e => { if (e.key === 'Enter') toggleServer(server); }}>
               <div className="topo-icon" style={{ borderColor: sel ? 'var(--accent)' : col, background: sel ? 'var(--accent-bg)' : 'var(--surface)' }}>
-                <Package size={10} color={sel ? 'var(--accent-text)' : col} />
+                <Package size={14} color={sel ? 'var(--accent-text)' : col} />
               </div>
               <span className="topo-label">{server.name.length > 11 ? server.name.slice(0, 10) + '…' : server.name}</span>
             </div>
@@ -236,7 +237,7 @@ function WorkerDetail({ node, servers }: { node: WorkerNode; servers: Server[] }
           <span className="hierarchy-kind">{node.role === 'worker' ? '호스트 서버' : '관리 서버'}</span>
           <strong className="topo-detail-name">{node.name}</strong>
         </div>
-        <Status value={node.status === 'ready' ? 'running' : 'error'} />
+        <Status value={node.status.toLowerCase() === 'ready' ? 'running' : 'error'} />
       </div>
       <small className="muted">
         {node.cpu_capacity} 코어 · {(node.memory_mb_capacity / 1024).toFixed(0)} GiB RAM · 서버 {ns.length}개{node.schedulable ? '' : ' · 스케줄 불가'}
