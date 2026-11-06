@@ -100,6 +100,11 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     setAddonSaved(false);
     try {
       const ids = addonInput.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+      const invalid = ids.filter(id => !/^\d+$/.test(id));
+      if (invalid.length) {
+        setAddonError(`숫자 ID만 입력할 수 있습니다: ${invalid.join(', ')}`);
+        return;
+      }
       const result = await api.setWorkshopAddons(server.id, ids);
       setAddonInput(result.addon_ids.join('\n'));
       const addonResult = await api.getWorkshopAddons(server.id).catch(() => null);
@@ -118,11 +123,15 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
       setError('월드 이름을 입력하세요.');
       return;
     }
-    if ('map_name' in settings &&
-        (!/^[A-Za-z0-9_-]+$/.test(settings.map_name) ||
-         !/^[A-Za-z0-9_-]+$/.test(settings.gamemode_name))) {
-      setError('맵과 게임모드는 영문, 숫자, 밑줄, 하이픈만 사용할 수 있습니다.');
-      return;
+    if ('map_name' in settings) {
+      if (!/^[A-Za-z0-9_-]+$/.test(settings.map_name)) {
+        setError('맵 이름은 영문, 숫자, 밑줄, 하이픈만 사용할 수 있습니다.');
+        return;
+      }
+      if (!/^[A-Za-z0-9_-]+$/.test(settings.gamemode_name)) {
+        setError('게임모드 이름은 영문, 숫자, 밑줄, 하이픈만 사용할 수 있습니다.');
+        return;
+      }
     }
     setSaving(true);
     setError('');

@@ -24,9 +24,13 @@ export function ServerSettingsPanel({ serverId, currentVersion, onVersionSaved, 
   useEffect(() => {
     api.getSettings(serverId)
       .then(raw => {
+        const DIFFICULTIES: ServerSettings['difficulty'][] = ['peaceful', 'easy', 'normal', 'hard'];
+        const GAMEMODES: ServerSettings['gamemode'][] = ['survival', 'creative', 'adventure', 'spectator'];
         setSettings({
-          difficulty: (raw.difficulty as ServerSettings['difficulty']) || 'easy',
-          gamemode: (raw.gamemode as ServerSettings['gamemode']) || 'survival',
+          difficulty: DIFFICULTIES.includes(raw.difficulty as ServerSettings['difficulty'])
+            ? (raw.difficulty as ServerSettings['difficulty']) : 'easy',
+          gamemode: GAMEMODES.includes(raw.gamemode as ServerSettings['gamemode'])
+            ? (raw.gamemode as ServerSettings['gamemode']) : 'survival',
           max_players: Number(raw.max_players) || 20,
           motd: raw.motd || 'A Minecraft Server',
           pvp: raw.pvp?.toUpperCase() !== 'FALSE',

@@ -28,7 +28,9 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
   const ownedPods = pods.filter(pod => visible.has(pod.server_id));
   const podServers = new Set(ownedPods.map(pod => pod.server_id));
   const serverById = new Map(servers.map(server => [server.id, server]));
-  const pendingPods = ownedPods.filter(pod => !pod.node_id || !nodes.some(node => node.id === pod.node_id));
+  const unscheduledPods = ownedPods.filter(pod => (!pod.node_id || !nodes.some(node => node.id === pod.node_id)) && pod.phase !== 'Failed');
+  const failedPods = ownedPods.filter(pod => (!pod.node_id || !nodes.some(node => node.id === pod.node_id)) && pod.phase === 'Failed');
+  const pendingPods = [...unscheduledPods, ...failedPods];
 
   function renderPod(pod: TopologyPod) {
     const server = serverById.get(pod.server_id);
@@ -75,7 +77,8 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
         </li>;
       })}
     </ul>}
-    {pendingPods.length > 0 && <div className="hierarchy-unscheduled"><h3>노드 배치 대기</h3><ul className="hierarchy-pod-list">{pendingPods.map(renderPod)}</ul></div>}
+    {unscheduledPods.length > 0 && <div className="hierarchy-unscheduled"><h3>노드 배치 대기</h3><ul className="hierarchy-pod-list">{unscheduledPods.map(renderPod)}</ul></div>}
+    {failedPods.length > 0 && <div className="hierarchy-unscheduled"><h3>스케줄링 실패</h3><ul className="hierarchy-pod-list">{failedPods.map(renderPod)}</ul></div>}
   </section>;
 }
 

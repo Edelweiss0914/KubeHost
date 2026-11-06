@@ -119,7 +119,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
   const load = () => {
     setLoading(true);
     setError('');
-    api.adminListUsers()
+    return api.adminListUsers()
       .then(setUsers)
       .catch(e => setError(e instanceof Error ? e.message : '불러오기 실패'))
       .finally(() => setLoading(false));
@@ -540,19 +540,31 @@ const ACTION_LABEL: Record<string, string> = {
   'invite.revoke': '초대 코드 삭제',
 };
 
+const AUDIT_PAGE_SIZE = 50;
+
 function AuditTab() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [hasMore, setHasMore] = useState(false);
 
   const load = (action?: string) => {
     setLoading(true);
     setError('');
-    api.adminListAuditLogs({ action: action || undefined, limit: 200 })
-      .then(setEntries)
+    api.adminListAuditLogs({ action: action || undefined, limit: AUDIT_PAGE_SIZE, offset: 0 })
+      .then(data => { setEntries(data); setHasMore(data.length === AUDIT_PAGE_SIZE); })
       .catch(e => setError(e instanceof Error ? e.message : '불러오기 실패'))
       .finally(() => setLoading(false));
+  };
+
+  const loadMore = () => {
+    setLoadingMore(true);
+    api.adminListAuditLogs({ action: actionFilter || undefined, limit: AUDIT_PAGE_SIZE, offset: entries.length })
+      .then(data => { setEntries(prev => [...prev, ...data]); setHasMore(data.length === AUDIT_PAGE_SIZE); })
+      .catch(e => setError(e instanceof Error ? e.message : '불러오기 실패'))
+      .finally(() => setLoadingMore(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -564,7 +576,7 @@ function AuditTab() {
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px', padding: '16px 16px 0' }}>
         <button
           className={`filter-chip${!actionFilter ? ' selected' : ''}`}
-          onClick={() => { setActionFilter(''); load(); }}
+          onClick={() => { setActionFilter(''); load(undefined); }}
         >전체</button>
         {actions.map(a => (
           <button
@@ -623,6 +635,13 @@ function AuditTab() {
             </tbody>
           </table>
           {entries.length === 0 && <p className="muted" style={{ padding: '16px' }}>로그가 없습니다.</p>}
+          {hasMore && (
+            <div style={{ padding: '12px 16px', textAlign: 'center' }}>
+              <button className="secondary" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? '불러오는 중…' : '더 보기'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

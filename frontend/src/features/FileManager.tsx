@@ -275,7 +275,7 @@ export function FileManager({ serverId, game }: Props) {
       {showMkdir && (
         <div className="manage-add-row" style={{ marginTop: '8px' }}>
           <input value={newDirName} onChange={e => setNewDirName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.isComposing) void handleMkdir(); if (e.key === 'Escape') setShowMkdir(false); }}
             placeholder="폴더 이름" disabled={busy} autoFocus />
           <button onClick={() => void handleMkdir()} disabled={busy || !newDirName.trim()}>생성</button>
           <button className="secondary" onClick={() => { setShowMkdir(false); setNewDirName(''); }}>취소</button>
@@ -288,7 +288,7 @@ export function FileManager({ serverId, game }: Props) {
           <input
             value={githubUrl}
             onChange={e => setGithubUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') void handleGithubClone(); if (e.key === 'Escape') setShowGithub(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.isComposing) void handleGithubClone(); if (e.key === 'Escape') setShowGithub(false); }}
             placeholder="https://github.com/owner/repo"
             disabled={busy}
             autoFocus

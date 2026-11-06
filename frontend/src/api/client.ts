@@ -76,7 +76,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   catch { throw new ApiError(0, 'API에 연결할 수 없습니다. 백엔드 실행 상태를 확인하세요.'); }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const message = typeof body.detail === 'string' ? body.detail : Array.isArray(body.detail) ? body.detail.map((e: {msg:string}) => e.msg).join(' · ') : '요청을 처리하지 못했습니다. 다시 시도하세요.';
+    const message = typeof body.detail === 'string'
+      ? body.detail
+      : Array.isArray(body.detail)
+        ? body.detail.map((e: unknown) => (e && typeof e === 'object' && 'msg' in e ? (e as { msg: string }).msg : String(e))).filter(Boolean).join(' · ') || '요청을 처리하지 못했습니다. 다시 시도하세요.'
+        : '요청을 처리하지 못했습니다. 다시 시도하세요.';
     throw new ApiError(response.status, message);
   }
   return response.status === 204 ? undefined as T : response.json();

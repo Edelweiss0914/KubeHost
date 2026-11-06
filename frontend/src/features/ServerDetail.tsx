@@ -219,8 +219,8 @@ function ManagePanel({ serverId, active, game }: { serverId: string; active: boo
   const showFlash = (msg: string) => { setFlash(msg); setTimeout(() => setFlash(''), 3000); };
 
   useEffect(() => {
-    api.listOps(serverId).then(r => setOps(r.names)).catch(() => {});
-    api.listBans(serverId).then(r => setBans(r.names)).catch(() => {});
+    api.listOps(serverId).then(r => setOps(r.names)).catch(e => showFlash(e instanceof Error ? e.message : 'OP 목록 불러오기 실패'));
+    api.listBans(serverId).then(r => setBans(r.names)).catch(e => showFlash(e instanceof Error ? e.message : '차단 목록 불러오기 실패'));
     api.getJvm(serverId).then(r => setJvmMb(r.memory_mb)).catch(() => {}).finally(() => setJvmLoading(false));
     api.getAutoRestart(serverId).then(r => setAutoRestart(r.enabled)).catch(() => {});
     api.getProperties(serverId).then(r => setProps(r.content)).catch(() => {}).finally(() => setPropsLoading(false));
@@ -554,6 +554,7 @@ function ServerMetricsPanel({ serverId }: { serverId: string }) {
 function SchedulePanel({ serverId }: { serverId: string }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Schedule | null>(null);
 
@@ -564,8 +565,12 @@ function SchedulePanel({ serverId }: { serverId: string }) {
   }, [serverId]);
 
   async function handleDelete(scheduleId: string) {
-    await api.deleteSchedule(serverId, scheduleId);
-    setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+    try {
+      await api.deleteSchedule(serverId, scheduleId);
+      setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '스케줄 삭제 실패');
+    }
   }
 
   async function handleSave(input: ScheduleInput, id?: string) {
@@ -586,6 +591,7 @@ function SchedulePanel({ serverId }: { serverId: string }) {
         <div><span className="eyebrow">AUTOMATION</span><h2>자동 스케줄</h2></div>
         <button onClick={() => { setEditing(null); setShowForm(true); }}>+ 추가</button>
       </div>
+      {error && <div role="alert" className="error">{error}</div>}
       {loading ? <p className="muted">불러오는 중…</p> : (
         <>
           {schedules.length === 0 && <p className="muted">등록된 스케줄이 없습니다.</p>}
