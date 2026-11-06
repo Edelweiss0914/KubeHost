@@ -13,3 +13,5 @@ class Template:
     storage_gb: int
     archive_path: str  # 라이브러리 내 경로 e.g. /library/templates/{id}.tar.gz
     created_at: str    # ISO 8601
+    is_public: bool = False
+    description: str = ""

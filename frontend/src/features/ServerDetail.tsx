@@ -679,6 +679,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [cloneError, setCloneError] = useState('');
   const [snapshotting, setSnapshotting] = useState(false);
   const [snapshotName, setSnapshotName] = useState('');
+  const [snapshotDesc, setSnapshotDesc] = useState('');
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [snapshotError, setSnapshotError] = useState('');
   const [snapshotDone, setSnapshotDone] = useState(false);
@@ -780,7 +781,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
               if (!name) return;
               setSnapshotBusy(true);
               setSnapshotError('');
-              api.snapshotServer(server.id, name)
+              api.snapshotServer(server.id, name, snapshotDesc.trim())
                 .then(() => { setSnapshotDone(true); })
                 .catch(err => setSnapshotError(err instanceof Error ? err.message : '저장 실패'))
                 .finally(() => setSnapshotBusy(false));
@@ -792,6 +793,15 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                   onChange={e => setSnapshotName(e.target.value)}
                   placeholder={server.name}
                   disabled={snapshotBusy}
+                />
+              </label>
+              <label>설명
+                <textarea
+                  value={snapshotDesc}
+                  onChange={e => setSnapshotDesc(e.target.value)}
+                  placeholder="템플릿 설명 (선택 사항)"
+                  disabled={snapshotBusy}
+                  rows={2}
                 />
               </label>
               {snapshotError && <p style={{ color: 'var(--danger, #f87171)', fontSize: '0.85em' }}>{snapshotError}</p>}

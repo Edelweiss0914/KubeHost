@@ -34,6 +34,8 @@ export type Template = {
   memory_mb: number;
   storage_gb: number;
   created_at: string;
+  is_public: boolean;
+  description: string;
 };
 
 export type Schedule = {
@@ -171,9 +173,11 @@ export interface ServerGateway {
   githubClone(serverId: string, url: string, branch: string, path: string): Promise<{ owner: string; repo: string; branch: string; path: string }>;
   cloneServer(serverId: string, name: string): Promise<{ id: string }>;
   listTemplates(): Promise<Template[]>;
-  snapshotServer(serverId: string, name: string): Promise<{ id: string }>;
+  snapshotServer(serverId: string, name: string, description?: string): Promise<{ id: string }>;
   deployTemplate(templateId: string, name: string): Promise<{ id: string }>;
   deleteTemplate(templateId: string): Promise<void>;
+  updateTemplate(templateId: string, patch: { is_public?: boolean; description?: string }): Promise<void>;
+  listPublicTemplates(): Promise<(Template & { owner_name: string; owner_id: string })[]>;
   setWorkshop(serverId: string, collectionId: string): Promise<{ collection_id: string }>;
   getWorkshopItems(serverId: string, page: number): Promise<{ items: WorkshopItem[]; total: number; page: number; per_page: number; collection_id: string }>;
   setWorkshopAddons(serverId: string, addonIds: string[]): Promise<{ addon_ids: string[] }>;
@@ -362,9 +366,11 @@ export const api: ServerGateway = {
   githubClone: (serverId, url, branch, path) => versioned(`/servers/${encodeURIComponent(serverId)}/fs/github`, { method: 'POST', body: JSON.stringify({ url, branch, path }) }),
   cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
   listTemplates: () => versioned('/templates'),
-  snapshotServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name }) }),
+  snapshotServer: (serverId, name, description = '') => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name, description }) }),
   deployTemplate: (templateId, name) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name }) }),
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
+  updateTemplate: (templateId, patch) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  listPublicTemplates: () => versioned('/templates/public'),
   setWorkshop: (serverId, collectionId) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop`, { method: 'POST', body: JSON.stringify({ collection_id: collectionId }) }),
   getWorkshopItems: (serverId, page) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/items?page=${page}`),
   setWorkshopAddons: (serverId, addonIds) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/addons`, { method: 'POST', body: JSON.stringify({ addon_ids: addonIds }) }),

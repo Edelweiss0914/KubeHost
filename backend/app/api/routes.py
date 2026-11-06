@@ -1101,6 +1101,7 @@ def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, r
 
 class _SnapshotBody(_BaseModel):
     name: str
+    description: str = ""
 
 
 class _DeployBody(_BaseModel):
@@ -1119,9 +1120,37 @@ def list_templates(owner: Owner, repo: TemplateRepo) -> list[dict]:
             "memory_mb": t.memory_mb,
             "storage_gb": t.storage_gb,
             "created_at": t.created_at,
+            "is_public": t.is_public,
+            "description": t.description,
         }
         for t in templates
     ]
+
+
+@router.get("/api/v1/templates/public")
+def list_public_templates(owner: Owner, repo: TemplateRepo, request: Request) -> list[dict]:
+    templates = repo.list_public()
+    auth_svc = request.app.state.auth_service
+    result = []
+    for t in templates:
+        user = auth_svc.get_user_by_id(t.owner_id)
+        if not (user and user.is_admin):
+            continue
+        owner_name = user.username
+        result.append({
+            "id": t.id,
+            "owner_id": t.owner_id,
+            "owner_name": owner_name,
+            "name": t.name,
+            "game": t.game,
+            "cpu": t.cpu,
+            "memory_mb": t.memory_mb,
+            "storage_gb": t.storage_gb,
+            "created_at": t.created_at,
+            "is_public": t.is_public,
+            "description": t.description,
+        })
+    return result
 
 
 @router.post("/api/v1/servers/{server_id}/snapshot", status_code=201)
@@ -1168,6 +1197,7 @@ def snapshot_server(
         storage_gb=src.storage_gb,
         archive_path=archive_path,
         created_at=datetime.now(timezone.utc).isoformat(),
+        description=body.description,
     )
     repo.save(template)
 
@@ -1183,7 +1213,7 @@ def deploy_template(
     request: Request,
 ) -> dict:
     template = repo.get(template_id)
-    if template is None or template.owner_id != owner:
+    if template is None or (template.owner_id != owner and not template.is_public):
         raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
 
     name = body.name.strip()
@@ -1202,7 +1232,7 @@ def deploy_template(
     except InvalidOperation as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    lib_ns = _lib_ns(owner)
+    lib_ns = _lib_ns(template.owner_id)
     try:
         svc.adapter.restore_library_to_pvc(
             new_server.id,
@@ -1236,3 +1266,18 @@ def delete_template(
         pass  # 파일이 없어도 메타데이터는 삭제
 
     repo.delete(template_id)
+
+
+class _PatchTemplateBody(_BaseModel):
+    is_public: bool | None = None
+    description: str | None = None
+
+
+@router.patch("/api/v1/templates/{template_id}", status_code=204)
+def patch_template(
+    template_id: str, body: _PatchTemplateBody, owner: Owner, repo: TemplateRepo,
+) -> None:
+    template = repo.get(template_id)
+    if template is None or template.owner_id != owner:
+        raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
+    repo.update(template_id, body.is_public, body.description)

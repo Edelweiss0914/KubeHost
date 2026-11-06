@@ -480,6 +480,14 @@ class SQLiteTemplateRepository:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates(owner_id)"
             )
+            try:
+                conn.execute("ALTER TABLE templates ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE templates ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -498,12 +506,13 @@ class SQLiteTemplateRepository:
             id=row[0], owner_id=row[1], name=row[2], game=row[3],
             cpu=row[4], memory_mb=row[5], storage_gb=row[6],
             archive_path=row[7], created_at=row[8],
+            is_public=bool(row[9]), description=row[10],
         )
 
     def list_by_owner(self, owner_id: str) -> list[Template]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at FROM templates WHERE owner_id = ? ORDER BY created_at DESC",
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description FROM templates WHERE owner_id = ? ORDER BY created_at DESC",
                 (owner_id,),
             ).fetchall()
         return [self._row_to_template(r) for r in rows]
@@ -511,7 +520,7 @@ class SQLiteTemplateRepository:
     def get(self, template_id: str) -> Template | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at FROM templates WHERE id = ?",
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description FROM templates WHERE id = ?",
                 (template_id,),
             ).fetchone()
         return self._row_to_template(row) if row else None
@@ -519,11 +528,34 @@ class SQLiteTemplateRepository:
     def save(self, template: Template) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO templates (id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO templates (id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (template.id, template.owner_id, template.name, template.game,
                  template.cpu, template.memory_mb, template.storage_gb,
-                 template.archive_path, template.created_at),
+                 template.archive_path, template.created_at,
+                 int(template.is_public), template.description),
             )
+
+    def list_public(self) -> list[Template]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description FROM templates WHERE is_public = 1 ORDER BY created_at DESC",
+            ).fetchall()
+        return [self._row_to_template(r) for r in rows]
+
+    def update(self, template_id: str, is_public: bool | None, description: str | None) -> None:
+        parts = []
+        params: list = []
+        if is_public is not None:
+            parts.append("is_public = ?")
+            params.append(int(is_public))
+        if description is not None:
+            parts.append("description = ?")
+            params.append(description)
+        if not parts:
+            return
+        params.append(template_id)
+        with self._connect() as conn:
+            conn.execute(f"UPDATE templates SET {', '.join(parts)} WHERE id = ?", params)
 
     def delete(self, template_id: str) -> None:
         with self._connect() as conn:
