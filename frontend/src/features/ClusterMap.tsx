@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Server, TopologyPod, WorkerNode } from '../domain/server';
 import { Status } from '../components/Status';
-import { ArrowUpRight, Map as MapIcon, HardDrive, Share2, Package } from 'lucide-react';
+import { ArrowUpRight, Map as MapIcon, HardDrive, Package } from 'lucide-react';
 
 type Props = {
   nodes: WorkerNode[];
@@ -190,7 +190,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
         {/* Hub */}
         <div className="topo-node topo-hub" style={{ left: pct(HUB_X, W), top: pct(HUB_Y, H) }}>
           <div className="topo-icon" style={{ borderColor: 'var(--accent)', background: 'var(--accent-bg)' }}>
-            <Share2 size={28} color="var(--accent-text)" />
+            <img src="/kubehost-icon.png" alt="KubeHost" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
           </div>
           <span className="topo-label" style={{ color: 'var(--accent-text)', fontWeight: 700 }}>KubeHost</span>
         </div>
