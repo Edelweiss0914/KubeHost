@@ -416,32 +416,37 @@ class K8sAdapter:
             return []
 
     def get_tenant_quota(self, namespace: str) -> dict[str, dict[str, str]]:
-        try:
-            quota = self._core.read_namespaced_resource_quota("tenant-quota", namespace)
-            used = quota.status.used or {}
-            hard = quota.status.hard or {}
-            return {k: {"used": used.get(k, "0"), "hard": hard[k]} for k in hard}
-        except ApiException:
-            return {}
+        result: dict[str, dict[str, str]] = {}
+        for name in ("tenant-quota", "tenant-storage-quota"):
+            try:
+                quota = self._core.read_namespaced_resource_quota(name, namespace)
+                used = quota.status.used or {}
+                hard = quota.status.hard or {}
+                result.update({k: {"used": used.get(k, "0"), "hard": hard[k]} for k in hard})
+            except ApiException:
+                pass
+        return result
 
     def update_tenant_quota(self, namespace: str, max_cpu: float, max_memory_mb: int, max_storage_gb: int, max_servers: int) -> None:
         cpu_str = str(int(max_cpu)) if max_cpu == int(max_cpu) else str(max_cpu)
         mem_str = f"{max_memory_mb // 1024}Gi" if max_memory_mb % 1024 == 0 else f"{max_memory_mb}Mi"
-        hard = {
-            "requests.cpu": cpu_str, "limits.cpu": cpu_str,
-            "requests.memory": mem_str, "limits.memory": mem_str,
-            "requests.storage": f"{max_storage_gb}Gi",
-            "persistentvolumeclaims": str(max_servers),
-            "pods": str(max_servers),
-        }
-        body = {"spec": {"hard": hard}}
-        try:
-            self._core.patch_namespaced_resource_quota("tenant-quota", namespace, body)
-        except ApiException as exc:
-            if exc.status == 404:
-                pass  # 네임스페이스/쿼터가 아직 생성되지 않은 경우 무시
-            else:
-                raise
+        patches = [
+            ("tenant-quota", {
+                "requests.cpu": cpu_str, "limits.cpu": cpu_str,
+                "requests.memory": mem_str, "limits.memory": mem_str,
+                "pods": str(max_servers),
+            }),
+            ("tenant-storage-quota", {
+                "requests.storage": f"{max_storage_gb}Gi",
+                "persistentvolumeclaims": str(max_servers),
+            }),
+        ]
+        for quota_name, hard in patches:
+            try:
+                self._core.patch_namespaced_resource_quota(quota_name, namespace, {"spec": {"hard": hard}})
+            except ApiException as exc:
+                if exc.status != 404:
+                    raise
 
     def delete(self, server_id: str, namespace: str, delete_data: bool, sts_name: str | None = None) -> None:
         name = sts_name or self._sts_name(server_id)
