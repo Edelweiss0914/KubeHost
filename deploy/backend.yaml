@@ -46,7 +46,7 @@ spec:
         - name: KUBEHOST_ADMIN_SECRET
           value: "kubehost"
         - name: KUBEHOST_CORS_ORIGINS
-          value: "http://100.84.38.5"
+          value: "http://100.84.38.5,https://kubehost.edelweiss0297.cloud"
         - name: FRP_PUBLIC_IP
           value: "203.229.87.118"
         - name: FRP_MANAGER_URL

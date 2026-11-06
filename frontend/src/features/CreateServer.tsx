@@ -128,7 +128,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
             {games.length === 0
               ? <div className="game-picker-card selected" role="radio" aria-checked="true" tabIndex={0}>
                   <span className="game-picker-icon" aria-hidden="true"><Pickaxe size={22}/></span>
-                  <div><strong>Minecraft Java</strong><small>Paper</small></div>
+                  <div><strong>Minecraft Java</strong></div>
                 </div>
               : games.map(game => (
                   <div
@@ -157,6 +157,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                         modrinth_project: null, cf_slug: null,
                         server_password: null, world_name: null, server_public: false,
                         map_name: null, gamemode_name: null,
+                        cs2_workshop_map: null, cs2_workshop_collection: null,
                         ...gameDefaults,
                       }));
                     }}
@@ -172,7 +173,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                       : <span className="game-picker-icon" aria-hidden="true">⛏</span>}
                     <div>
                       <strong>{game.name}</strong>
-                      <small>{game.supported ? game.description : '예정...'}</small>
+                      {!game.supported && <small>예정...</small>}
                     </div>
                   </div>
                 ))
@@ -281,6 +282,30 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
               <label className="checkbox" style={{ marginTop: '8px' }}>
                 <input type="checkbox" checked={input.server_public ?? false} onChange={e => set('server_public', e.target.checked)}/>
                 Steam 공개 서버 목록에 표시
+              </label>
+            </div>
+          )}
+
+          {input.game === 'cs2' && (
+            <div className="full">
+              <h4 style={{ margin: '0 0 12px' }}>CS2 Workshop</h4>
+              <label>Workshop 맵 ID <small>(선택 사항)</small>
+                <input
+                  value={input.cs2_workshop_map ?? ''}
+                  onChange={e => set('cs2_workshop_map', e.target.value || null)}
+                  placeholder="예: 3070596702"
+                  maxLength={32}
+                />
+                <small>단일 Workshop 맵 ID — 서버 시작 시 자동 로드</small>
+              </label>
+              <label style={{ marginTop: '12px' }}>Workshop 컬렉션 ID <small>(선택 사항)</small>
+                <input
+                  value={input.cs2_workshop_collection ?? ''}
+                  onChange={e => set('cs2_workshop_collection', e.target.value || null)}
+                  placeholder="예: 3070596702"
+                  maxLength={32}
+                />
+                <small>컬렉션 ID — 서버 시작 시 포함된 맵 모두 다운로드</small>
               </label>
             </div>
           )}
