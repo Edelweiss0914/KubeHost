@@ -2661,7 +2661,7 @@ label:focus-within small { color: var(--muted); }
   --hover: #e1eaff;
   --shadow: 0 18px 38px #253d771a;
 }
-html, body, #root { min-width: 0; }
+html, body, #root { min-width: 1024px; overflow-x: auto; }
 body {
   background:
     radial-gradient(circle at 12% 0%, #334aa02e, transparent 34%),
