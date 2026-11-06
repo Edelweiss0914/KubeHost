@@ -1106,6 +1106,9 @@ class _SnapshotBody(_BaseModel):
 
 class _DeployBody(_BaseModel):
     name: str
+    cpu: float | None = Field(default=None, ge=0.5, le=4)
+    memory_mb: int | None = Field(default=None, ge=1024, le=8192)
+    storage_gb: int | None = Field(default=None, ge=5, le=100)
 
 
 @router.get("/api/v1/templates")
@@ -1223,9 +1226,9 @@ def deploy_template(
     deploy_input = ServerCreate(
         name=name,
         game=template.game,  # type: ignore[arg-type]
-        cpu=template.cpu,
-        memory_mb=template.memory_mb,
-        storage_gb=template.storage_gb,
+        cpu=body.cpu if body.cpu is not None else template.cpu,
+        memory_mb=body.memory_mb if body.memory_mb is not None else template.memory_mb,
+        storage_gb=body.storage_gb if body.storage_gb is not None else template.storage_gb,
     )
     try:
         new_server = svc.create(owner, deploy_input)

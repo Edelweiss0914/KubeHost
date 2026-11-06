@@ -25,6 +25,9 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
 
   const [deploying, setDeploying] = useState<string | null>(null);
   const [deployName, setDeployName] = useState('');
+  const [deployCpu, setDeployCpu] = useState(1);
+  const [deployMemory, setDeployMemory] = useState(2048);
+  const [deployStorage, setDeployStorage] = useState(10);
   const [deployBusy, setDeployBusy] = useState(false);
   const [deployError, setDeployError] = useState('');
 
@@ -62,6 +65,9 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
   function startDeploy(t: Template | PublicTemplate) {
     setDeploying(t.id);
     setDeployName(t.name + '-server');
+    setDeployCpu(t.cpu);
+    setDeployMemory(t.memory_mb);
+    setDeployStorage(t.storage_gb);
     setDeployError('');
   }
 
@@ -77,7 +83,7 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
     setDeployBusy(true);
     setDeployError('');
     try {
-      const result = await api.deployTemplate(templateId, name);
+      const result = await api.deployTemplate(templateId, name, { cpu: deployCpu, memory_mb: deployMemory, storage_gb: deployStorage });
       setDeploying(null);
       setDeployName('');
       setNotice('서버를 생성했습니다.');
@@ -140,7 +146,7 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
           style={{ marginTop: '8px' }}
           onSubmit={e => { e.preventDefault(); void submitDeploy(templateId); }}
         >
-          <p>새 서버 이름을 입력하세요.</p>
+          <p>새 서버 이름과 리소스를 설정하세요.</p>
           <label>서버 이름
             <input
               value={deployName}
@@ -148,6 +154,18 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
               disabled={deployBusy}
               autoFocus
             />
+          </label>
+          <label>CPU ({deployCpu} 코어)
+            <input type="range" min={0.5} max={4} step={0.5} value={deployCpu}
+              onChange={e => setDeployCpu(Number(e.target.value))} disabled={deployBusy}/>
+          </label>
+          <label>메모리 ({deployMemory} MiB)
+            <input type="range" min={1024} max={8192} step={512} value={deployMemory}
+              onChange={e => setDeployMemory(Number(e.target.value))} disabled={deployBusy}/>
+          </label>
+          <label>스토리지 ({deployStorage} GiB)
+            <input type="range" min={5} max={100} step={5} value={deployStorage}
+              onChange={e => setDeployStorage(Number(e.target.value))} disabled={deployBusy}/>
           </label>
           {deployError && (
             <p style={{ color: 'var(--danger, #f87171)', fontSize: '0.85em' }}>{deployError}</p>

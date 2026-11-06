@@ -174,7 +174,7 @@ export interface ServerGateway {
   cloneServer(serverId: string, name: string): Promise<{ id: string }>;
   listTemplates(): Promise<Template[]>;
   snapshotServer(serverId: string, name: string, description?: string): Promise<{ id: string }>;
-  deployTemplate(templateId: string, name: string): Promise<{ id: string }>;
+  deployTemplate(templateId: string, name: string, resources?: { cpu?: number; memory_mb?: number; storage_gb?: number }): Promise<{ id: string }>;
   deleteTemplate(templateId: string): Promise<void>;
   updateTemplate(templateId: string, patch: { is_public?: boolean; description?: string }): Promise<void>;
   listPublicTemplates(): Promise<(Template & { owner_name: string; owner_id: string })[]>;
@@ -367,7 +367,7 @@ export const api: ServerGateway = {
   cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
   listTemplates: () => versioned('/templates'),
   snapshotServer: (serverId, name, description = '') => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name, description }) }),
-  deployTemplate: (templateId, name) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deployTemplate: (templateId, name, resources) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name, ...resources }) }),
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
   updateTemplate: (templateId, patch) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   listPublicTemplates: () => versioned('/templates/public'),
