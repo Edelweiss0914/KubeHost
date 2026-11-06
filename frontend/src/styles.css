@@ -3033,17 +3033,17 @@ h1, h2, h3, p, .section-copy, .topology-core strong, .topology-worker strong {
 }
 
 /* ── Topology canvas ──────────────────────────────────────────────────── */
-.topo-wrap { position: relative; width: 100%; aspect-ratio: 9/5; min-height: 320px; }
+.topo-wrap { position: relative; width: 100%; height: 340px; }
 .topo-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.topo-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; z-index: 1; }
+.topo-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; z-index: 1; }
 .topo-hub { cursor: default; }
 .topo-icon { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid; transition: transform .15s, box-shadow .15s; }
-.topo-hub .topo-icon { width: 68px; height: 68px; border-width: 2.5px; }
-.topo-worker .topo-icon { width: 54px; height: 54px; }
-.topo-pod .topo-icon { width: 36px; height: 36px; }
+.topo-hub .topo-icon { width: 76px; height: 76px; border-width: 2.5px; }
+.topo-worker .topo-icon { width: 64px; height: 64px; }
+.topo-pod .topo-icon { width: 46px; height: 46px; }
 .topo-worker:hover .topo-icon, .topo-pod:hover .topo-icon { transform: scale(1.12); }
 .topo-sel .topo-icon { transform: scale(1.1); box-shadow: 0 0 0 3px var(--accent-bg); }
-.topo-label { font-size: 10px; color: var(--muted); white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.topo-label { font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .topo-detail { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
 .topo-detail-inner { max-width: 380px; }
 .topo-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }

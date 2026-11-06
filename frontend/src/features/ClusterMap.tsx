@@ -94,8 +94,8 @@ function Hierarchy({ nodes, servers, pods, onSelect }: Props) {
 // ── Topology layout ───────────────────────────────────────────────────────────
 const W = 900, H = 500;
 const HUB_X = W / 2, HUB_Y = H / 2;
-const WORKER_DIST = 185;
-const POD_DIST = 100;
+const WORKER_DIST = 160;
+const POD_DIST = 95;
 
 function sColor(s: string): string {
   const l = s.toLowerCase();
@@ -133,7 +133,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
       const ns = servers.filter(s => s.node_id === node.id);
       const n = ns.length;
       if (!n) continue;
-      const step = n === 1 ? 0 : Math.min(28 * Math.PI / 180, (110 * Math.PI / 180) / (n - 1));
+      const step = n === 1 ? 0 : Math.min(32 * Math.PI / 180, (110 * Math.PI / 180) / (n - 1));
       ns.forEach((server, i) => {
         const a = wa + (i - (n - 1) / 2) * step;
         pp.push({ server, pod: podByServerId.get(server.id), x: wx + POD_DIST * Math.cos(a), y: wy + POD_DIST * Math.sin(a), wx, wy });
@@ -169,7 +169,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
         {/* Hub */}
         <div className="topo-node topo-hub" style={{ left: p(HUB_X, W), top: p(HUB_Y, H) }}>
           <div className="topo-icon" style={{ borderColor: 'var(--accent)', background: 'var(--accent-bg)' }}>
-            <Share2 size={22} color="var(--accent-text)" />
+            <Share2 size={28} color="var(--accent-text)" />
           </div>
           <span className="topo-label" style={{ color: 'var(--accent-text)', fontWeight: 700 }}>KubeHost</span>
         </div>
@@ -187,7 +187,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
               aria-label={node.name}
               onKeyDown={e => { if (e.key === 'Enter') toggleWorker(node); }}>
               <div className="topo-icon" style={{ borderColor: sel ? 'var(--accent)' : col, background: sel ? 'var(--accent-bg)' : 'var(--surface-2)' }}>
-                <HardDrive size={18} color={sel ? 'var(--accent-text)' : col} />
+                <HardDrive size={24} color={sel ? 'var(--accent-text)' : col} />
               </div>
               <span className="topo-label">{node.name.length > 12 ? node.name.slice(0, 11) + '…' : node.name}</span>
             </div>
@@ -207,7 +207,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
               aria-label={server.name}
               onKeyDown={e => { if (e.key === 'Enter') toggleServer(server); }}>
               <div className="topo-icon" style={{ borderColor: sel ? 'var(--accent)' : col, background: sel ? 'var(--accent-bg)' : 'var(--surface)' }}>
-                <Package size={14} color={sel ? 'var(--accent-text)' : col} />
+                <Package size={18} color={sel ? 'var(--accent-text)' : col} />
               </div>
               <span className="topo-label">{server.name.length > 11 ? server.name.slice(0, 10) + '…' : server.name}</span>
             </div>
