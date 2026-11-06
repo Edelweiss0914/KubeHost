@@ -36,6 +36,7 @@ class K8sAdapter:
         self._core = client.CoreV1Api(self._api_client)
         self._apps = client.AppsV1Api(self._api_client)
         self._networking = client.NetworkingV1Api(self._api_client)
+        self._batch = client.BatchV1Api(self._api_client)
         self._frp_public_ip = os.getenv("FRP_PUBLIC_IP", "")
 
     @staticmethod
@@ -1077,39 +1078,114 @@ class K8sAdapter:
 
     # ── Template snapshot / restore ───────────────────────────────────────────
 
+    def _get_pvc_host_path(self, namespace: str, pvc_name: str) -> str:
+        pvc = self._core.read_namespaced_persistent_volume_claim(pvc_name, namespace)
+        pv = self._core.read_persistent_volume(pvc.spec.volume_name)
+        if pv.spec.host_path is None:
+            raise ValueError(f"PVC {namespace}/{pvc_name} 는 hostPath 스토리지가 아닙니다.")
+        return pv.spec.host_path.path
+
+    def _run_snapshot_job(
+        self, namespace: str, node_name: str,
+        src_pvc: str, lib_pvc_ns: str, lib_pvc: str,
+        command: list[str],
+        timeout: int = 1800,
+    ) -> None:
+        import time
+        from uuid import uuid4
+
+        job_name = f"kubehost-snap-{uuid4().hex[:8]}"
+
+        # If lib PVC is in a different namespace, use hostPath to bypass namespace restriction
+        same_ns = lib_pvc_ns == namespace
+        if same_ns:
+            volumes = [
+                {"name": "src", "persistentVolumeClaim": {"claimName": src_pvc}},
+                {"name": "lib", "persistentVolumeClaim": {"claimName": lib_pvc}},
+            ]
+        else:
+            src_path = self._get_pvc_host_path(namespace, src_pvc)
+            lib_path = self._get_pvc_host_path(lib_pvc_ns, lib_pvc)
+            volumes = [
+                {"name": "src", "hostPath": {"path": src_path}},
+                {"name": "lib", "hostPath": {"path": lib_path}},
+            ]
+
+        job_body = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": job_name, "namespace": namespace,
+                "labels": {"app.kubernetes.io/managed-by": "kubehost", "kubehost.io/role": "snapshot"},
+            },
+            "spec": {
+                "ttlSecondsAfterFinished": 120,
+                "backoffLimit": 0,
+                "template": {
+                    "metadata": {"labels": {"kubehost.io/role": "snapshot"}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "activeDeadlineSeconds": timeout,
+                        "automountServiceAccountToken": False,
+                        **({"nodeSelector": {"kubernetes.io/hostname": node_name}} if node_name else {}),
+                        "securityContext": {
+                            "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,
+                            "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"},
+                        },
+                        "containers": [{
+                            "name": "snap",
+                            "image": "busybox:latest",
+                            "command": command,
+                            "securityContext": {
+                                "allowPrivilegeEscalation": False,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                            "volumeMounts": [
+                                {"name": "src", "mountPath": "/data"},
+                                {"name": "lib", "mountPath": "/library"},
+                            ],
+                        }],
+                        "volumes": volumes,
+                    },
+                },
+            },
+        }
+
+        batch = client.BatchV1Api(self._api_client)
+        try:
+            batch.create_namespaced_job(namespace, job_body)
+            for _ in range(timeout // 5):
+                time.sleep(5)
+                job = batch.read_namespaced_job(job_name, namespace)
+                if job.status and job.status.succeeded:
+                    return
+                if job.status and job.status.failed:
+                    raise RuntimeError("스냅샷 Job 실패")
+            raise RuntimeError("스냅샷 Job 타임아웃")
+        finally:
+            try:
+                batch.delete_namespaced_job(
+                    job_name, namespace,
+                    body=client.V1DeleteOptions(propagation_policy="Foreground"),
+                )
+            except Exception:
+                pass
+
     def snapshot_pvc_to_library(self, server_id: str, namespace: str, library_namespace: str,
                                 archive_path: str, sts_name: str | None = None,
                                 game: str = "minecraft-java") -> None:
-        """서버 PVC 내용을 tar.gz로 묶어 라이브러리에 저장한다.
-
-        namespace 경계를 넘기 위해:
-          1. 서버 namespace의 임시 파드에서 tar czf → stdout (stdin_data 없음)으로 읽기
-          2. library_write_file()로 라이브러리 PVC에 저장
-        """
+        """서버 PVC 내용을 tar.gz로 묶어 라이브러리 PVC에 직접 저장한다 (K8s Job 사용)."""
         pvc = self._pvc_name(server_id, sts_name)
         node = self._get_server_node(server_id, namespace, sts_name)
-        # tar 결과를 stdout으로 출력 (바이너리를 base64로 감싸 텍스트로 전달)
-        cmd = ["sh", "-c", "tar czf - -C /data . 2>/dev/null | base64 -w 0"]
-        b64_out = self._exec_in_temp_pod(namespace, pvc, node, cmd, game=game)
-        import base64
-        archive_bytes = base64.b64decode(b64_out.strip())
-        if len(archive_bytes) > self._MAX_FILE_BYTES:
-            raise ValueError(
-                f"스냅샷 크기가 너무 큽니다 ({len(archive_bytes) // (1024 * 1024)} MiB, 최대 1 GiB)."
-            )
-        self.library_write_file(library_namespace, archive_path, archive_bytes)
+        cmd = ["sh", "-c",
+               f"mkdir -p /library/templates && tar czf {archive_path} -C /data . 2>/dev/null"]
+        self._run_snapshot_job(namespace, node, pvc, library_namespace, "library", cmd)
 
     def restore_library_to_pvc(self, server_id: str, namespace: str, library_namespace: str,
                                archive_path: str, sts_name: str | None = None,
                                game: str = "minecraft-java") -> None:
-        """라이브러리의 tar.gz를 서버 PVC에 복원한다.
-
-        namespace 경계를 넘기 위해:
-          1. library_read_file()로 tar.gz 읽기
-          2. 서버 namespace의 임시 파드에 stdin으로 전달하여 tar xzf
-        """
-        archive_bytes = self.library_read_file(library_namespace, archive_path)
+        """라이브러리 PVC의 tar.gz를 서버 PVC에 직접 복원한다 (K8s Job 사용)."""
         pvc = self._pvc_name(server_id, sts_name)
         node = self._get_server_node(server_id, namespace, sts_name)
-        cmd = ["sh", "-c", "tar xzf - -C /data 2>/dev/null"]
-        self._exec_in_temp_pod(namespace, pvc, node, cmd, stdin_data=archive_bytes, game=game)
+        cmd = ["sh", "-c", f"tar xzf {archive_path} -C /data 2>/dev/null"]
+        self._run_snapshot_job(namespace, node, pvc, library_namespace, "library", cmd)
