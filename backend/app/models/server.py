@@ -25,6 +25,9 @@ class ServerCreate(BaseModel):
     # Garry's Mod
     map_name: str | None = Field(default=None, max_length=64)
     gamemode_name: str | None = Field(default=None, max_length=32)
+    # CS2
+    cs2_workshop_map: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
+    cs2_workshop_collection: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
     cpu: float = Field(default=1, ge=0.5, le=4, allow_inf_nan=False)
     memory_mb: int = Field(default=2048, ge=1024, le=8192, strict=True)
     storage_gb: int = Field(default=10, ge=5, le=100, strict=True)

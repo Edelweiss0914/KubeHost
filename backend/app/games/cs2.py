@@ -75,7 +75,7 @@ class CS2(GameDefinition):
 
     def container_env(self, request, server_id: UUID) -> list[dict]:
         from app.services.plans import rcon_password
-        return [
+        env = [
             {"name": "CS2_SERVERNAME",   "value": request.name},
             {"name": "CS2_MAXPLAYERS",   "value": "10"},
             {"name": "CS2_RCONPW",       "value": rcon_password(server_id)},
@@ -84,3 +84,8 @@ class CS2(GameDefinition):
             {"name": "CS2_GAMETYPE",     "value": "0"},
             {"name": "CS2_GAMEMODE",     "value": "1"},
         ]
+        if getattr(request, "cs2_workshop_map", None):
+            env.append({"name": "CS2_HOST_WORKSHOP_MAP", "value": request.cs2_workshop_map})
+        if getattr(request, "cs2_workshop_collection", None):
+            env.append({"name": "CS2_HOST_WORKSHOP_COLLECTION", "value": request.cs2_workshop_collection})
+        return env
