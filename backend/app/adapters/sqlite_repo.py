@@ -422,7 +422,7 @@ class SQLiteServerRepository:
                 "INSERT OR IGNORE INTO games (id, slug, name, steam_app_id, image_url, description, supported) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 g,
             )
-        conn.execute("UPDATE games SET supported = 1 WHERE slug IN ('valheim', 'garrysmod')")
+        conn.execute("UPDATE games SET supported = 1 WHERE slug IN ('valheim', 'garrysmod', 'cs2', 'rust')")
 
     def list_games(self) -> list[dict]:
         with self._connect() as conn:
