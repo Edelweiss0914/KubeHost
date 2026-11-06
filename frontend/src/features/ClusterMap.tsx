@@ -124,12 +124,6 @@ function pct(v: number, dim: number): string {
 }
 
 
-// Deterministic jitter per server ID for organic feel
-function jitter(id: string): [number, number] {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) h = (Math.imul(h ^ id.charCodeAt(i), 0x1000193)) >>> 0;
-  return [((h & 0xff) - 128) * 0.14, ((h >> 8 & 0xff) - 128) * 0.14];
-}
 
 type Selected =
   | { kind: 'worker'; data: WorkerNode }
@@ -142,6 +136,15 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
 
   const workers = nodes.filter(n => n.role === 'worker');
   const podByServerId = useMemo(() => new Map(pods.map(pod => [pod.server_id, pod])), [pods]);
+
+  // Random jitter per server, stable until server list changes
+  const serverIdKey = servers.map(s => s.id).join(',');
+  const jitterMap = useMemo(() => {
+    const m = new Map<string, [number, number]>();
+    servers.forEach(s => m.set(s.id, [(Math.random() - 0.5) * 44, (Math.random() - 0.5) * 44]));
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverIdKey]);
 
   const layout = useMemo(() => {
     const wp = workers.map((node, i) => {
@@ -160,12 +163,12 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
       const step = n === 1 ? 0 : Math.min(32 * Math.PI / 180, (110 * Math.PI / 180) / (n - 1));
       ns.forEach((server, i) => {
         const a = wa + (i - (n - 1) / 2) * step;
-        const [jx, jy] = jitter(server.id);
+        const [jx, jy] = jitterMap.get(server.id) ?? [0, 0];
         pp.push({ server, pod: podByServerId.get(server.id), x: wx + POD_DIST * Math.cos(a) + jx, y: wy + POD_DIST * Math.sin(a) + jy, wx, wy });
       });
     }
     return { wp, pp };
-  }, [workers, servers, podByServerId]);
+  }, [workers, servers, podByServerId, jitterMap]);
 
   function toggleWorker(node: WorkerNode) {
     setSelected(s => s?.kind === 'worker' && s.data.id === node.id ? null : { kind: 'worker', data: node });
