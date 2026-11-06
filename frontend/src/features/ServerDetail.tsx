@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CopyBtn } from '../components/CopyBtn';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { Tooltip } from '../components/Tooltip';
@@ -100,34 +101,6 @@ function ResourcePlanViewer({ plan }: { plan: Server['resource_plan'] }) {
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
-function CopyBtn({ text }: { text: string | null }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCallback(() => {
-    if (!text) return;
-    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(done).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta); done();
-      });
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta); done();
-    }
-  }, [text]);
-  if (!text) return null;
-  return (
-    <button className={`copy-btn${copied ? ' copied' : ''}`} onClick={copy} title="클립보드에 복사">
-      {copied ? '✓ 복사됨' : '복사'}
-    </button>
-  );
-}
 
 type PlayerData = { count: number; max: number; names: string[] };
 

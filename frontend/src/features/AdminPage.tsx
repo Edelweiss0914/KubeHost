@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CopyBtn } from '../components/CopyBtn';
 import { api } from '../api/client';
 import type { ClusterMetrics } from '../api/client';
 import type { WorkerNode } from '../domain/server';
@@ -10,32 +11,6 @@ type AdminServer = { id: string; name: string; status: string; owner_id: string;
 
 type Tab = 'users' | 'invites' | 'overview' | 'audit';
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  function doCopy() {
-    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(done).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta); done();
-      });
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta); done();
-    }
-  }
-  return (
-    <button className="text-button" style={{ fontSize: '11px' }} onClick={doCopy}>
-      {copied ? '복사됨' : '복사'}
-    </button>
-  );
-}
 
 function QuotaModal({ userId, username, onClose }: { userId: string; username: string; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -294,7 +269,7 @@ function InvitesTab() {
             {invites.map(inv => (
               <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)', opacity: inv.is_valid ? 1 : 0.5 }}>
                 <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px' }}>
-                  {inv.code} <CopyButton text={inv.code}/>
+                  {inv.code} <CopyBtn text={inv.code}/>
                 </td>
                 <td style={{ padding: '8px 12px' }}>
                   <span className="tag">{inv.single_use ? '일회용' : '다회용'}</span>
