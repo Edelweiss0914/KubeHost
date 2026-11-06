@@ -47,6 +47,10 @@ spec:
           value: "kubehost"
         - name: KUBEHOST_CORS_ORIGINS
           value: "http://100.84.38.5"
+        - name: FRP_PUBLIC_IP
+          value: "203.229.87.118"
+        - name: FRP_MANAGER_URL
+          value: "http://100.77.32.31:7401"
         - name: KUBEHOST_JWT_SECRET
           valueFrom:
             secretKeyRef:

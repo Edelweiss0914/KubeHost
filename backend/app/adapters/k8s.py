@@ -1,4 +1,5 @@
 """Real Kubernetes adapter using the kubernetes Python client."""
+import os
 import re
 import socket
 import struct
@@ -35,6 +36,7 @@ class K8sAdapter:
         self._core = client.CoreV1Api(self._api_client)
         self._apps = client.AppsV1Api(self._api_client)
         self._networking = client.NetworkingV1Api(self._api_client)
+        self._frp_public_ip = os.getenv("FRP_PUBLIC_IP", "")
 
     @staticmethod
     def _fresh_core() -> "client.CoreV1Api":
@@ -177,7 +179,14 @@ class K8sAdapter:
              if r.get("kind") == "Service" and r.get("spec", {}).get("type") == "NodePort"),
             None,
         )
-        return self._read_connection(plan.namespace, plan.target_node, game_svc_name)
+        result = self._read_connection(plan.namespace, plan.target_node, game_svc_name)
+        if result and game_svc_name and self._frp_public_ip:
+            from app.services.frp import register_proxy
+            try:
+                register_proxy(game_svc_name, int(result.split(":")[-1]))
+            except Exception:
+                pass
+        return result
 
     def _read_connection(self, namespace: str, node_name: str, svc_name: str | None) -> str | None:
         try:
@@ -194,7 +203,8 @@ class K8sAdapter:
             internal_ip = next(
                 (a.address for a in (node.status.addresses or []) if a.type == "InternalIP"), None
             )
-            return f"{internal_ip}:{node_port}" if internal_ip else None
+            host = self._frp_public_ip or internal_ip
+            return f"{host}:{node_port}" if host else None
         except Exception:
             return None
 
@@ -435,6 +445,9 @@ class K8sAdapter:
 
     def delete(self, server_id: str, namespace: str, delete_data: bool, sts_name: str | None = None) -> None:
         name = sts_name or self._sts_name(server_id)
+        if self._frp_public_ip:
+            from app.services.frp import unregister_proxy
+            unregister_proxy(f"{name}-game")
         if name.startswith("gmod-"):
             try:
                 self._networking.delete_namespaced_network_policy(f"{name}-ingress", namespace)
