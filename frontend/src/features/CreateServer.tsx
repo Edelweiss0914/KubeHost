@@ -107,6 +107,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
   const selectedPlan = matchesPlan(input);
   const visiblePlans = RESOURCE_PLANS.filter(p => {
     if (input.game === 'valheim') return p.memory_mb >= 2048;
+    if (input.game === 'cs2' || input.game === 'rust') return p.memory_mb >= 4096;
     return true;
   });
 
@@ -139,11 +140,14 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                     onClick={() => {
                       if (!game.supported) return;
                       const slug = game.slug as ServerInput['game'];
-                      if (slug !== 'minecraft-java' && slug !== 'valheim' && slug !== 'garrysmod') return;
                       const gameDefaults = slug === 'valheim'
                         ? { cpu: 2, memory_mb: 4096, storage_gb: 20 }
                         : slug === 'garrysmod'
                         ? { cpu: 1, memory_mb: 2048, storage_gb: 15 }
+                        : slug === 'cs2'
+                        ? { cpu: 2, memory_mb: 4096, storage_gb: 20 }
+                        : slug === 'rust'
+                        ? { cpu: 2, memory_mb: 4096, storage_gb: 30 }
                         : { cpu: 1, memory_mb: 2048, storage_gb: 10 };
                       setInput(prev => ({
                         ...prev,
@@ -159,7 +163,6 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                       if (e.key !== 'Enter' && e.key !== ' ') return;
                       if (!game.supported) return;
                       const slug = game.slug as ServerInput['game'];
-                      if (slug !== 'minecraft-java' && slug !== 'valheim' && slug !== 'garrysmod') return;
                       set('game', slug);
                     }}
                   >
