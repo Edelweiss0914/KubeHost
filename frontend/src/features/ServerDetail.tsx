@@ -769,7 +769,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
         {snapshotting && (
           snapshotDone ? (
             <div className="server-delete-form">
-              <p role="status" className="notice" style={{ marginBottom: '8px' }}>템플릿으로 저장됐습니다.</p>
+              <p role="status" className="notice" style={{ marginBottom: '8px' }}>스냅샷 작업이 시작됐습니다. 서버가 중지된 후 백그라운드에서 처리됩니다. 완료되면 템플릿 탭에서 확인하세요.</p>
               <div className="actions">
                 <button type="button" className="secondary" onClick={() => setSnapshotting(false)}>닫기</button>
               </div>

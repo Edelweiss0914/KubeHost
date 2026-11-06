@@ -58,6 +58,14 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
 
   useEffect(() => { loadMy(); }, [loadMy]);
 
+  // Poll while any template is pending
+  useEffect(() => {
+    const hasPending = templates.some(t => t.status === 'pending');
+    if (!hasPending) return;
+    const id = setInterval(() => { loadMy(); }, 5000);
+    return () => clearInterval(id);
+  }, [templates, loadMy]);
+
   useEffect(() => {
     if (tab === 'public') loadPublic();
   }, [tab, loadPublic]);
@@ -228,7 +236,11 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
                     <>
                       <tr key={t.id} style={{ borderBottom: editingDesc === t.id || deploying === t.id ? 'none' : '1px solid var(--border)' }}>
                         <td style={{ padding: '10px 12px' }}>
-                          <div style={{ fontWeight: 500 }}>{t.name}</div>
+                          <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {t.name}
+                            {t.status === 'pending' && <span style={{ fontSize: '11px', background: 'var(--accent, #3b82f6)', color: '#fff', borderRadius: '4px', padding: '1px 6px' }}>처리 중</span>}
+                            {t.status === 'failed' && <span style={{ fontSize: '11px', background: 'var(--danger, #ef4444)', color: '#fff', borderRadius: '4px', padding: '1px 6px' }}>실패</span>}
+                          </div>
                           {t.description && editingDesc !== t.id && (
                             <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.description}>
                               {t.description}
@@ -263,7 +275,7 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
                             </button>
                             <button
                               className="secondary"
-                              disabled={deploying === t.id || deleteBusy === t.id}
+                              disabled={deploying === t.id || deleteBusy === t.id || t.status !== 'ready'}
                               onClick={() => startDeploy(t)}
                             >
                               배포

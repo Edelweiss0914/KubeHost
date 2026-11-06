@@ -15,3 +15,4 @@ class Template:
     created_at: str    # ISO 8601
     is_public: bool = False
     description: str = ""
+    status: str = "ready"  # pending | ready | failed

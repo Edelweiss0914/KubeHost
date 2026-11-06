@@ -36,6 +36,7 @@ export type Template = {
   created_at: string;
   is_public: boolean;
   description: string;
+  status: string;  // pending | ready | failed
 };
 
 export type Schedule = {

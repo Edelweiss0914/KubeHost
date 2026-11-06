@@ -3,7 +3,7 @@ import asyncio
 from typing import Annotated
 from uuid import NAMESPACE_URL, uuid5
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from app.models.server import (
     DeletionResult, GarrysModSettings, Node, Server, ServerCreate, ServerPod, ServerSettings,
@@ -1156,11 +1156,12 @@ def list_public_templates(owner: Owner, repo: TemplateRepo, request: Request) ->
     return result
 
 
-@router.post("/api/v1/servers/{server_id}/snapshot", status_code=201)
+@router.post("/api/v1/servers/{server_id}/snapshot", status_code=202)
 def snapshot_server(
     server_id: str, body: _SnapshotBody, owner: Owner, svc: Service, repo: TemplateRepo,
-    request: Request,
+    request: Request, background_tasks: BackgroundTasks,
 ) -> dict:
+    import time as _time
     from datetime import datetime, timezone
     from uuid import uuid4
     try:
@@ -1175,20 +1176,8 @@ def snapshot_server(
     lib_ns = _lib_ns(owner)
     template_id = str(uuid4())
     archive_path = f"/library/templates/{template_id}.tar.gz"
-
-    try:
-        svc.adapter.snapshot_pvc_to_library(
-            server_id,
-            src.resource_plan.namespace,
-            lib_ns,
-            archive_path,
-            sts_name=src.resource_plan.sts_name,
-            game=src.game,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"스냅샷 생성 실패: {exc}")
+    ns = src.resource_plan.namespace
+    sts_name = src.resource_plan.sts_name
 
     template = Template(
         id=template_id,
@@ -1201,13 +1190,38 @@ def snapshot_server(
         archive_path=archive_path,
         created_at=datetime.now(timezone.utc).isoformat(),
         description=body.description,
+        status="pending",
     )
     repo.save(template)
+
+    # Stop server before snapshot to avoid PVC I/O conflict
+    try:
+        svc.adapter.set_state(server_id, ns, "stopped", sts_name=sts_name)
+    except Exception:
+        pass
 
     actor_id, actor_name = _actor(request)
     _audit(request, actor_id, actor_name, "template.snapshot", template_id, name,
            detail=f"source_server={server_id}")
-    return {"id": template_id}
+
+    def _do_snapshot() -> None:
+        _time.sleep(5)  # give pod time to terminate before mounting PVC
+        try:
+            svc.adapter.snapshot_pvc_to_library(
+                server_id, ns, lib_ns, archive_path,
+                sts_name=sts_name, game=src.game,
+            )
+            repo.update(template_id, status="ready")
+        except Exception:
+            repo.update(template_id, status="failed")
+        finally:
+            try:
+                svc.adapter.set_state(server_id, ns, "running", sts_name=sts_name)
+            except Exception:
+                pass
+
+    background_tasks.add_task(_do_snapshot)
+    return {"id": template_id, "status": "pending"}
 
 
 @router.post("/api/v1/templates/{template_id}/deploy", status_code=201)
