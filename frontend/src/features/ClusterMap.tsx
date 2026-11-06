@@ -1,7 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Server, TopologyPod, WorkerNode } from '../domain/server';
+import { api } from '../api/client';
+import type { Game } from '../api/client';
 import { Status } from '../components/Status';
 import { ArrowUpRight, Map as MapIcon, HardDrive, Package } from 'lucide-react';
+
+function useGameImages(): Map<string, string> {
+  const [images, setImages] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    api.games().then(games => {
+      const map = new Map<string, string>();
+      games.forEach((g: Game) => { if (g.image_url) map.set(g.slug, g.image_url); });
+      setImages(map);
+    }).catch(() => {});
+  }, []);
+  return images;
+}
 
 type Props = {
   nodes: WorkerNode[];
@@ -124,6 +138,7 @@ type Selected =
 // ── Topology canvas (HTML nodes + SVG lines) ──────────────────────────────────
 function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
   const [selected, setSelected] = useState<Selected | null>(null);
+  const gameImages = useGameImages();
 
   const workers = nodes.filter(n => n.role === 'worker');
   const podByServerId = useMemo(() => new Map(pods.map(pod => [pod.server_id, pod])), [pods]);
@@ -217,7 +232,9 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
               aria-label={server.name}
               onKeyDown={e => { if (e.key === 'Enter') toggleServer(server); }}>
               <div className="topo-icon" style={{ borderColor: sel ? 'var(--accent)' : col, background: sel ? 'var(--accent-bg)' : 'var(--surface)' }}>
-                <Package size={18} color={sel ? 'var(--accent-text)' : col} />
+                {gameImages.get(server.game)
+                  ? <img src={gameImages.get(server.game)} alt={server.game} style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }} />
+                  : <Package size={18} color={sel ? 'var(--accent-text)' : col} />}
               </div>
               <span className="topo-label">{server.name.length > 11 ? server.name.slice(0, 10) + '…' : server.name}</span>
             </div>
