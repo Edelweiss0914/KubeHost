@@ -78,8 +78,7 @@ class CS2(GameDefinition):
         return [
             {"name": "CS2_SERVERNAME",   "value": request.name},
             {"name": "CS2_MAXPLAYERS",   "value": "10"},
-            {"name": "CS2_RCON_PORT",    "value": "27015"},
-            {"name": "RCON_PASSWORD",    "value": rcon_password(server_id)},
+            {"name": "CS2_RCONPW",       "value": rcon_password(server_id)},
             {"name": "CS2_CFG_URL",      "value": ""},
             {"name": "CS2_BOT_QUOTA",    "value": "0"},
             {"name": "CS2_GAMETYPE",     "value": "0"},
