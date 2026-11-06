@@ -109,16 +109,16 @@ function pct(v: number, dim: number): string {
   return `${(v / dim * 100).toFixed(2)}%`;
 }
 
-// Quadratic bezier with perpendicular control point offset
+// Quadratic bezier with perpendicular control point offset (absolute SVG coords)
 function curvePath(x1: number, y1: number, x2: number, y2: number): string {
   const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1) return `M${pct(x1,W)} ${pct(y1,H)}L${pct(x2,W)} ${pct(y2,H)}`;
+  if (len < 1) return `M${x1} ${y1}L${x2} ${y2}`;
   const offset = Math.min(len * 0.28, 55);
   const cpx = mx + (-dy / len) * offset;
   const cpy = my + (dx / len) * offset;
-  return `M${pct(x1,W)} ${pct(y1,H)}Q${pct(cpx,W)} ${pct(cpy,H)} ${pct(x2,W)} ${pct(y2,H)}`;
+  return `M${x1} ${y1}Q${cpx.toFixed(1)} ${cpy.toFixed(1)} ${x2} ${y2}`;
 }
 
 // Deterministic jitter per server ID for organic feel
@@ -174,7 +174,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
     <>
       <div className="topo-wrap">
         {/* SVG layer — lines only */}
-        <svg className="topo-svg" aria-hidden="true">
+        <svg className="topo-svg" viewBox="0 0 900 500" preserveAspectRatio="none" aria-hidden="true">
           {layout.wp.map(({ node, x, y }) => (
             <path key={`he-${node.id}`}
               d={curvePath(HUB_X, HUB_Y, x, y)}
