@@ -105,8 +105,27 @@ function sColor(s: string): string {
   return '#6b7280';
 }
 
-function p(v: number, dim: number): string {
+function pct(v: number, dim: number): string {
   return `${(v / dim * 100).toFixed(2)}%`;
+}
+
+// Quadratic bezier with perpendicular control point offset
+function curvePath(x1: number, y1: number, x2: number, y2: number): string {
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return `M${pct(x1,W)} ${pct(y1,H)}L${pct(x2,W)} ${pct(y2,H)}`;
+  const offset = Math.min(len * 0.28, 55);
+  const cpx = mx + (-dy / len) * offset;
+  const cpy = my + (dx / len) * offset;
+  return `M${pct(x1,W)} ${pct(y1,H)}Q${pct(cpx,W)} ${pct(cpy,H)} ${pct(x2,W)} ${pct(y2,H)}`;
+}
+
+// Deterministic jitter per server ID for organic feel
+function jitter(id: string): [number, number] {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h ^ id.charCodeAt(i), 0x1000193)) >>> 0;
+  return [((h & 0xff) - 128) * 0.14, ((h >> 8 & 0xff) - 128) * 0.14];
 }
 
 type Selected =
@@ -122,9 +141,10 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
 
   const layout = useMemo(() => {
     const wp = workers.map((node, i) => {
+      // Single worker: place to the right (angle=0) to avoid vertical stack
       const angle = workers.length === 1
-        ? -Math.PI / 2
-        : (2 * Math.PI * i / workers.length) - Math.PI / 2;
+        ? 0
+        : (2 * Math.PI * i / workers.length);
       return { node, x: HUB_X + WORKER_DIST * Math.cos(angle), y: HUB_Y + WORKER_DIST * Math.sin(angle), angle };
     });
 
@@ -136,7 +156,8 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
       const step = n === 1 ? 0 : Math.min(32 * Math.PI / 180, (110 * Math.PI / 180) / (n - 1));
       ns.forEach((server, i) => {
         const a = wa + (i - (n - 1) / 2) * step;
-        pp.push({ server, pod: podByServerId.get(server.id), x: wx + POD_DIST * Math.cos(a), y: wy + POD_DIST * Math.sin(a), wx, wy });
+        const [jx, jy] = jitter(server.id);
+        pp.push({ server, pod: podByServerId.get(server.id), x: wx + POD_DIST * Math.cos(a) + jx, y: wy + POD_DIST * Math.sin(a) + jy, wx, wy });
       });
     }
     return { wp, pp };
@@ -155,19 +176,19 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
         {/* SVG layer — lines only */}
         <svg className="topo-svg" aria-hidden="true">
           {layout.wp.map(({ node, x, y }) => (
-            <line key={`he-${node.id}`}
-              x1={p(HUB_X, W)} y1={p(HUB_Y, H)} x2={p(x, W)} y2={p(y, H)}
-              stroke={sColor(node.status)} strokeWidth={2} strokeOpacity={0.4} />
+            <path key={`he-${node.id}`}
+              d={curvePath(HUB_X, HUB_Y, x, y)}
+              fill="none" stroke={sColor(node.status)} strokeWidth={2} strokeOpacity={0.45} />
           ))}
           {layout.pp.map(({ server, x, y, wx, wy }) => (
-            <line key={`pe-${server.id}`}
-              x1={p(wx, W)} y1={p(wy, H)} x2={p(x, W)} y2={p(y, H)}
-              stroke={sColor(server.status)} strokeWidth={1.5} strokeOpacity={0.3} />
+            <path key={`pe-${server.id}`}
+              d={curvePath(wx, wy, x, y)}
+              fill="none" stroke={sColor(server.status)} strokeWidth={1.5} strokeOpacity={0.35} />
           ))}
         </svg>
 
         {/* Hub */}
-        <div className="topo-node topo-hub" style={{ left: p(HUB_X, W), top: p(HUB_Y, H) }}>
+        <div className="topo-node topo-hub" style={{ left: pct(HUB_X, W), top: pct(HUB_Y, H) }}>
           <div className="topo-icon" style={{ borderColor: 'var(--accent)', background: 'var(--accent-bg)' }}>
             <Share2 size={28} color="var(--accent-text)" />
           </div>
@@ -181,7 +202,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
           return (
             <div key={node.id}
               className={`topo-node topo-worker${sel ? ' topo-sel' : ''}`}
-              style={{ left: p(x, W), top: p(y, H) }}
+              style={{ left: pct(x, W), top: pct(y, H) }}
               onClick={() => toggleWorker(node)}
               role="button" tabIndex={0}
               aria-label={node.name}
@@ -201,7 +222,7 @@ function TopologyCanvas({ nodes, servers, pods, onSelect }: Props) {
           return (
             <div key={server.id}
               className={`topo-node topo-pod${sel ? ' topo-sel' : ''}`}
-              style={{ left: p(x, W), top: p(y, H) }}
+              style={{ left: pct(x, W), top: pct(y, H) }}
               onClick={() => toggleServer(server)}
               role="button" tabIndex={0}
               aria-label={server.name}
