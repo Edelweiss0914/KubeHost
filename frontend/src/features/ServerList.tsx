@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { LayoutGrid, List, Hexagon } from 'lucide-react';
-import type { GameDefinition } from '../api/client';
+import type { GameDefinition, Game } from '../api/client';
 import type { Server } from '../domain/server';
 import { Status } from '../components/Status';
 import { CopyBtn } from '../components/CopyBtn';
@@ -42,6 +42,18 @@ function badgeStyle(def?: GameDefinition): React.CSSProperties {
   };
 }
 
+function useGameImages(): Map<string, string> {
+  const [images, setImages] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    api.games().then(games => {
+      const map = new Map<string, string>();
+      games.forEach((g: Game) => { if (g.image_url) map.set(g.slug, g.image_url); });
+      setImages(map);
+    }).catch(() => {});
+  }, []);
+  return images;
+}
+
 function useGameDefs(servers: Server[]): Map<string, GameDefinition> {
   const [defs, setDefs] = useState<Map<string, GameDefinition>>(new Map());
   const slugKey = [...new Set(servers.map(s => s.game))].sort().join(',');
@@ -59,7 +71,7 @@ function useGameDefs(servers: Server[]): Map<string, GameDefinition> {
   return defs;
 }
 
-function ServerCard({ server, onSelect, gameDef }: { server: Server; onSelect: (id: string) => void; gameDef?: GameDefinition }) {
+function ServerCard({ server, onSelect, gameDef, imageUrl }: { server: Server; onSelect: (id: string) => void; gameDef?: GameDefinition; imageUrl?: string }) {
   return (
     <div
       className="server-card"
@@ -70,9 +82,10 @@ function ServerCard({ server, onSelect, gameDef }: { server: Server; onSelect: (
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(server.id); } }}
     >
       <div className="server-card-header">
-        <span className="server-card-game-badge" style={badgeStyle(gameDef)} aria-hidden="true">
-          {gameDef?.icon ?? <Hexagon size={20}/>}
-        </span>
+        {imageUrl
+          ? <img src={imageUrl} alt={gameDef?.name ?? server.game} className="game-picker-img" style={{width:'40px',height:'40px'}} aria-hidden="true"/>
+          : <span className="server-card-game-badge" style={badgeStyle(gameDef)} aria-hidden="true">{gameDef?.icon ?? <Hexagon size={20}/>}</span>
+        }
         <div className="server-card-title">
           <strong>{server.name}</strong>
           <Status value={server.status} />
@@ -103,6 +116,7 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const gameDefs = useGameDefs(servers);
+  const gameImages = useGameImages();
 
   const visible = servers.filter(server =>
     (filter === 'all' || server.status === filter) &&
@@ -161,15 +175,15 @@ export function ServerList({ servers, retained, onSelect, onCreate, onRestore }:
           viewMode === 'card' ? (
             <div className="server-card-grid">
               {visible.map(server => (
-                <ServerCard key={server.id} server={server} onSelect={onSelect} gameDef={gameDefs.get(server.game)} />
+                <ServerCard key={server.id} server={server} onSelect={onSelect} gameDef={gameDefs.get(server.game)} imageUrl={gameImages.get(server.game)} />
               ))}
             </div>
           ) : (
             <div className="table-wrap">
               <table>
                 <thead><tr><th scope="col">서버</th><th scope="col">상태</th><th scope="col">호스트 서버</th><th scope="col">할당 리소스</th><th scope="col">접속 주소</th><th scope="col"><span className="sr-only">작업</span></th></tr></thead>
-                <tbody>{visible.map(server => { const def = gameDefs.get(server.game); return <tr key={server.id}>
-                  <td><div style={{display:'flex',alignItems:'center',gap:'8px'}}><span style={badgeStyle(def)} aria-hidden="true">{def?.icon ?? '⬡'}</span><div><strong>{server.name}</strong><small>{def?.name ?? server.game}{server.version ? ` · ${server.version}` : ''}</small></div></div></td>
+                <tbody>{visible.map(server => { const def = gameDefs.get(server.game); const imgUrl = gameImages.get(server.game); return <tr key={server.id}>
+                  <td><div style={{display:'flex',alignItems:'center',gap:'8px'}}>{imgUrl ? <img src={imgUrl} alt="" className="game-picker-img" style={{width:'36px',height:'36px'}} aria-hidden="true"/> : <span style={badgeStyle(def)} aria-hidden="true">{def?.icon ?? <Hexagon size={20}/>}</span>}<div><strong>{server.name}</strong><small>{def?.name ?? server.game}{server.version ? ` · ${server.version}` : ''}</small></div></div></td>
                   <td><Status value={server.status}/></td>
                   <td>{server.node_id}</td>
                   <td>{server.cpu} vCPU · {server.memory_mb / 1024} GiB RAM<small>{server.storage_gb} GiB 스토리지</small></td>
