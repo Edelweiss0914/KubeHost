@@ -352,7 +352,7 @@ class K8sAdapter:
             raise ValueError("파드 IP를 확인할 수 없습니다.")
         sts = self._apps.read_namespaced_stateful_set(name, namespace)
         env = {e.name: (e.value or "") for e in (sts.spec.template.spec.containers[0].env or [])}
-        password = env.get("RCON_PASSWORD", "")
+        password = env.get("RCON_PASSWORD") or env.get("CS2_RCONPW", "")
         if not password:
             raise ValueError("RCON이 설정되지 않았습니다. 서버를 중지한 뒤 다시 시작하세요.")
 
