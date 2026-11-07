@@ -54,13 +54,15 @@ button.danger:hover{background:var(--error-bg);filter:brightness(1.1)}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .text-button{min-height:auto;background:none;color:var(--accent);font-weight:650}
 .text-button:hover{background:none;color:var(--accent-hover);transform:none}
+.shell{display:flex;min-height:100vh}
+.workspace{margin-left:262px;width:calc(100% - 262px);flex:1;min-width:0}
 .sidebar{width:262px;padding:28px 18px;background:var(--sidebar);border-right:1px solid var(--border)}
 .brand{padding:4px 10px;color:var(--text);font-size:22px;letter-spacing:-.7px}
 .brand-logo{display:block;flex:none;width:48px;height:48px;object-fit:contain}
 .beta{border-color:var(--border);color:var(--muted);font-size:11px;border-radius:5px;padding:3px 6px}
 .nav-label{font-size:11px;color:var(--subtle);margin:42px 14px 12px}
 nav{gap:5px}
-nav button{min-height:45px;font-size:14px;font-weight:600;border-radius:9px;color:var(--muted);box-shadow:none}
+nav button{min-height:45px;font-size:14px;font-weight:600;border-radius:9px;color:var(--muted);box-shadow:none;background:none;border-color:transparent}
 nav button:hover{background:var(--hover)}
 nav button.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent-border)}
 .nav-count{font-size:12px;border-radius:999px;background:var(--surface-2);color:var(--text);padding:3px 8px}
@@ -2002,7 +2004,7 @@ tbody tr { transition: background .13s; }
 }
 
 /* --- Sidebar top accent line --- */
-.sidebar { position: fixed; }
+.sidebar { position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; }
 .sidebar::before {
   content: '';
   position: absolute;
@@ -2489,7 +2491,7 @@ main:has(.mission-grid) .demo-banner { margin-bottom: 17px; padding-top: 12px; p
 .resource-plan-list { display: grid; gap: 4px; margin-top: 16px; }
 .resource-plan-item > summary { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); list-style: none; cursor: pointer; transition: background .15s, border-color .15s; }
 .resource-plan-item > summary::-webkit-details-marker { display: none; }
-.resource-plan-item > summary::before { content: '??; font-size: 9px; color: var(--subtle); flex: none; transition: transform .15s; }
+.resource-plan-item > summary::before { content: '▶'; font-size: 9px; color: var(--subtle); flex: none; transition: transform .15s; }
 .resource-plan-item[open] > summary { border-radius: 9px 9px 0 0; border-color: var(--accent-border); background: var(--hover); }
 .resource-plan-item[open] > summary::before { transform: rotate(90deg); }
 .resource-plan-item[open] > pre { border-top: 0; border-radius: 0 0 9px 9px; margin: 0; max-height: 320px; }
