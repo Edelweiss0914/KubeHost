@@ -129,7 +129,7 @@ export function Landing({ onEnter }: LandingProps) {
         <div className="landing-hero-content">
           <h1 id="hero-headline" className="landing-hero-h1 landing-hero-enter-1">
             게임 서버를 K8s로,<br />
-            단 몇 초 만에.
+            클릭 몇 번으로.
           </h1>
           <p className="landing-hero-sub landing-hero-enter-3">
             Kubernetes 위에서 동작하는 게임 서버 호스팅 플랫폼.<br />
@@ -151,7 +151,7 @@ export function Landing({ onEnter }: LandingProps) {
             </div>
             <div className="landing-hero-stat-divider" aria-hidden="true" />
             <div className="landing-hero-stat">
-              <strong>수초</strong>
+              <strong>수 분</strong>
               <span>서버 배포 시간</span>
             </div>
             <div className="landing-hero-stat-divider" aria-hidden="true" />
@@ -180,7 +180,7 @@ export function Landing({ onEnter }: LandingProps) {
               <Clock size={12}/> 네임스페이스 격리 적용 중...
             </p>
             <p className="landing-terminal-line landing-terminal-ok landing-anim-line" style={{'--li':3} as React.CSSProperties}>
-              <Check size={12}/>서버가 배포되었습니다 (2.3s)
+              <Check size={12}/>서버가 배포되었습니다 (23s)
             </p>
             <p className="landing-terminal-line landing-terminal-ok landing-anim-line" style={{'--li':4} as React.CSSProperties}>
               <Check size={12}/>포트 포워딩: 7777 → game-my-world:7777
@@ -272,7 +272,7 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-step-content">
               <h3 className="landing-step-title">K8s 배포</h3>
               <p className="landing-step-desc">
-                서버, 저장소, 네트워크가 자동으로 구성됩니다. 수초 안에 서버가 올라옵니다.
+                서버, 저장소, 네트워크가 자동으로 구성됩니다. 몇 분 안에 서버가 올라옵니다.
               </p>
             </div>
           </li>
