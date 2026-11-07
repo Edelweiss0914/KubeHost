@@ -33,7 +33,7 @@ const STACK: { icon: ReactNode; name: string; desc: string }[] = [
   { icon: <Zap size={18}/>,        name: 'FastAPI',     desc: 'Python 백엔드' },
   { icon: <Atom size={18}/>,       name: 'React',       desc: '프론트엔드' },
   { icon: <Activity size={18}/>,   name: 'Prometheus',  desc: '메트릭 수집' },
-  { icon: <Layers size={18}/>,     name: 'StatefulSet', desc: '영속 스토리지' },
+  { icon: <Layers size={18}/>,     name: 'StatefulSet', desc: '데이터 영속성' },
   { icon: <Terminal size={18}/>,   name: 'Console',     desc: '서버 제어' },
 ];
 
@@ -48,11 +48,11 @@ const FAQ = [
   },
   {
     q: '서버 데이터는 안전하게 보관되나요?',
-    a: 'PersistentVolumeClaim(PVC)을 통해 Worker 노드 로컬 디스크에 저장됩니다. Worker 노드 장애 시 자동 이전은 지원하지 않으므로 중요 데이터는 별도 백업을 권장합니다.',
+    a: '게임 데이터는 호스팅 컴퓨터의 로컬 디스크에 저장됩니다. 호스팅 컴퓨터 장애 시 데이터가 자동으로 이동하지 않으므로 중요 데이터는 별도 백업을 권장합니다.',
   },
   {
     q: '서버를 중지해도 데이터가 유지되나요?',
-    a: '네. 파드(Pod)를 중지·삭제해도 PVC 데이터는 보존됩니다. 다음 시작 시 동일한 월드 데이터로 재개됩니다.',
+    a: '네. 서버를 중지하거나 삭제해도 게임 데이터는 그대로 보존됩니다. 다음 시작 시 동일한 월드 데이터로 재개됩니다.',
   },
 ];
 
@@ -125,11 +125,9 @@ export function Landing({ onEnter }: LandingProps) {
       <section className="landing-hero landing-hero-enter" id="hero" aria-labelledby="hero-headline">
         <div className="landing-hero-grid-overlay" aria-hidden="true" />
         <div className="landing-hero-orb landing-hero-orb-1" aria-hidden="true" />
-        <div className="landing-hero-orb landing-hero-orb-2" aria-hidden="true" />
 
         <div className="landing-hero-content">
-          <span className="landing-eyebrow landing-hero-enter-1">K3S · KUBERNETES · GAME SERVERS</span>
-          <h1 id="hero-headline" className="landing-hero-h1 landing-hero-enter-2">
+          <h1 id="hero-headline" className="landing-hero-h1 landing-hero-enter-1">
             게임 서버를 K8s로,<br />
             <span className="landing-accent-text">단 몇 초 만에.</span>
           </h1>
@@ -200,7 +198,6 @@ export function Landing({ onEnter }: LandingProps) {
 
       {/* ── Games Marquee (2 rows) ────────────────────────────── */}
       <div className="landing-marquee-wrap" aria-label="지원 게임 목록">
-        <p className="landing-marquee-label">SUPPORTED GAMES</p>
         <MarqueeRow games={GAMES_ROW1} />
         <MarqueeRow games={GAMES_ROW2} reverse />
       </div>
@@ -208,7 +205,6 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── Features ─────────────────────────────────────────── */}
       <section className="landing-features landing-reveal" id="features" aria-labelledby="features-heading">
         <div className="landing-section-header">
-          <span className="landing-eyebrow">CORE FEATURES</span>
           <h2 id="features-heading" className="landing-section-h2">
             운영을 자동화하는 세 가지 핵심
           </h2>
@@ -218,23 +214,23 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-feature-icon" aria-hidden="true"><LayoutGrid size={28}/></div>
             <h3 className="landing-feature-title">원클릭 배포</h3>
             <p className="landing-feature-desc">
-              K8s StatefulSet을 자동 생성합니다. 네임스페이스 격리로 테넌트 간 완전 분리를 보장합니다.
+              게임 서버를 버튼 하나로 생성합니다. 각 서버는 완전히 분리된 환경에서 실행되며 저장소가 자동으로 할당됩니다.
             </p>
             <ul className="landing-feature-tags">
-              <li>StatefulSet</li>
-              <li>Namespace 격리</li>
-              <li>PVC 자동 프로비저닝</li>
+              <li>원클릭 생성</li>
+              <li>서버 간 완전 분리</li>
+              <li>자동 저장소 할당</li>
             </ul>
           </article>
           <article className="landing-feature-card" tabIndex={0}>
             <div className="landing-feature-icon" aria-hidden="true"><Clock size={28}/></div>
             <h3 className="landing-feature-title">자동 스케줄</h3>
             <p className="landing-feature-desc">
-              요일별 시작·종료를 자동화합니다. 미사용 시간에 파드를 정지해 운영 비용을 절감합니다.
+              요일별 시작·종료를 자동화합니다. 사용하지 않는 시간에 서버를 자동으로 멈춰 리소스를 절약합니다.
             </p>
             <ul className="landing-feature-tags">
-              <li>CronJob 연동</li>
-              <li>비용 절감</li>
+              <li>예약 시작·종료</li>
+              <li>리소스 절약</li>
               <li>자동 재시작</li>
             </ul>
           </article>
@@ -242,12 +238,12 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-feature-icon" aria-hidden="true"><MapIcon size={28}/></div>
             <h3 className="landing-feature-title">실시간 메트릭</h3>
             <p className="landing-feature-desc">
-              Prometheus 기반 CPU·메모리 시계열 모니터링. 이상 징후를 즉시 감지합니다.
+              CPU·메모리 사용량을 실시간 그래프로 확인합니다. 이상 징후를 즉시 감지하고 서버 상태를 한눈에 파악합니다.
             </p>
             <ul className="landing-feature-tags">
-              <li>Prometheus</li>
-              <li>시계열 그래프</li>
-              <li>리소스 쿼터</li>
+              <li>실시간 그래프</li>
+              <li>CPU·메모리 추적</li>
+              <li>사용량 제한 설정</li>
             </ul>
           </article>
         </div>
@@ -256,7 +252,6 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── How it works ─────────────────────────────────────── */}
       <section className="landing-steps landing-reveal" aria-labelledby="steps-heading">
         <div className="landing-section-header">
-          <span className="landing-eyebrow">HOW IT WORKS</span>
           <h2 id="steps-heading" className="landing-section-h2">
             세 단계로 완성되는 서버 운영
           </h2>
@@ -267,7 +262,7 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-step-content">
               <h3 className="landing-step-title">서버 생성</h3>
               <p className="landing-step-desc">
-                서버 이름, 게임 이미지, 리소스 플랜을 입력합니다. Worker 노드를 선택하면 끝입니다.
+                서버 이름, 게임 종류, 리소스 플랜을 입력합니다. 호스팅 노드를 선택하면 끝입니다.
               </p>
             </div>
           </li>
@@ -277,7 +272,7 @@ export function Landing({ onEnter }: LandingProps) {
             <div className="landing-step-content">
               <h3 className="landing-step-title">K8s 배포</h3>
               <p className="landing-step-desc">
-                StatefulSet과 PVC, Service가 자동으로 생성됩니다. 수초 안에 서버가 올라옵니다.
+                서버, 저장소, 네트워크가 자동으로 구성됩니다. 수초 안에 서버가 올라옵니다.
               </p>
             </div>
           </li>
@@ -297,7 +292,6 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── Dashboard Mockup ─────────────────────────────────── */}
       <section className="landing-mockup-section landing-reveal" aria-labelledby="mockup-heading">
         <div className="landing-section-header">
-          <span className="landing-eyebrow">DASHBOARD</span>
           <h2 id="mockup-heading" className="landing-section-h2">
             한눈에 보는 관리 콘솔
           </h2>
@@ -356,7 +350,6 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── FAQ ──────────────────────────────────────────────── */}
       <section className="landing-faq landing-reveal" id="faq" aria-labelledby="faq-heading">
         <div className="landing-section-header">
-          <span className="landing-eyebrow">FAQ</span>
           <h2 id="faq-heading" className="landing-section-h2">자주 묻는 질문</h2>
         </div>
         <dl className="landing-faq-list">
@@ -371,7 +364,6 @@ export function Landing({ onEnter }: LandingProps) {
 
       {/* ── Tech Stack ───────────────────────────────────────── */}
       <section className="landing-stack landing-reveal" aria-label="기술 스택">
-        <p className="landing-stack-label">BUILT WITH</p>
         <div className="landing-stack-grid">
           {STACK.map(s => (
             <div className="landing-stack-item" key={s.name}>
@@ -386,8 +378,6 @@ export function Landing({ onEnter }: LandingProps) {
       {/* ── CTA ──────────────────────────────────────────────── */}
       <section className="landing-cta landing-reveal" aria-labelledby="cta-heading">
         <div className="landing-cta-inner">
-          <div className="landing-cta-orb" aria-hidden="true" />
-          <span className="landing-eyebrow">ACCESS</span>
           <h2 id="cta-heading" className="landing-cta-h2">초대 코드가 있으신가요?</h2>
           <p className="landing-cta-sub">
             현재 초대 코드를 통한 가입만 허용합니다.<br />
