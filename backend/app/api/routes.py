@@ -1102,6 +1102,7 @@ def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, r
 class _SnapshotBody(_BaseModel):
     name: str
     description: str = ""
+    pvc_clone: bool = False  # PVC 복사 템플릿 (관리자 전용, 대용량 게임)
 
 
 class _DeployBody(_BaseModel):
@@ -1125,6 +1126,8 @@ def list_templates(owner: Owner, repo: TemplateRepo) -> list[dict]:
             "created_at": t.created_at,
             "is_public": t.is_public,
             "description": t.description,
+            "status": t.status,
+            "template_type": t.template_type,
         }
         for t in templates
     ]
@@ -1152,6 +1155,7 @@ def list_public_templates(owner: Owner, repo: TemplateRepo, request: Request) ->
             "created_at": t.created_at,
             "is_public": t.is_public,
             "description": t.description,
+            "template_type": t.template_type,
         })
     return result
 
@@ -1179,6 +1183,15 @@ def snapshot_server(
     ns = src.resource_plan.namespace
     sts_name = src.resource_plan.sts_name
 
+    # pvc_clone: 관리자 전용
+    if body.pvc_clone:
+        auth_svc = request.app.state.auth_service
+        user = auth_svc.get_user_by_id(owner)
+        if not (user and user.is_admin):
+            raise HTTPException(status_code=403, detail="PVC 복사 템플릿은 관리자만 생성할 수 있습니다.")
+
+    src_pvc_name = svc.adapter._pvc_name(server_id, sts_name) if body.pvc_clone else None
+
     template = Template(
         id=template_id,
         owner_id=owner,
@@ -1190,9 +1203,19 @@ def snapshot_server(
         archive_path=archive_path,
         created_at=datetime.now(timezone.utc).isoformat(),
         description=body.description,
-        status="pending",
+        status="ready" if body.pvc_clone else "pending",
+        template_type="pvc_clone" if body.pvc_clone else "archive",
+        source_pvc_name=src_pvc_name,
+        source_pvc_ns=ns if body.pvc_clone else None,
     )
     repo.save(template)
+
+    actor_id, actor_name = _actor(request)
+
+    if body.pvc_clone:
+        _audit(request, actor_id, actor_name, "template.snapshot", template_id, name,
+               detail=f"source_server={server_id} type=pvc_clone")
+        return {"id": template_id, "status": "ready"}
 
     # Stop server before snapshot to avoid PVC I/O conflict
     try:
@@ -1200,7 +1223,6 @@ def snapshot_server(
     except Exception:
         pass
 
-    actor_id, actor_name = _actor(request)
     _audit(request, actor_id, actor_name, "template.snapshot", template_id, name,
            detail=f"source_server={server_id}")
 
@@ -1251,14 +1273,25 @@ def deploy_template(
 
     lib_ns = _lib_ns(template.owner_id)
     try:
-        svc.adapter.restore_library_to_pvc(
-            new_server.id,
-            new_server.resource_plan.namespace,
-            lib_ns,
-            template.archive_path,
-            sts_name=new_server.resource_plan.sts_name,
-            game=new_server.game,
-        )
+        if template.template_type == "pvc_clone":
+            if not template.source_pvc_name or not template.source_pvc_ns:
+                raise ValueError("소스 PVC 정보가 없습니다.")
+            svc.adapter.clone_pvc(
+                src_pvc_name=template.source_pvc_name,
+                src_ns=template.source_pvc_ns,
+                dst_server_id=new_server.id,
+                dst_ns=new_server.resource_plan.namespace,
+                dst_sts_name=new_server.resource_plan.sts_name,
+            )
+        else:
+            svc.adapter.restore_library_to_pvc(
+                new_server.id,
+                new_server.resource_plan.namespace,
+                lib_ns,
+                template.archive_path,
+                sts_name=new_server.resource_plan.sts_name,
+                game=new_server.game,
+            )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"템플릿 복원 실패: {exc}")
 
@@ -1276,11 +1309,12 @@ def delete_template(
     if template is None or template.owner_id != owner:
         raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
 
-    lib_ns = _lib_ns(owner)
-    try:
-        svc.adapter.library_delete_path(lib_ns, template.archive_path)
-    except Exception:
-        pass  # 파일이 없어도 메타데이터는 삭제
+    if template.template_type != "pvc_clone":
+        lib_ns = _lib_ns(owner)
+        try:
+            svc.adapter.library_delete_path(lib_ns, template.archive_path)
+        except Exception:
+            pass  # 파일이 없어도 메타데이터는 삭제
 
     repo.delete(template_id)
 

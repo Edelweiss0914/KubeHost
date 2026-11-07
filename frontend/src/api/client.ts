@@ -37,6 +37,7 @@ export type Template = {
   is_public: boolean;
   description: string;
   status: string;  // pending | ready | failed
+  template_type: string;  // "archive" | "pvc_clone"
 };
 
 export type Schedule = {
@@ -174,7 +175,7 @@ export interface ServerGateway {
   githubClone(serverId: string, url: string, branch: string, path: string): Promise<{ owner: string; repo: string; branch: string; path: string }>;
   cloneServer(serverId: string, name: string): Promise<{ id: string }>;
   listTemplates(): Promise<Template[]>;
-  snapshotServer(serverId: string, name: string, description?: string): Promise<{ id: string }>;
+  snapshotServer(serverId: string, name: string, description?: string, pvc_clone?: boolean): Promise<{ id: string }>;
   deployTemplate(templateId: string, name: string, resources?: { cpu?: number; memory_mb?: number; storage_gb?: number }): Promise<{ id: string }>;
   deleteTemplate(templateId: string): Promise<void>;
   updateTemplate(templateId: string, patch: { is_public?: boolean; description?: string }): Promise<void>;
@@ -367,7 +368,7 @@ export const api: ServerGateway = {
   githubClone: (serverId, url, branch, path) => versioned(`/servers/${encodeURIComponent(serverId)}/fs/github`, { method: 'POST', body: JSON.stringify({ url, branch, path }) }),
   cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
   listTemplates: () => versioned('/templates'),
-  snapshotServer: (serverId, name, description = '') => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name, description }) }),
+  snapshotServer: (serverId, name, description = '', pvc_clone = false) => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name, description, pvc_clone }) }),
   deployTemplate: (templateId, name, resources) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name, ...resources }) }),
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
   updateTemplate: (templateId, patch) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'PATCH', body: JSON.stringify(patch) }),

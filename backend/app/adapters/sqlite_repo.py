@@ -492,6 +492,18 @@ class SQLiteTemplateRepository:
                 conn.execute("ALTER TABLE templates ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'")
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'archive'")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE templates ADD COLUMN source_pvc_name TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE templates ADD COLUMN source_pvc_ns TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -512,12 +524,15 @@ class SQLiteTemplateRepository:
             archive_path=row[7], created_at=row[8],
             is_public=bool(row[9]), description=row[10],
             status=row[11] if len(row) > 11 else "ready",
+            template_type=row[12] if len(row) > 12 else "archive",
+            source_pvc_name=row[13] if len(row) > 13 else None,
+            source_pvc_ns=row[14] if len(row) > 14 else None,
         )
 
     def list_by_owner(self, owner_id: str) -> list[Template]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status FROM templates WHERE owner_id = ? ORDER BY created_at DESC",
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status, template_type, source_pvc_name, source_pvc_ns FROM templates WHERE owner_id = ? ORDER BY created_at DESC",
                 (owner_id,),
             ).fetchall()
         return [self._row_to_template(r) for r in rows]
@@ -525,7 +540,7 @@ class SQLiteTemplateRepository:
     def get(self, template_id: str) -> Template | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status FROM templates WHERE id = ?",
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status, template_type, source_pvc_name, source_pvc_ns FROM templates WHERE id = ?",
                 (template_id,),
             ).fetchone()
         return self._row_to_template(row) if row else None
@@ -533,17 +548,18 @@ class SQLiteTemplateRepository:
     def save(self, template: Template) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO templates (id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO templates (id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status, template_type, source_pvc_name, source_pvc_ns) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (template.id, template.owner_id, template.name, template.game,
                  template.cpu, template.memory_mb, template.storage_gb,
                  template.archive_path, template.created_at,
-                 int(template.is_public), template.description, template.status),
+                 int(template.is_public), template.description, template.status,
+                 template.template_type, template.source_pvc_name, template.source_pvc_ns),
             )
 
     def list_public(self) -> list[Template]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status FROM templates WHERE is_public = 1 ORDER BY created_at DESC",
+                "SELECT id, owner_id, name, game, cpu, memory_mb, storage_gb, archive_path, created_at, is_public, description, status, template_type, source_pvc_name, source_pvc_ns FROM templates WHERE is_public = 1 ORDER BY created_at DESC",
             ).fetchall()
         return [self._row_to_template(r) for r in rows]
 

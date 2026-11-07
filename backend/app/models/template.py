@@ -16,3 +16,6 @@ class Template:
     is_public: bool = False
     description: str = ""
     status: str = "ready"  # pending | ready | failed
+    template_type: str = "archive"      # "archive" | "pvc_clone"
+    source_pvc_name: str | None = None  # pvc_clone: PVC name in source ns
+    source_pvc_ns: str | None = None    # pvc_clone: namespace of source PVC

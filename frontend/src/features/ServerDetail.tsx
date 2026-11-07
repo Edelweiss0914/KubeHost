@@ -680,6 +680,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [snapshotting, setSnapshotting] = useState(false);
   const [snapshotName, setSnapshotName] = useState('');
   const [snapshotDesc, setSnapshotDesc] = useState('');
+  const [deployPvcClone, setDeployPvcClone] = useState(false);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [snapshotError, setSnapshotError] = useState('');
   const [snapshotDone, setSnapshotDone] = useState(false);
@@ -781,7 +782,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
               if (!name) return;
               setSnapshotBusy(true);
               setSnapshotError('');
-              api.snapshotServer(server.id, name, snapshotDesc.trim())
+              api.snapshotServer(server.id, name, snapshotDesc.trim(), deployPvcClone)
                 .then(() => { setSnapshotDone(true); })
                 .catch(err => setSnapshotError(err instanceof Error ? err.message : '저장 실패'))
                 .finally(() => setSnapshotBusy(false));
@@ -803,6 +804,14 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                   disabled={snapshotBusy}
                   rows={2}
                 />
+              </label>
+              <label style={{flexDirection:'row',alignItems:'center',gap:'8px',marginTop:'8px'}}>
+                <input
+                  type="checkbox"
+                  checked={deployPvcClone}
+                  onChange={e => setDeployPvcClone(e.target.checked)}
+                />
+                <span style={{fontSize:'13px',color:'var(--muted)'}}>PVC 직접 복사 템플릿 (관리자, 대용량 게임)</span>
               </label>
               {snapshotError && <p style={{ color: 'var(--danger, #f87171)', fontSize: '0.85em' }}>{snapshotError}</p>}
               <div className="actions">

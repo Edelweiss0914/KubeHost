@@ -1171,6 +1171,55 @@ class K8sAdapter:
             except Exception:
                 pass
 
+    def _get_pvc_node(self, namespace: str, pvc_name: str) -> str:
+        """PVC가 프로비저닝된 노드 이름 반환 (local-path nodeAffinity 기반)."""
+        try:
+            pvc = self._core.read_namespaced_persistent_volume_claim(pvc_name, namespace)
+            if not pvc.spec.volume_name:
+                return ""
+            pv = self._core.read_persistent_volume(pvc.spec.volume_name)
+            if pv.spec.node_affinity and pv.spec.node_affinity.required:
+                for term in pv.spec.node_affinity.required.node_selector_terms:
+                    for expr in term.match_expressions:
+                        if expr.key == "kubernetes.io/hostname" and expr.values:
+                            return expr.values[0]
+        except Exception:
+            pass
+        return ""
+
+    def clone_pvc(
+        self,
+        src_pvc_name: str, src_ns: str,
+        dst_server_id: str, dst_ns: str,
+        dst_sts_name: str | None = None,
+    ) -> None:
+        """소스 PVC → 대상 서버 PVC 직접 복사 (hostPath Job). 73GB+ 대용량 게임에 사용."""
+        import time as _time
+        dst_pvc = self._pvc_name(dst_server_id, dst_sts_name)
+        # 대상 PVC Bound 대기
+        for _ in range(60):
+            pvc = self._core.read_namespaced_persistent_volume_claim(dst_pvc, dst_ns)
+            if pvc.status.phase == "Bound":
+                break
+            _time.sleep(5)
+        else:
+            raise TimeoutError(f"PVC {dst_ns}/{dst_pvc} Bound 대기 타임아웃")
+        # 대상 서버 중지
+        try:
+            self.set_state(dst_server_id, dst_ns, "stopped", sts_name=dst_sts_name)
+        except Exception:
+            pass
+        _time.sleep(5)
+        # 소스 PVC 노드에서 Job 실행
+        node = self._get_pvc_node(src_ns, src_pvc_name)
+        cmd = ["sh", "-c", "cp -a /data/. /library/ 2>/dev/null; true"]
+        self._run_snapshot_job(src_ns, node, src_pvc_name, dst_ns, dst_pvc, cmd, timeout=7200)
+        # 복사 완료 후 대상 서버 재시작
+        try:
+            self.set_state(dst_server_id, dst_ns, "running", sts_name=dst_sts_name)
+        except Exception:
+            pass
+
     def snapshot_pvc_to_library(self, server_id: str, namespace: str, library_namespace: str,
                                 archive_path: str, sts_name: str | None = None,
                                 game: str = "minecraft-java") -> None:
