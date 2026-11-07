@@ -24,6 +24,7 @@ export type GameDefinition = {
   icon: string;
   color: string;
   console_placeholder: string;
+  image_url: string | null;
 };
 
 export type Template = {
@@ -176,6 +177,7 @@ export interface ServerGateway {
   cloneServer(serverId: string, name: string): Promise<{ id: string }>;
   listTemplates(): Promise<Template[]>;
   snapshotServer(serverId: string, name: string, description?: string, pvc_clone?: boolean): Promise<{ id: string }>;
+  getSnapshotProgress(serverId: string): Promise<{ active: boolean; copied_bytes?: number; total_bytes?: number }>;
   deployTemplate(templateId: string, name: string, resources?: { cpu?: number; memory_mb?: number; storage_gb?: number }): Promise<{ id: string }>;
   deleteTemplate(templateId: string): Promise<void>;
   updateTemplate(templateId: string, patch: { is_public?: boolean; description?: string }): Promise<void>;
@@ -184,6 +186,11 @@ export interface ServerGateway {
   getWorkshopItems(serverId: string, page: number): Promise<{ items: WorkshopItem[]; total: number; page: number; per_page: number; collection_id: string }>;
   setWorkshopAddons(serverId: string, addonIds: string[]): Promise<{ addon_ids: string[] }>;
   getWorkshopAddons(serverId: string): Promise<{ addon_ids: string[]; items: WorkshopItem[] }>;
+  listTenantMembers(): Promise<{ member_id: string; username: string; joined_at: string }[]>;
+  addTenantMember(username: string): Promise<{ member_id: string; username: string }>;
+  removeTenantMember(memberId: string): Promise<void>;
+  listMemberships(): Promise<{ tenant_owner_id: string; owner_username: string; joined_at: string }[]>;
+  leaveTenant(tenantOwnerId: string): Promise<void>;
 }
 
 export interface WorkshopItem {
@@ -369,6 +376,7 @@ export const api: ServerGateway = {
   cloneServer: (serverId, name) => versioned(`/servers/${encodeURIComponent(serverId)}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
   listTemplates: () => versioned('/templates'),
   snapshotServer: (serverId, name, description = '', pvc_clone = false) => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot`, { method: 'POST', body: JSON.stringify({ name, description, pvc_clone }) }),
+  getSnapshotProgress: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/snapshot/progress`),
   deployTemplate: (templateId, name, resources) => versioned(`/templates/${encodeURIComponent(templateId)}/deploy`, { method: 'POST', body: JSON.stringify({ name, ...resources }) }),
   deleteTemplate: (templateId) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' }),
   updateTemplate: (templateId, patch) => versioned(`/templates/${encodeURIComponent(templateId)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
@@ -377,4 +385,9 @@ export const api: ServerGateway = {
   getWorkshopItems: (serverId, page) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/items?page=${page}`),
   setWorkshopAddons: (serverId, addonIds) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/addons`, { method: 'POST', body: JSON.stringify({ addon_ids: addonIds }) }),
   getWorkshopAddons: (serverId) => versioned(`/servers/${encodeURIComponent(serverId)}/workshop/addons`),
+  listTenantMembers: () => versioned('/tenant/members'),
+  addTenantMember: (username) => versioned('/tenant/members', { method: 'POST', body: JSON.stringify({ username }) }),
+  removeTenantMember: (memberId) => versioned(`/tenant/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' }),
+  listMemberships: () => versioned('/tenant/memberships'),
+  leaveTenant: (tenantOwnerId) => versioned(`/tenant/memberships/${encodeURIComponent(tenantOwnerId)}`, { method: 'DELETE' }),
 };

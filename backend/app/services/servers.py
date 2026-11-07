@@ -5,6 +5,7 @@ from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from app.models.server import (
+    CS2Settings,
     DeletionResult,
     GarrysModSettings,
     Server,
@@ -57,14 +58,20 @@ class ServerService:
             pass
         return server
 
-    def get(self, owner_id: str, server_id: str) -> Server:
+    def get(self, owner_id: str, server_id: str, require_owner: bool = False) -> Server:
         server = self.repository.get(server_id)
-        if server is None or server.owner_id != owner_id:
+        if server is None:
             raise ServerNotFound("Server not found")
+        if server.owner_id != owner_id:
+            if require_owner or not self.repository.is_tenant_member(owner_id, server.owner_id):
+                raise ServerNotFound("Server not found")
         return self._sync_status(server)
 
     def list(self, owner_id: str) -> list[Server]:
-        servers = self.repository.list_by_owner(owner_id)
+        memberships = self.repository.list_user_memberships(owner_id)
+        shared_owner_ids = [m["tenant_owner_id"] for m in memberships]
+        all_owner_ids = [owner_id] + shared_owner_ids
+        servers = self.repository.list_by_owners(all_owner_ids)
         return [self._sync_status(s) for s in servers]
 
     def create(self, owner_id: str, request: ServerCreate) -> Server:
@@ -145,7 +152,7 @@ class ServerService:
         confirmation: str | None,
     ) -> DeletionResult:
         with self._lock:
-            server = self.get(owner_id, server_id)
+            server = self.get(owner_id, server_id, require_owner=True)
             if delete_data and confirmation != server.name:
                 raise InvalidOperation("Type the exact server name to confirm permanent data deletion")
             self.adapter.delete(server.id, server.resource_plan.namespace, delete_data, sts_name=server.resource_plan.sts_name)
@@ -215,6 +222,9 @@ class ServerService:
         if server.game == "garrysmod":
             return {"map_name": server.map_name or "gm_flatgrass",
                     "gamemode_name": server.gamemode_name or "sandbox"}
+        if server.game == "cs2":
+            return {"cs2_workshop_map": server.cs2_workshop_map or "",
+                    "cs2_workshop_collection": server.cs2_workshop_collection or ""}
         raise InvalidOperation("Minecraft 설정은 기존 설정 화면에서 관리합니다.")
 
     def update_game_settings(
@@ -229,6 +239,12 @@ class ServerService:
             elif server.game == "garrysmod" and isinstance(settings, GarrysModSettings):
                 values = settings.model_dump()
                 env_updates = {"MAP": settings.map_name, "GAMEMODE": settings.gamemode_name}
+            elif server.game == "cs2" and isinstance(settings, CS2Settings):
+                values = settings.model_dump()
+                env_updates = {
+                    "CS2_HOST_WORKSHOP_MAP": settings.cs2_workshop_map or "",
+                    "CS2_HOST_WORKSHOP_COLLECTION": settings.cs2_workshop_collection or "",
+                }
             else:
                 raise InvalidOperation("서버 게임과 설정 종류가 일치하지 않습니다.")
 

@@ -54,7 +54,10 @@ class CS2(GameDefinition):
         }
 
     def container_security_context(self) -> dict:
-        return {"allowPrivilegeEscalation": False}
+        return {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}
+
+    def container_command(self) -> list[str]:
+        return ["sh", "-c", "cd /home/steam/cs2-dedicated && exec /home/steam/entry.sh"]
 
     def extra_resources(self, name: str, namespace: str, labels: dict, request) -> list[dict]:
         return [{

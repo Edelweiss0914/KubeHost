@@ -6,7 +6,7 @@ from uuid import NAMESPACE_URL, uuid5
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from app.models.server import (
-    DeletionResult, GarrysModSettings, Node, Server, ServerCreate, ServerPod, ServerSettings,
+    CS2Settings, DeletionResult, GarrysModSettings, Node, Server, ServerCreate, ServerPod, ServerSettings,
     ValheimSettings,
 )
 from app.models.template import Template
@@ -184,7 +184,7 @@ def get_game_settings(server_id: str, owner: Owner, svc: Service) -> dict[str, s
 
 @router.put("/api/v1/servers/{server_id}/game-settings", status_code=204)
 def update_game_settings(
-    server_id: str, payload: ValheimSettings | GarrysModSettings, owner: Owner, svc: Service,
+    server_id: str, payload: ValheimSettings | GarrysModSettings | CS2Settings, owner: Owner, svc: Service,
 ) -> None:
     try:
         svc.update_game_settings(owner, server_id, payload)
@@ -247,8 +247,44 @@ def tenant_info(owner: Owner, svc: Service) -> dict[str, object]:
     return {"namespace": namespace, "quota": quota}
 
 
+from pydantic import BaseModel as _BaseModel, Field  # noqa: E402
+
+class _AddMemberBody(_BaseModel):
+    username: str
+
+
+@router.get("/api/v1/tenant/members")
+def list_tenant_members(owner: Owner, svc: Service) -> list[dict]:
+    return svc.repository.list_tenant_members(owner)
+
+
+@router.post("/api/v1/tenant/members", status_code=201)
+def add_tenant_member(body: _AddMemberBody, owner: Owner, svc: Service) -> dict:
+    target = svc.repository.get_user_by_username(body.username.strip())
+    if target is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if target.id == owner:
+        raise HTTPException(status_code=422, detail="자기 자신은 추가할 수 없습니다.")
+    svc.repository.add_tenant_member(owner, target.id)
+    return {"member_id": target.id, "username": target.username}
+
+
+@router.delete("/api/v1/tenant/members/{member_id}", status_code=204)
+def remove_tenant_member(member_id: str, owner: Owner, svc: Service) -> None:
+    svc.repository.remove_tenant_member(owner, member_id)
+
+
+@router.get("/api/v1/tenant/memberships")
+def list_memberships(owner: Owner, svc: Service) -> list[dict]:
+    return svc.repository.list_user_memberships(owner)
+
+
+@router.delete("/api/v1/tenant/memberships/{tenant_owner_id}", status_code=204)
+def leave_tenant(tenant_owner_id: str, owner: Owner, svc: Service) -> None:
+    svc.repository.remove_tenant_member(tenant_owner_id, owner)
+
+
 from uuid import uuid4 as _uuid4
-from pydantic import BaseModel as _BaseModel, Field
 
 
 class _WorkshopBody(_BaseModel):
@@ -1160,6 +1196,12 @@ def list_public_templates(owner: Owner, repo: TemplateRepo, request: Request) ->
     return result
 
 
+@router.get("/api/v1/servers/{server_id}/snapshot/progress")
+def snapshot_progress(server_id: str, owner: Owner, svc: Service) -> dict:
+    svc.get(owner, server_id)
+    return svc.adapter.get_snapshot_progress(server_id)
+
+
 @router.post("/api/v1/servers/{server_id}/snapshot", status_code=202)
 def snapshot_server(
     server_id: str, body: _SnapshotBody, owner: Owner, svc: Service, repo: TemplateRepo,
@@ -1190,8 +1232,6 @@ def snapshot_server(
         if not (user and user.is_admin):
             raise HTTPException(status_code=403, detail="PVC 복사 템플릿은 관리자만 생성할 수 있습니다.")
 
-    src_pvc_name = svc.adapter._pvc_name(server_id, sts_name) if body.pvc_clone else None
-
     template = Template(
         id=template_id,
         owner_id=owner,
@@ -1203,10 +1243,10 @@ def snapshot_server(
         archive_path=archive_path,
         created_at=datetime.now(timezone.utc).isoformat(),
         description=body.description,
-        status="ready" if body.pvc_clone else "pending",
+        status="pending",
         template_type="pvc_clone" if body.pvc_clone else "archive",
-        source_pvc_name=src_pvc_name,
-        source_pvc_ns=ns if body.pvc_clone else None,
+        source_pvc_name=f"tmpl-{template_id}" if body.pvc_clone else None,
+        source_pvc_ns="kubehost-templates" if body.pvc_clone else None,
     )
     repo.save(template)
 
@@ -1215,7 +1255,21 @@ def snapshot_server(
     if body.pvc_clone:
         _audit(request, actor_id, actor_name, "template.snapshot", template_id, name,
                detail=f"source_server={server_id} type=pvc_clone")
-        return {"id": template_id, "status": "ready"}
+        storage_gb = src.storage_gb
+
+        def _do_pvc_clone() -> None:
+            try:
+                svc.adapter.clone_server_to_template_pvc(
+                    server_id, ns, template_id, storage_gb, sts_name=sts_name,
+                )
+                repo.update(template_id, status="ready")
+            except Exception as _exc:
+                import traceback
+                print(f"[pvc_clone ERROR] {_exc}\n{traceback.format_exc()}", flush=True)
+                repo.update(template_id, status="failed")
+
+        background_tasks.add_task(_do_pvc_clone)
+        return {"id": template_id, "status": "pending"}
 
     # Stop server before snapshot to avoid PVC I/O conflict
     try:
@@ -1249,7 +1303,7 @@ def snapshot_server(
 @router.post("/api/v1/templates/{template_id}/deploy", status_code=201)
 def deploy_template(
     template_id: str, body: _DeployBody, owner: Owner, svc: Service, repo: TemplateRepo,
-    request: Request,
+    request: Request, background_tasks: BackgroundTasks,
 ) -> dict:
     template = repo.get(template_id)
     if template is None or (template.owner_id != owner and not template.is_public):
@@ -1272,28 +1326,27 @@ def deploy_template(
         raise HTTPException(status_code=422, detail=str(exc))
 
     lib_ns = _lib_ns(template.owner_id)
-    try:
-        if template.template_type == "pvc_clone":
-            if not template.source_pvc_name or not template.source_pvc_ns:
-                raise ValueError("소스 PVC 정보가 없습니다.")
-            svc.adapter.clone_pvc(
-                src_pvc_name=template.source_pvc_name,
-                src_ns=template.source_pvc_ns,
-                dst_server_id=new_server.id,
-                dst_ns=new_server.resource_plan.namespace,
-                dst_sts_name=new_server.resource_plan.sts_name,
-            )
-        else:
-            svc.adapter.restore_library_to_pvc(
-                new_server.id,
-                new_server.resource_plan.namespace,
-                lib_ns,
-                template.archive_path,
-                sts_name=new_server.resource_plan.sts_name,
-                game=new_server.game,
-            )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"템플릿 복원 실패: {exc}")
+    if template.template_type == "pvc_clone":
+        if not template.source_pvc_name or not template.source_pvc_ns:
+            raise HTTPException(status_code=422, detail="소스 PVC 정보가 없습니다.")
+        background_tasks.add_task(
+            svc.adapter.clone_pvc,
+            src_pvc_name=template.source_pvc_name,
+            src_ns=template.source_pvc_ns,
+            dst_server_id=new_server.id,
+            dst_ns=new_server.resource_plan.namespace,
+            dst_sts_name=new_server.resource_plan.sts_name,
+        )
+    else:
+        background_tasks.add_task(
+            svc.adapter.restore_library_to_pvc,
+            new_server.id,
+            new_server.resource_plan.namespace,
+            lib_ns,
+            template.archive_path,
+            sts_name=new_server.resource_plan.sts_name,
+            game=new_server.game,
+        )
 
     actor_id, actor_name = _actor(request)
     _audit(request, actor_id, actor_name, "template.deploy", new_server.id, new_server.name,
@@ -1309,7 +1362,12 @@ def delete_template(
     if template is None or template.owner_id != owner:
         raise HTTPException(status_code=404, detail="템플릿을 찾을 수 없습니다.")
 
-    if template.template_type != "pvc_clone":
+    if template.template_type == "pvc_clone":
+        try:
+            svc.adapter.delete_template_pvc(template_id)
+        except Exception:
+            pass
+    else:
         lib_ns = _lib_ns(owner)
         try:
             svc.adapter.library_delete_path(lib_ns, template.archive_path)

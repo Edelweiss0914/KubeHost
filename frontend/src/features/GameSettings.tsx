@@ -182,6 +182,45 @@ export function GameSettingsPanel({ server, onClose, onSaved }: Props) {
     {settings && <div className="actions"><button onClick={() => void save()} disabled={saving}>
       {saving ? '저장 중…' : '설정 저장'}
     </button></div>}
+    {!loading && server.game === 'cs2' && settings && 'cs2_workshop_map' in settings && <section className="panel" style={{marginTop: '1.5rem'}}>
+      <div className="section-title">
+        <div><h3>CS2 창작마당 (Workshop)</h3></div>
+      </div>
+      <div className="notice" style={{marginBottom: '12px'}}>
+        <strong>적용 순서</strong><br/>
+        <ol style={{margin: '6px 0 0 16px', lineHeight: 1.8}}>
+          <li>맵 ID 또는 컬렉션 ID 입력 → 저장 → 서버 재시작</li>
+          <li>재시작 후 맵 다운로드 완료 대기 (파드 로그 확인)</li>
+          <li>RCON: <code>map workshop/&lt;ID&gt;/&lt;맵이름&gt;</code> 으로 전환</li>
+        </ol>
+        맵 ID와 컬렉션 ID를 동시에 설정하면 맵 ID가 우선 적용됩니다.
+      </div>
+      <div className="form-grid">
+        <label>Workshop 맵 ID <small>(단일 맵)</small>
+          <input
+            value={settings.cs2_workshop_map}
+            maxLength={32}
+            placeholder="예: 3070253400"
+            onChange={e => setSettings({...settings, cs2_workshop_map: e.target.value.replace(/\D/g, '')})}
+          />
+          <small>Steam Workshop 맵 URL의 숫자 ID. 비우면 Workshop 맵 연동이 해제됩니다.</small>
+        </label>
+        <label style={{marginTop: '12px'}}>Workshop 컬렉션 ID <small>(여러 맵)</small>
+          <input
+            value={settings.cs2_workshop_collection}
+            maxLength={32}
+            placeholder="예: 2982223457"
+            onChange={e => setSettings({...settings, cs2_workshop_collection: e.target.value.replace(/\D/g, '')})}
+          />
+          <small>컬렉션의 모든 맵을 서버에 다운로드합니다.</small>
+        </label>
+      </div>
+      {error && <p role="alert" className="error">{error}</p>}
+      {saved && <p role="status" className="notice">Workshop 설정을 저장했습니다. 서버를 재시작하면 적용됩니다.</p>}
+      <div className="actions"><button onClick={() => void save()} disabled={saving}>
+        {saving ? '저장 중…' : '저장'}
+      </button></div>
+    </section>}
     {!loading && server.game === 'garrysmod' && <section className="panel" style={{marginTop: '1.5rem'}}>
       <div className="section-title">
         <div><h3>Workshop 컬렉션</h3></div>

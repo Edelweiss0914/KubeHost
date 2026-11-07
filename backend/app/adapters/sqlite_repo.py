@@ -139,6 +139,18 @@ class SQLiteServerRepository:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates(owner_id)"
             )
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS tenant_members (
+                    id TEXT PRIMARY KEY,
+                    tenant_owner_id TEXT NOT NULL,
+                    member_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE (tenant_owner_id, member_id)
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tm_member ON tenant_members(member_id)"
+            )
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -219,6 +231,14 @@ class SQLiteServerRepository:
             row = conn.execute(
                 f"SELECT {self._USER_COLS} FROM users WHERE id = ?",
                 (user_id,),
+            ).fetchone()
+        return self._row_to_user(row) if row else None
+
+    def get_user_by_username(self, username: str) -> User | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                f"SELECT {self._USER_COLS} FROM users WHERE username = ?",
+                (username,),
             ).fetchone()
         return self._row_to_user(row) if row else None
 
@@ -338,6 +358,63 @@ class SQLiteServerRepository:
                 "INSERT OR REPLACE INTO user_quotas (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers) VALUES (?, ?, ?, ?, ?)",
                 (user_id, max_cpu, max_memory_mb, max_storage_gb, max_servers),
             )
+
+    # ── Tenant member methods ─────────────────────────────────────────────────
+
+    def add_tenant_member(self, tenant_owner_id: str, member_id: str) -> None:
+        from uuid import uuid4
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO tenant_members (id, tenant_owner_id, member_id, created_at) VALUES (?, ?, ?, ?)",
+                (str(uuid4()), tenant_owner_id, member_id, datetime.now(timezone.utc).isoformat()),
+            )
+
+    def remove_tenant_member(self, tenant_owner_id: str, member_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM tenant_members WHERE tenant_owner_id = ? AND member_id = ?",
+                (tenant_owner_id, member_id),
+            )
+
+    def list_tenant_members(self, tenant_owner_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT tm.member_id, u.username, tm.created_at
+                   FROM tenant_members tm JOIN users u ON tm.member_id = u.id
+                   WHERE tm.tenant_owner_id = ?""",
+                (tenant_owner_id,),
+            ).fetchall()
+        return [{"member_id": r[0], "username": r[1], "joined_at": r[2]} for r in rows]
+
+    def list_user_memberships(self, user_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT tm.tenant_owner_id, u.username, tm.created_at
+                   FROM tenant_members tm JOIN users u ON tm.tenant_owner_id = u.id
+                   WHERE tm.member_id = ?""",
+                (user_id,),
+            ).fetchall()
+        return [{"tenant_owner_id": r[0], "owner_username": r[1], "joined_at": r[2]} for r in rows]
+
+    def is_tenant_member(self, user_id: str, tenant_owner_id: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM tenant_members WHERE tenant_owner_id = ? AND member_id = ?",
+                (tenant_owner_id, user_id),
+            ).fetchone()
+        return row is not None
+
+    def list_by_owners(self, owner_ids: list[str]) -> list[Server]:
+        if not owner_ids:
+            return []
+        placeholders = ",".join("?" * len(owner_ids))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT data FROM servers WHERE owner_id IN ({placeholders}) AND retained = 0",
+                owner_ids,
+            ).fetchall()
+        return [Server.model_validate_json(row[0]) for row in rows]
 
     # ── Schedule methods ──────────────────────────────────────────────────────────
 

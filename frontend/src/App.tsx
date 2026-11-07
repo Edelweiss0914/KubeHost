@@ -15,10 +15,11 @@ import { Landing } from './features/Landing';
 import { AdminPage } from './features/AdminPage';
 import { LibraryManager } from './features/LibraryManager';
 import { Templates } from './features/Templates';
+import { TenantMembers } from './features/TenantMembers';
 import { useToast, ToastContainer } from './components/Toast';
 import { Tooltip } from './components/Tooltip';
 import { HelpModal } from './features/HelpModal';
-import { LayoutDashboard, Server as ServerIcon, Map as MapIcon, Package, ClipboardList, Shield, Sun, Moon, Timer, HardDrive, LayoutGrid, Circle, Clock, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Server as ServerIcon, Map as MapIcon, Package, ClipboardList, Shield, Sun, Moon, Timer, HardDrive, LayoutGrid, Circle, Clock, HelpCircle, Users } from 'lucide-react';
 
 function getStoredAuth(): { token: string; username: string } | null {
   try {
@@ -28,7 +29,7 @@ function getStoredAuth(): { token: string; username: string } | null {
   } catch { return null; }
 }
 
-type View = 'dashboard' | 'servers' | 'create' | 'detail' | 'cluster' | 'admin' | 'library' | 'templates';
+type View = 'dashboard' | 'servers' | 'create' | 'detail' | 'cluster' | 'admin' | 'library' | 'templates' | 'team';
 
 type QuotaEntry = { used: string; hard: string };
 type TenantInfo = { namespace: string; quota: Record<string, QuotaEntry> };
@@ -496,7 +497,7 @@ export function App() {
   }
 
   const titles: Record<View, string> = {
-    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '서버 현황 맵', admin: '관리자', library: '내 라이브러리', templates: '서버 템플릿',
+    dashboard: '운영 대시보드', servers: '게임 서버', create: '서버 생성', detail: '서버 상세', cluster: '서버 현황 맵', admin: '관리자', library: '내 라이브러리', templates: '서버 템플릿', team: '팀 관리',
   };
 
   return <div className="shell">
@@ -521,6 +522,9 @@ export function App() {
         </button>
         <button className={view === 'templates' ? 'active' : ''} aria-current={view === 'templates' ? 'page' : undefined} onClick={() => navigate('templates')}>
           <ClipboardList size={16}/> <span>템플릿</span>
+        </button>
+        <button className={view === 'team' ? 'active' : ''} aria-current={view === 'team' ? 'page' : undefined} onClick={() => navigate('team')}>
+          <Users size={16}/> <span>팀 관리</span>
         </button>
         {isAdmin && <button className={view === 'admin' ? 'active' : ''} aria-current={view === 'admin' ? 'page' : undefined} onClick={() => navigate('admin')}>
           <Shield size={16}/> <span>관리자</span>
@@ -559,7 +563,7 @@ export function App() {
     <div className="workspace">
       <main id="main" tabIndex={-1}>
         <div className="page-heading">
-          <div><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : view === 'templates' ? '서버 설정과 파일을 템플릿으로 저장하고 새 서버를 빠르게 배포하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
+          <div><h1>{titles[view]}</h1><p>{view === 'dashboard' ? '서버와 인프라의 현재 상태를 확인하세요.' : view === 'servers' ? '서버 목록을 확인하고 필요한 작업을 관리하세요.' : view === 'create' ? '호스트 서버와 리소스를 선택하세요.' : view === 'cluster' ? '호스트 서버와 게임 서버의 배치 현황을 확인하세요.' : view === 'admin' ? '사용자, 초대 코드, 테넌트 현황을 관리하세요.' : view === 'library' ? '자주 쓰는 파일을 보관하고 필요할 때 꺼내 쓰세요.' : view === 'templates' ? '서버 설정과 파일을 템플릿으로 저장하고 새 서버를 빠르게 배포하세요.' : view === 'team' ? '팀 멤버를 초대하고 서버를 함께 관리하세요.' : '상태, 설정, 콘솔과 데이터를 관리하세요.'}</p></div>
           <button className="secondary" onClick={() => void refreshView()} disabled={loading || busy}>↻ 새로고침</button>
         </div>
         {notice && <p role="status" className="notice">{notice}</p>}
@@ -574,6 +578,7 @@ export function App() {
             {view === 'admin' && (meLoaded ? (isAdmin ? <AdminPage currentUserId={currentUserId}/> : <div className="panel muted">관리자 권한이 없습니다.</div>) : <div className="panel loading" role="status">사용자 정보를 확인하는 중…</div>)}
             {view === 'library' && <LibraryManager />}
             {view === 'templates' && <Templates onDeployed={id => void open(id)} />}
+            {view === 'team' && <TenantMembers />}
             {view === 'detail' && selected && <ServerDetail
               key={selected.id}
               server={selected}

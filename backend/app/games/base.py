@@ -83,6 +83,9 @@ class GameDefinition:
     def container_security_context(self) -> dict:
         return {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}
 
+    def container_command(self) -> list[str] | None:
+        return None
+
     def service_ports(self) -> list[dict]:
         return [{"name": "game", "port": self.game_port,
                  "targetPort": self.game_port, "protocol": self.game_protocol}]
@@ -141,6 +144,7 @@ class GameDefinition:
             "securityContext": self.pod_security_context(),
             "containers": [{
                 "name": self.container_name, "image": self.image,
+                **( {"command": self.container_command()} if self.container_command() is not None else {} ),
                 "env": self.container_env(request, server_id),
                 "ports": self.container_ports(),
                 "resources": {"requests": {"cpu": cpu, "memory": memory},
@@ -190,4 +194,8 @@ class GameDefinition:
             "icon": self.icon,
             "color": self.color,
             "console_placeholder": self.console_placeholder,
+            "image_url": (
+                f"https://cdn.cloudflare.steamstatic.com/steam/apps/{self.steam_app_id}/capsule_sm_120.jpg"
+                if self.steam_app_id else None
+            ),
         }

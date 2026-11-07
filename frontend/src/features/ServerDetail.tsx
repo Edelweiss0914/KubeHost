@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { BookMarked, Terminal, ScrollText, Users2, FolderOpen, Wrench, Info, BarChart2, Clock, Settings, Play, Square, Copy, Trash2 } from 'lucide-react';
 import { CopyBtn } from '../components/CopyBtn';
 import type { Server } from '../domain/server';
 import { GAME_ICONS } from '../domain/server';
@@ -684,6 +685,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [snapshotError, setSnapshotError] = useState('');
   const [snapshotDone, setSnapshotDone] = useState(false);
+  const [snapshotProgress, setSnapshotProgress] = useState<{ active: boolean; copied_bytes?: number; total_bytes?: number } | null>(null);
   const [gameCaps, setGameCaps] = useState<Set<string>>(new Set());
   const [gameDef, setGameDef] = useState<GameDefinition | null>(null);
   const canStart = server.status === 'stopped' || server.status === 'error';
@@ -703,16 +705,29 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
       .catch(() => {});
   }, [server.id, server.game]);
 
-  const NAV_ITEMS: [ServerSubView, string, string][] = [
-    ['console', '⌨', 'RCON 콘솔'],
-    ['logs', '▤', '파드 로그'],
-    ...(gameCaps.has('players') ? [['players', '◉', '플레이어'] as [ServerSubView, string, string]] : []),
-    ...(gameCaps.has('file_manager') ? [['files', '◫', '파일'] as [ServerSubView, string, string]] : []),
-    ...(gameCaps.has('manage') ? [['manage', '⚒', '관리'] as [ServerSubView, string, string]] : []),
-    ['overview', '⬡', '서버 정보'],
-    ['metrics', '▦', '메트릭'],
-    ['schedule', '◷', '스케줄'],
-    ['settings', '⚙', '설정'],
+  useEffect(() => {
+    if (!snapshotDone) return;
+    let cancelled = false;
+    const poll = () => {
+      api.getSnapshotProgress(server.id)
+        .then(p => { if (!cancelled) setSnapshotProgress(p); })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [snapshotDone, server.id]);
+
+  const NAV_ITEMS: [ServerSubView, ReactNode, string][] = [
+    ['console', <Terminal size={14}/>, 'RCON 콘솔'],
+    ['logs', <ScrollText size={14}/>, '파드 로그'],
+    ...(gameCaps.has('players') ? [['players', <Users2 size={14}/>, '플레이어'] as [ServerSubView, ReactNode, string]] : []),
+    ...(gameCaps.has('file_manager') ? [['files', <FolderOpen size={14}/>, '파일'] as [ServerSubView, ReactNode, string]] : []),
+    ...(gameCaps.has('manage') ? [['manage', <Wrench size={14}/>, '관리'] as [ServerSubView, ReactNode, string]] : []),
+    ['overview', <Info size={14}/>, '서버 정보'],
+    ['metrics', <BarChart2 size={14}/>, '메트릭'],
+    ['schedule', <Clock size={14}/>, '스케줄'],
+    ['settings', <Settings size={14}/>, '설정'],
   ];
 
   return (
@@ -722,15 +737,18 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
         <div className="server-sidebar-header">
           <button className="text-button server-sidebar-back" onClick={onBack}>← 목록</button>
           <div className="server-sidebar-identity">
-            <span className="server-sidebar-icon" aria-hidden="true">{gameDef?.icon ?? GAME_ICONS[server.game] ?? '⬡'}</span>
+            {gameDef?.image_url
+              ? <img className="server-sidebar-icon" src={gameDef.image_url} alt={gameDef.name} style={{width:36,height:36,objectFit:'cover',borderRadius:4}}/>
+              : <span className="server-sidebar-icon" aria-hidden="true">{gameDef?.icon ?? GAME_ICONS[server.game] ?? '⬡'}</span>
+            }
             <div>
               <strong className="server-sidebar-name">{server.name}</strong>
               <div style={{marginTop:'5px'}}><Status value={server.status}/></div>
             </div>
           </div>
           <div className="server-sidebar-controls">
-            <button disabled={busy || !canStart} onClick={() => onAction('start')}>▶ 시작</button>
-            <button className="secondary" disabled={busy || !canStop} onClick={() => onAction('stop')}>■ 중지</button>
+            <button disabled={busy || !canStart} onClick={() => onAction('start')}><Play size={12}/> 시작</button>
+            <button className="secondary" disabled={busy || !canStop} onClick={() => onAction('stop')}><Square size={12}/> 중지</button>
           </div>
         </div>
         <nav className="server-sidebar-nav" aria-label="서버 메뉴">
@@ -750,27 +768,46 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
             disabled={busy || cloneBusy}
             onClick={() => { setCloning(d => !d); setCloneError(''); setCloneName(server.name + '-copy'); }}
           >
-            <span aria-hidden="true">⎘</span> 복제
+            <Copy size={14}/> 복제
           </button>
           <button
             className="secondary"
             disabled={busy || snapshotBusy}
             onClick={() => { setSnapshotting(d => !d); setSnapshotError(''); setSnapshotName(server.name); setSnapshotDone(false); }}
           >
-            <span aria-hidden="true">📋</span> 템플릿으로 저장
+            <BookMarked size={14}/> 템플릿으로 저장
           </button>
           <button
             className="server-sidebar-danger"
             disabled={busy}
             onClick={() => setDeleting(d => !d)}
           >
-            <span aria-hidden="true">✕</span>서버 삭제
+            <Trash2 size={14}/> 서버 삭제
           </button>
         </nav>
         {snapshotting && (
           snapshotDone ? (
             <div className="server-delete-form">
               <p role="status" className="notice" style={{ marginBottom: '8px' }}>스냅샷 작업이 시작됐습니다. 서버가 중지된 후 백그라운드에서 처리됩니다. 완료되면 템플릿 탭에서 확인하세요.</p>
+              {snapshotProgress && snapshotProgress.active && snapshotProgress.total_bytes != null && snapshotProgress.copied_bytes != null && (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' }}>
+                    복사 중… {(snapshotProgress.copied_bytes / 1073741824).toFixed(1)} GB / {(snapshotProgress.total_bytes / 1073741824).toFixed(1)} GB
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(100, (snapshotProgress.copied_bytes / snapshotProgress.total_bytes) * 100).toFixed(1)}%`,
+                      background: 'var(--accent)',
+                      borderRadius: '3px',
+                      transition: 'width 0.5s ease',
+                    }}/>
+                  </div>
+                </div>
+              )}
+              {snapshotProgress && !snapshotProgress.active && (
+                <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>복사 완료.</p>
+              )}
               <div className="actions">
                 <button type="button" className="secondary" onClick={() => setSnapshotting(false)}>닫기</button>
               </div>
@@ -940,7 +977,7 @@ export function ServerDetail({ server, busy, onAction, onDelete, onBack, onUpdat
                 onVersionSaved={() => {}}
                 onClose={() => setSubView('console')}
               />
-            : (server.game === 'valheim' || server.game === 'garrysmod')
+            : (server.game === 'valheim' || server.game === 'garrysmod' || server.game === 'cs2')
               ? <GameSettingsPanel server={server} onClose={() => setSubView('logs')} onSaved={onUpdated}/>
               : <section className="panel"><p className="muted">이 게임은 별도 설정 항목이 없습니다.</p></section>
         )}

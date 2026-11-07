@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
 import type { Template } from '../api/client';
 
@@ -39,6 +39,39 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
   const [editDescBusy, setEditDescBusy] = useState(false);
 
   const [notice, setNotice] = useState('');
+  const [deployProgress, setDeployProgress] = useState<{ active: boolean; copied_bytes?: number; total_bytes?: number } | null>(null);
+  const deployProgressServerId = useRef<string | null>(null);
+
+  // Restore in-progress deploy tracking after page reload
+  useEffect(() => {
+    const stored = localStorage.getItem('kubehost.deployProgress');
+    if (!stored) return;
+    try {
+      const { serverId } = JSON.parse(stored) as { serverId: string };
+      deployProgressServerId.current = serverId;
+      api.getSnapshotProgress(serverId)
+        .then(p => { setDeployProgress(p); if (!p.active) localStorage.removeItem('kubehost.deployProgress'); })
+        .catch(() => { localStorage.removeItem('kubehost.deployProgress'); });
+    } catch { localStorage.removeItem('kubehost.deployProgress'); }
+  }, []);
+
+  useEffect(() => {
+    if (!deployProgress?.active) return;
+    const sid = deployProgressServerId.current;
+    if (!sid) return;
+    let cancelled = false;
+    const id = setInterval(() => {
+      api.getSnapshotProgress(sid)
+        .then(p => {
+          if (!cancelled) {
+            setDeployProgress(p);
+            if (!p.active) localStorage.removeItem('kubehost.deployProgress');
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [deployProgress?.active]);
 
   const loadMy = useCallback(() => {
     setLoadingMy(true);
@@ -91,11 +124,18 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
     setDeployBusy(true);
     setDeployError('');
     try {
+      const tpl = [...templates, ...publicTemplates].find(t => t.id === templateId);
       const result = await api.deployTemplate(templateId, name, { cpu: deployCpu, memory_mb: deployMemory, storage_gb: deployStorage });
       setDeploying(null);
       setDeployName('');
       setNotice('서버를 생성했습니다.');
-      if (onDeployed) onDeployed(result.id);
+      if (tpl && tpl.template_type === 'pvc_clone') {
+        deployProgressServerId.current = result.id;
+        localStorage.setItem('kubehost.deployProgress', JSON.stringify({ serverId: result.id }));
+        setDeployProgress({ active: true });
+      } else {
+        if (onDeployed) onDeployed(result.id);
+      }
     } catch (err) {
       setDeployError(err instanceof Error ? err.message : '배포 실패');
     } finally {
@@ -192,6 +232,38 @@ export function Templates({ onDeployed }: { onDeployed?: (serverId: string) => v
   return (
     <div>
       {notice && <p role="status" className="notice">{notice}</p>}
+      {deployProgress && (
+        <div className="panel" style={{ marginBottom: '12px', padding: '12px 16px' }}>
+          {deployProgress.active && deployProgress.total_bytes != null && deployProgress.copied_bytes != null ? (
+            <>
+              <div style={{ fontSize: '13px', marginBottom: '6px' }}>
+                PVC 복사 중… {(deployProgress.copied_bytes / 1073741824).toFixed(1)} GB / {(deployProgress.total_bytes / 1073741824).toFixed(1)} GB
+              </div>
+              <div style={{ height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(100, (deployProgress.copied_bytes / deployProgress.total_bytes) * 100).toFixed(1)}%`,
+                  background: 'var(--accent)',
+                  borderRadius: '3px',
+                  transition: 'width 0.5s ease',
+                }}/>
+              </div>
+            </>
+          ) : deployProgress.active ? (
+            <div style={{ fontSize: '13px', color: 'var(--muted)' }}>PVC 복사 준비 중…</div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px' }}>PVC 복사 완료.</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {onDeployed && deployProgressServerId.current && (
+                  <button style={{ fontSize: '12px' }} onClick={() => { onDeployed(deployProgressServerId.current!); }}>서버 보기</button>
+                )}
+                <button className="secondary" style={{ fontSize: '12px' }} onClick={() => setDeployProgress(null)}>닫기</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <button

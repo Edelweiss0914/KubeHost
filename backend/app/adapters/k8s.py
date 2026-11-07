@@ -13,6 +13,7 @@ from app.services.file_paths import file_path, library_path
 from app.services.gmod_storage import GMOD_ROOT, GMOD_IMAGE, gmod_file_init_container, gmod_volume_mounts
 
 _SHARED_KINDS = {"Namespace", "ResourceQuota", "LimitRange", "NetworkPolicy"}
+_TEMPLATE_NS = "kubehost-templates"
 
 
 def _parse_memory_mb(quantity: str) -> int:
@@ -1081,29 +1082,36 @@ class K8sAdapter:
     def _get_pvc_host_path(self, namespace: str, pvc_name: str) -> str:
         pvc = self._core.read_namespaced_persistent_volume_claim(pvc_name, namespace)
         pv = self._core.read_persistent_volume(pvc.spec.volume_name)
-        if pv.spec.host_path is None:
-            raise ValueError(f"PVC {namespace}/{pvc_name} 는 hostPath 스토리지가 아닙니다.")
-        return pv.spec.host_path.path
+        if pv.spec.host_path is not None:
+            return pv.spec.host_path.path
+        if pv.spec.local is not None:
+            return pv.spec.local.path
+        raise ValueError(f"PVC {namespace}/{pvc_name} 는 hostPath/LocalVolume 스토리지가 아닙니다.")
 
     def _run_snapshot_job(
         self, namespace: str, node_name: str,
         src_pvc: str, lib_pvc_ns: str, lib_pvc: str,
         command: list[str],
         timeout: int = 1800,
+        extra_labels: dict | None = None,
     ) -> None:
         import time
         from uuid import uuid4
 
         job_name = f"kubehost-snap-{uuid4().hex[:8]}"
 
-        # If lib PVC is in a different namespace, use hostPath to bypass namespace restriction
+        # If lib PVC is in a different namespace, use hostPath to bypass namespace restriction.
+        # hostPath volumes are blocked by PodSecurity baseline on tenant namespaces,
+        # so run cross-namespace Jobs in kubehost-system (privileged/unrestricted).
         same_ns = lib_pvc_ns == namespace
         if same_ns:
+            job_ns = namespace
             volumes = [
                 {"name": "src", "persistentVolumeClaim": {"claimName": src_pvc}},
                 {"name": "lib", "persistentVolumeClaim": {"claimName": lib_pvc}},
             ]
         else:
+            job_ns = "kubehost-system"
             src_path = self._get_pvc_host_path(namespace, src_pvc)
             lib_path = self._get_pvc_host_path(lib_pvc_ns, lib_pvc)
             volumes = [
@@ -1115,14 +1123,14 @@ class K8sAdapter:
             "apiVersion": "batch/v1",
             "kind": "Job",
             "metadata": {
-                "name": job_name, "namespace": namespace,
-                "labels": {"app.kubernetes.io/managed-by": "kubehost", "kubehost.io/role": "snapshot"},
+                "name": job_name, "namespace": job_ns,
+                "labels": {"app.kubernetes.io/managed-by": "kubehost", "kubehost.io/role": "snapshot", **(extra_labels or {})},
             },
             "spec": {
                 "ttlSecondsAfterFinished": 120,
                 "backoffLimit": 0,
                 "template": {
-                    "metadata": {"labels": {"kubehost.io/role": "snapshot"}},
+                    "metadata": {"labels": {"kubehost.io/role": "snapshot", **(extra_labels or {})}},
                     "spec": {
                         "restartPolicy": "Never",
                         "activeDeadlineSeconds": timeout,
@@ -1153,10 +1161,10 @@ class K8sAdapter:
 
         batch = client.BatchV1Api(self._api_client)
         try:
-            batch.create_namespaced_job(namespace, job_body)
+            batch.create_namespaced_job(job_ns, job_body)
             for _ in range(timeout // 5):
                 time.sleep(5)
-                job = batch.read_namespaced_job(job_name, namespace)
+                job = batch.read_namespaced_job(job_name, job_ns)
                 if job.status and job.status.succeeded:
                     return
                 if job.status and job.status.failed:
@@ -1165,11 +1173,38 @@ class K8sAdapter:
         finally:
             try:
                 batch.delete_namespaced_job(
-                    job_name, namespace,
+                    job_name, job_ns,
                     body=client.V1DeleteOptions(propagation_policy="Foreground"),
                 )
             except Exception:
                 pass
+
+    def get_snapshot_progress(self, server_id: str) -> dict:
+        """진행 중인 스냅샷 Job의 복사 진행도 반환 (copied_bytes, total_bytes)."""
+        from kubernetes import stream as k8s_stream
+        try:
+            pods = self._core.list_namespaced_pod(
+                "kubehost-system",
+                label_selector=f"kubehost.io/server-id={server_id},kubehost.io/role=snapshot",
+            )
+            if not pods.items:
+                return {"active": False}
+            pod = pods.items[0]
+            if pod.status.phase not in ("Running",):
+                return {"active": False}
+            resp = k8s_stream.stream(
+                self._core.connect_get_namespaced_pod_exec,
+                pod.metadata.name, "kubehost-system",
+                command=["sh", "-c", "du -sb /library 2>/dev/null; du -sb /data 2>/dev/null"],
+                stderr=False, stdin=False, stdout=True, tty=False,
+                _preload_content=True,
+            )
+            lines = [ln.strip() for ln in resp.strip().splitlines() if ln.strip()]
+            copied = int(lines[0].split()[0]) if lines else 0
+            total = int(lines[1].split()[0]) if len(lines) > 1 else 0
+            return {"active": True, "copied_bytes": copied, "total_bytes": total}
+        except Exception:
+            return {"active": False}
 
     def _get_pvc_node(self, namespace: str, pvc_name: str) -> str:
         """PVC가 프로비저닝된 노드 이름 반환 (local-path nodeAffinity 기반)."""
@@ -1212,11 +1247,129 @@ class K8sAdapter:
         _time.sleep(5)
         # 소스 PVC 노드에서 Job 실행
         node = self._get_pvc_node(src_ns, src_pvc_name)
-        cmd = ["sh", "-c", "cp -a /data/. /library/ 2>/dev/null; true"]
-        self._run_snapshot_job(src_ns, node, src_pvc_name, dst_ns, dst_pvc, cmd, timeout=7200)
+        cmd = ["sh", "-c", "cp -a /data/. /library/ 2>/dev/null; ln -sf game/cs2.sh /library/cs2.sh 2>/dev/null; true"]
+        self._run_snapshot_job(src_ns, node, src_pvc_name, dst_ns, dst_pvc, cmd, timeout=7200,
+                               extra_labels={"kubehost.io/server-id": dst_server_id})
         # 복사 완료 후 대상 서버 재시작
         try:
             self.set_state(dst_server_id, dst_ns, "running", sts_name=dst_sts_name)
+        except Exception:
+            pass
+
+    def ensure_template_namespace(self) -> None:
+        """kubehost-templates 네임스페이스 생성 (없으면). ResourceQuota 없음."""
+        try:
+            self._core.read_namespace(_TEMPLATE_NS)
+        except Exception:
+            self._core.create_namespace(client.V1Namespace(
+                metadata=client.V1ObjectMeta(
+                    name=_TEMPLATE_NS,
+                    labels={"app.kubernetes.io/managed-by": "kubehost"},
+                )
+            ))
+
+    def clone_server_to_template_pvc(
+        self, server_id: str, server_ns: str, template_id: str, storage_gb: int,
+        sts_name: str | None = None, timeout: int = 7200,
+    ) -> None:
+        """서버 PVC → kubehost-templates/tmpl-{template_id} PVC 복사."""
+        import time as _time
+        from uuid import uuid4
+
+        self.ensure_template_namespace()
+        src_pvc = self._pvc_name(server_id, sts_name)
+        dst_pvc = f"tmpl-{template_id}"
+
+        # 소스 노드 확인 (local-path hostPath 위치 결정 및 더미 Job 스케줄링)
+        node = self._get_pvc_node(server_ns, src_pvc)
+
+        # 대상 PVC 생성
+        self._core.create_namespaced_persistent_volume_claim(
+            _TEMPLATE_NS,
+            client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(name=dst_pvc, namespace=_TEMPLATE_NS),
+                spec=client.V1PersistentVolumeClaimSpec(
+                    access_modes=["ReadWriteOnce"],
+                    resources=client.V1ResourceRequirements(
+                        requests={"storage": f"{storage_gb}Gi"}
+                    ),
+                    storage_class_name="local-path",
+                ),
+            ),
+        )
+
+        # local-path WaitForFirstConsumer: 같은 노드에 더미 Job으로 PVC Bound 유도
+        bind_job_name = f"kubehost-bind-{uuid4().hex[:8]}"
+        bind_job_body = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": bind_job_name, "namespace": _TEMPLATE_NS,
+                "labels": {"app.kubernetes.io/managed-by": "kubehost", "kubehost.io/role": "bind"},
+            },
+            "spec": {
+                "ttlSecondsAfterFinished": 60,
+                "backoffLimit": 0,
+                "template": {
+                    "metadata": {"labels": {"kubehost.io/role": "bind"}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "automountServiceAccountToken": False,
+                        **({"nodeSelector": {"kubernetes.io/hostname": node}} if node else {}),
+                        "securityContext": {
+                            "runAsNonRoot": True, "runAsUser": 1000, "runAsGroup": 1000,
+                            "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"},
+                        },
+                        "containers": [{
+                            "name": "bind",
+                            "image": "busybox:latest",
+                            "command": ["sh", "-c", "true"],
+                            "securityContext": {
+                                "allowPrivilegeEscalation": False,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                            "volumeMounts": [{"name": "data", "mountPath": "/data"}],
+                        }],
+                        "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": dst_pvc}}],
+                    },
+                },
+            },
+        }
+        batch = client.BatchV1Api(self._api_client)
+        batch.create_namespaced_job(_TEMPLATE_NS, bind_job_body)
+
+        # PVC Bound 대기
+        for _ in range(120):
+            pvc_status = self._core.read_namespaced_persistent_volume_claim(dst_pvc, _TEMPLATE_NS)
+            if pvc_status.status.phase == "Bound":
+                break
+            _time.sleep(5)
+        else:
+            raise TimeoutError(f"템플릿 PVC {_TEMPLATE_NS}/{dst_pvc} Bound 대기 타임아웃")
+
+        # 서버 중지
+        try:
+            self.set_state(server_id, server_ns, "stopped", sts_name=sts_name)
+        except Exception:
+            pass
+        _time.sleep(5)
+
+        # 복사 Job 실행 (cross-namespace → hostPath 사용)
+        cmd = ["sh", "-c", "cp -a /data/. /library/ 2>/dev/null; ln -sf game/cs2.sh /library/cs2.sh 2>/dev/null; true"]
+        self._run_snapshot_job(server_ns, node, src_pvc, _TEMPLATE_NS, dst_pvc, cmd, timeout=timeout,
+                               extra_labels={"kubehost.io/server-id": server_id})
+
+        # 서버 재시작
+        try:
+            self.set_state(server_id, server_ns, "running", sts_name=sts_name)
+        except Exception:
+            pass
+
+    def delete_template_pvc(self, template_id: str) -> None:
+        """kubehost-templates/tmpl-{template_id} PVC 삭제."""
+        pvc_name = f"tmpl-{template_id}"
+        try:
+            self._core.delete_namespaced_persistent_volume_claim(pvc_name, _TEMPLATE_NS)
         except Exception:
             pass
 

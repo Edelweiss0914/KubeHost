@@ -108,6 +108,12 @@ class GarrysModSettings(BaseModel):
     gamemode_name: str = Field(min_length=1, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
+class CS2Settings(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    cs2_workshop_map: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
+    cs2_workshop_collection: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
+
+
 class DeletionResult(BaseModel):
     id: str
     deleted: bool = True
