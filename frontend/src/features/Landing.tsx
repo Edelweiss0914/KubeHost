@@ -129,7 +129,7 @@ export function Landing({ onEnter }: LandingProps) {
         <div className="landing-hero-content">
           <h1 id="hero-headline" className="landing-hero-h1 landing-hero-enter-1">
             게임 서버를 K8s로,<br />
-            <span className="landing-accent-text">단 몇 초 만에.</span>
+            단 몇 초 만에.
           </h1>
           <p className="landing-hero-sub landing-hero-enter-3">
             Kubernetes 위에서 동작하는 게임 서버 호스팅 플랫폼.<br />
