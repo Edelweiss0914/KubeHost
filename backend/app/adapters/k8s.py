@@ -1247,7 +1247,7 @@ class K8sAdapter:
         _time.sleep(5)
         # 소스 PVC 노드에서 Job 실행
         node = self._get_pvc_node(src_ns, src_pvc_name)
-        cmd = ["sh", "-c", "cp -a /data/. /library/ 2>/dev/null; ln -sf game/cs2.sh /library/cs2.sh 2>/dev/null; true"]
+        cmd = ["sh", "-c", "cp -a /data/. /library/; ln -sf game/cs2.sh /library/cs2.sh; ls -la /library/cs2.sh"]
         self._run_snapshot_job(src_ns, node, src_pvc_name, dst_ns, dst_pvc, cmd, timeout=7200,
                                extra_labels={"kubehost.io/server-id": dst_server_id})
         # 복사 완료 후 대상 서버 재시작
