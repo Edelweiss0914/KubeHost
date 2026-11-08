@@ -49,6 +49,10 @@ class SQLiteServerRepository:
                 conn.execute("ALTER TABLE users ADD COLUMN cf_api_key TEXT")
             except sqlite3.OperationalError:
                 pass  # column already exists
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN cs2_gslt TEXT")
+            except sqlite3.OperationalError:
+                pass  # column already exists
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS invite_codes (
                     id TEXT PRIMARY KEY,
@@ -211,12 +215,13 @@ class SQLiteServerRepository:
 
     # ── User methods ──────────────────────────────────────────────────────────
 
-    _USER_COLS = "id, username, password_hash, is_admin, created_at, cf_api_key"
+    _USER_COLS = "id, username, password_hash, is_admin, created_at, cf_api_key, cs2_gslt"
 
     def _row_to_user(self, row: tuple) -> User:
         return User(id=row[0], username=row[1], password_hash=row[2],
                     is_admin=bool(row[3]), created_at=row[4],
-                    cf_api_key=row[5] if len(row) > 5 else None)
+                    cf_api_key=row[5] if len(row) > 5 else None,
+                    cs2_gslt=row[6] if len(row) > 6 else None)
 
     def get_by_username(self, username: str) -> User | None:
         with self._connect() as conn:
@@ -245,8 +250,8 @@ class SQLiteServerRepository:
     def save_user(self, user: User) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO users (id, username, password_hash, is_admin, created_at, cf_api_key) VALUES (?, ?, ?, ?, ?, ?)",
-                (user.id, user.username, user.password_hash, int(user.is_admin), user.created_at.isoformat(), user.cf_api_key),
+                "INSERT OR REPLACE INTO users (id, username, password_hash, is_admin, created_at, cf_api_key, cs2_gslt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (user.id, user.username, user.password_hash, int(user.is_admin), user.created_at.isoformat(), user.cf_api_key, user.cs2_gslt),
             )
 
     def list_users(self) -> list[User]:

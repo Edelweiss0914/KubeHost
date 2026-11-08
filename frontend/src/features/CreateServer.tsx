@@ -157,7 +157,7 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
                         modrinth_project: null, cf_slug: null,
                         server_password: null, world_name: null, server_public: false,
                         map_name: null, gamemode_name: null,
-                        cs2_workshop_map: null, cs2_workshop_collection: null,
+                        cs2_gslt: null, cs2_workshop_map: null, cs2_workshop_collection: null,
                         ...gameDefaults,
                       }));
                     }}
@@ -288,7 +288,17 @@ export function CreateServer({ nodes, busy, onCreate, onCancel }: CreateServerPr
 
           {input.game === 'cs2' && (
             <div className="full">
-              <h4 style={{ margin: '0 0 12px' }}>CS2 Workshop</h4>
+              <h4 style={{ margin: '0 0 12px' }}>CS2 서버 설정</h4>
+              <label>GSLT 토큰 <small>(권장)</small>
+                <input
+                  value={input.cs2_gslt ?? ''}
+                  onChange={e => set('cs2_gslt', e.target.value || null)}
+                  placeholder="Steam Game Server Login Token"
+                  maxLength={64}
+                />
+                <small>없으면 VAC 없는 insecure 모드로 실행됩니다.</small>
+              </label>
+              <h4 style={{ margin: '16px 0 12px' }}>CS2 Workshop</h4>
               <label>Workshop 맵 ID <small>(선택 사항)</small>
                 <input
                   value={input.cs2_workshop_map ?? ''}

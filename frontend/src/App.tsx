@@ -152,7 +152,7 @@ function SessionExpiredModal({ onRelogin }: { onRelogin: () => void }) {
 
 function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [tab, setTab] = useState<'account' | 'cfkey'>('account');
+  const [tab, setTab] = useState<'account' | 'cfkey' | 'gslt'>('account');
 
   // Account tab
   const [current, setCurrent] = useState('');
@@ -168,9 +168,16 @@ function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
   const [cfSaving, setCfSaving] = useState(false);
   const [cfMsg, setCfMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null);
 
+  // GSLT tab
+  const [gslt, setGslt] = useState<string | null | undefined>(undefined);
+  const [gsltInput, setGsltInput] = useState('');
+  const [gsltSaving, setGsltSaving] = useState(false);
+  const [gsltMsg, setGsltMsg] = useState<{ text: string; type: 'ok' | 'err' } | null>(null);
+
   useEffect(() => { dialogRef.current?.showModal(); }, []);
   useEffect(() => {
     api.getCfKey().then(r => setHasCfKey(r.has_key)).catch(() => setHasCfKey(false));
+    api.getGslt().then(r => setGslt(r.cs2_gslt)).catch(() => setGslt(null));
   }, []);
 
   function handleClick(e: React.MouseEvent<HTMLDialogElement>) {
@@ -220,6 +227,34 @@ function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function saveGslt() {
+    if (!gsltInput.trim()) return;
+    setGsltSaving(true); setGsltMsg(null);
+    try {
+      await api.setGslt(gsltInput.trim());
+      setGslt(gsltInput.trim());
+      setGsltInput('');
+      setGsltMsg({ text: 'GSLT가 저장됐습니다.', type: 'ok' });
+    } catch {
+      setGsltMsg({ text: '저장 실패. 다시 시도해주세요.', type: 'err' });
+    } finally {
+      setGsltSaving(false);
+    }
+  }
+
+  async function deleteGslt() {
+    setGsltSaving(true); setGsltMsg(null);
+    try {
+      await api.setGslt(null);
+      setGslt(null);
+      setGsltMsg({ text: 'GSLT가 삭제됐습니다.', type: 'ok' });
+    } catch {
+      setGsltMsg({ text: '삭제 실패. 다시 시도해주세요.', type: 'err' });
+    } finally {
+      setGsltSaving(false);
+    }
+  }
+
   return (
     <dialog ref={dialogRef} className="settings-dialog" onClick={handleClick} onCancel={onClose}>
       <div className="settings-dialog-inner">
@@ -230,6 +265,7 @@ function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
         <div className="profile-settings-tabs">
           <button className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>계정</button>
           <button className={tab === 'cfkey' ? 'active' : ''} onClick={() => setTab('cfkey')}>CurseForge API 키</button>
+          <button className={tab === 'gslt' ? 'active' : ''} onClick={() => setTab('gslt')}>CS2 GSLT</button>
         </div>
 
         {tab === 'account' && (
@@ -298,6 +334,49 @@ function ProfileSettingsModal({ onClose }: { onClose: () => void }) {
               )}
               <button type="button" onClick={() => void saveCfKey()} disabled={cfSaving || !cfKeyInput.trim()}>
                 {cfSaving ? '저장 중…' : hasCfKey ? '키 변경' : '키 저장'}
+              </button>
+            </div>
+          </div>
+        )}
+        {tab === 'gslt' && (
+          <div style={{ marginTop: '16px' }}>
+            <p className="muted" style={{ marginBottom: '12px', fontSize: '13px' }}>
+              CS2 서버 생성 시 자동으로 사용할 Steam Game Server Login Token입니다.{' '}
+              <a href="https://steamcommunity.com/dev/managegameservers" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                토큰 발급 →
+              </a>
+            </p>
+            <div className="cf-key-status">
+              <span className={`cf-key-badge${gslt ? ' registered' : ''}`}>
+                {gslt === undefined ? '확인 중…' : gslt ? '등록됨' : '미등록'}
+              </span>
+            </div>
+            <div className="form-grid" style={{ marginTop: '12px' }}>
+              <label className="full">{gslt ? 'GSLT 변경' : 'GSLT 등록'}
+                <input
+                  type="password"
+                  value={gsltInput}
+                  onChange={e => setGsltInput(e.target.value)}
+                  placeholder="Steam GSLT 입력"
+                  disabled={gsltSaving}
+                />
+              </label>
+            </div>
+            {gsltMsg && (
+              <div role={gsltMsg.type === 'err' ? 'alert' : 'status'}
+                className={gsltMsg.type === 'err' ? 'error' : 'notice'}
+                style={{ marginTop: '8px' }}>
+                {gsltMsg.text}
+              </div>
+            )}
+            <div className="actions" style={{ marginTop: '12px' }}>
+              {gslt && (
+                <button type="button" className="secondary danger" onClick={() => void deleteGslt()} disabled={gsltSaving}>
+                  {gsltSaving ? '처리 중…' : '토큰 삭제'}
+                </button>
+              )}
+              <button type="button" onClick={() => void saveGslt()} disabled={gsltSaving || !gsltInput.trim()}>
+                {gsltSaving ? '저장 중…' : gslt ? '토큰 변경' : '토큰 저장'}
               </button>
             </div>
           </div>

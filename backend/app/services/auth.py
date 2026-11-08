@@ -125,5 +125,18 @@ class AuthService:
         updated = user.model_copy(update={"cf_api_key": cf_api_key or None})
         self._repo.save_user(updated)  # type: ignore[union-attr]
 
+    def get_gslt(self, user_id: str) -> str | None:
+        user: User | None = self._repo.get_user_by_id(user_id)  # type: ignore[union-attr]
+        if not user:
+            raise ValueError("사용자를 찾을 수 없습니다.")
+        return user.cs2_gslt
+
+    def set_gslt(self, user_id: str, cs2_gslt: str | None) -> None:
+        user: User | None = self._repo.get_user_by_id(user_id)  # type: ignore[union-attr]
+        if not user:
+            raise ValueError("사용자를 찾을 수 없습니다.")
+        updated = user.model_copy(update={"cs2_gslt": cs2_gslt or None})
+        self._repo.save_user(updated)  # type: ignore[union-attr]
+
     def get_user_by_id(self, user_id: str) -> User | None:
         return self._repo.get_user_by_id(user_id)  # type: ignore[union-attr]

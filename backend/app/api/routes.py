@@ -108,12 +108,14 @@ def servers(owner: Owner, svc: Service) -> list[Server]:
 @router.post("/api/v1/servers", response_model=Server, status_code=201)
 def create(payload: ServerCreate, owner: Owner, svc: Service, request: Request) -> Server:
     try:
+        auth_svc = request.app.state.auth_service
+        user = auth_svc.get_user_by_id(owner)
         if payload.game_type == "AUTO_CURSEFORGE":
-            auth_svc = request.app.state.auth_service
-            user = auth_svc.get_user_by_id(owner)
             if not user or not user.cf_api_key:
                 raise InvalidOperation("CurseForge 모드팩을 사용하려면 설정에서 CurseForge API 키를 먼저 등록하세요.")
             payload = payload.model_copy(update={"cf_api_key": user.cf_api_key})
+        if payload.game == "cs2" and not payload.cs2_gslt and user and user.cs2_gslt:
+            payload = payload.model_copy(update={"cs2_gslt": user.cs2_gslt})
         server = svc.create(owner, payload)
         actor_id, actor_name = _actor(request)
         _audit(request, actor_id, actor_name, "server.create", server.id, server.name)
@@ -1096,6 +1098,7 @@ def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, r
     src_ns = src.resource_plan.namespace
 
     # 원본 설정으로 새 서버 생성
+    _clone_user = request.app.state.auth_service.get_user_by_id(owner)
     clone_input = ServerCreate(
         name=body.name,
         game=src.game,  # type: ignore[arg-type]
@@ -1110,6 +1113,7 @@ def clone_server(server_id: str, body: _CloneBody, owner: Owner, svc: Service, r
         server_public=src.server_public,
         map_name=src.map_name,
         gamemode_name=src.gamemode_name,
+        cs2_gslt=_clone_user.cs2_gslt if _clone_user else None,
     )
     try:
         new_server = svc.create(owner, clone_input)
@@ -1313,12 +1317,15 @@ def deploy_template(
     if not name:
         raise HTTPException(status_code=422, detail="서버 이름이 필요합니다.")
 
+    auth_svc = request.app.state.auth_service
+    _deploy_user = auth_svc.get_user_by_id(owner)
     deploy_input = ServerCreate(
         name=name,
         game=template.game,  # type: ignore[arg-type]
         cpu=body.cpu if body.cpu is not None else template.cpu,
         memory_mb=body.memory_mb if body.memory_mb is not None else template.memory_mb,
         storage_gb=body.storage_gb if body.storage_gb is not None else template.storage_gb,
+        cs2_gslt=_deploy_user.cs2_gslt if _deploy_user else None,
     )
     try:
         new_server = svc.create(owner, deploy_input)
@@ -1329,6 +1336,11 @@ def deploy_template(
     if template.template_type == "pvc_clone":
         if not template.source_pvc_name or not template.source_pvc_ns:
             raise HTTPException(status_code=422, detail="소스 PVC 정보가 없습니다.")
+        try:
+            svc.adapter.set_state(new_server.id, new_server.resource_plan.namespace, "stopped",
+                                  sts_name=new_server.resource_plan.sts_name)
+        except Exception:
+            pass
         background_tasks.add_task(
             svc.adapter.clone_pvc,
             src_pvc_name=template.source_pvc_name,

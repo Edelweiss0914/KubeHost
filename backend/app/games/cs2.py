@@ -57,7 +57,7 @@ class CS2(GameDefinition):
         return {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}
 
     def container_command(self) -> list[str]:
-        return ["sh", "-c", "cd /home/steam/cs2-dedicated && exec /home/steam/entry.sh"]
+        return ["sh", "-c", "cd /home/steam/cs2-dedicated && [ -f cs2.sh ] || ln -s game/cs2.sh cs2.sh && exec /home/steam/entry.sh"]
 
     def extra_resources(self, name: str, namespace: str, labels: dict, request) -> list[dict]:
         return [{
@@ -87,6 +87,8 @@ class CS2(GameDefinition):
             {"name": "CS2_GAMETYPE",     "value": "0"},
             {"name": "CS2_GAMEMODE",     "value": "1"},
         ]
+        if getattr(request, "cs2_gslt", None):
+            env.append({"name": "CS2_GSLT", "value": request.cs2_gslt})
         if getattr(request, "cs2_workshop_map", None):
             env.append({"name": "CS2_HOST_WORKSHOP_MAP", "value": request.cs2_workshop_map})
         if getattr(request, "cs2_workshop_collection", None):

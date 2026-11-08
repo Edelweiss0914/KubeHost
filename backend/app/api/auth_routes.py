@@ -138,6 +138,38 @@ def set_cf_key(payload: CfApiKeyRequest, request: Request) -> None:
         raise HTTPException(status_code=401, detail=str(exc))
 
 
+@auth_router.get("/me/gslt")
+def get_gslt(request: Request) -> dict[str, object]:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    token = authorization.removeprefix("Bearer ")
+    svc = _svc(request)
+    try:
+        payload = svc.verify_token(token)
+        return {"cs2_gslt": svc.get_gslt(str(payload["sub"]))}
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
+class GsltRequest(BaseModel):
+    cs2_gslt: str | None = None
+
+
+@auth_router.put("/me/gslt", status_code=204)
+def set_gslt(payload: GsltRequest, request: Request) -> None:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    token = authorization.removeprefix("Bearer ")
+    svc = _svc(request)
+    try:
+        token_payload = svc.verify_token(token)
+        svc.set_gslt(str(token_payload["sub"]), payload.cs2_gslt)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
 @auth_router.put("/password", status_code=204)
 def change_password(payload: ChangePasswordRequest, request: Request) -> None:
     authorization = request.headers.get("Authorization", "")

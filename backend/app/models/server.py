@@ -26,6 +26,7 @@ class ServerCreate(BaseModel):
     map_name: str | None = Field(default=None, max_length=64)
     gamemode_name: str | None = Field(default=None, max_length=32)
     # CS2
+    cs2_gslt: str | None = Field(default=None, max_length=64)
     cs2_workshop_map: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
     cs2_workshop_collection: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
     cpu: float = Field(default=1, ge=0.5, le=4, allow_inf_nan=False)
@@ -110,6 +111,7 @@ class GarrysModSettings(BaseModel):
 
 class CS2Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    cs2_gslt: str | None = Field(default=None, max_length=64)
     cs2_workshop_map: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
     cs2_workshop_collection: str | None = Field(default=None, max_length=32, pattern=r"^\d*$")
 

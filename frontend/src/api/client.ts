@@ -114,6 +114,8 @@ export interface ServerGateway {
   me(): Promise<{id: string; username: string; is_admin: boolean}>;
   getCfKey(): Promise<{has_key: boolean}>;
   setCfKey(key: string | null): Promise<void>;
+  getGslt(): Promise<{cs2_gslt: string | null}>;
+  setGslt(token: string | null): Promise<void>;
   tenant(): Promise<{namespace: string; quota: Record<string, {used: string; hard: string}>}>;
   // Admin
   adminListUsers(): Promise<{id: string; username: string; is_admin: boolean; created_at: string}[]>;
@@ -229,6 +231,8 @@ export const api: ServerGateway = {
   me: () => versioned('/auth/me'),
   getCfKey: () => versioned('/auth/me/cf-key'),
   setCfKey: (key: string | null) => versioned('/auth/me/cf-key', { method: 'PUT', body: JSON.stringify({ cf_api_key: key }) }).then(() => {}),
+  getGslt: () => versioned('/auth/me/gslt'),
+  setGslt: (token: string | null) => versioned('/auth/me/gslt', { method: 'PUT', body: JSON.stringify({ cs2_gslt: token }) }).then(() => {}),
   tenant: () => versioned('/tenant'),
   adminListUsers: () => versioned('/admin/users'),
   adminDeleteUser: (userId) => versioned(`/admin/users/${encodeURIComponent(userId)}`, {method:'DELETE'}),

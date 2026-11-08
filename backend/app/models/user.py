@@ -9,3 +9,4 @@ class User(BaseModel):
     is_admin: bool = False
     created_at: datetime
     cf_api_key: str | None = None
+    cs2_gslt: str | None = None
